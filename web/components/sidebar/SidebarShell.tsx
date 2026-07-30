@@ -21,6 +21,7 @@ import {
   PanelLeftOpen,
   PenLine,
   Settings,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -64,6 +65,12 @@ const PRIMARY_NAV: NavEntry[] = [
     label: "My Agents",
     icon: Bot,
     tooltipKey: "Agents tooltip",
+  },
+  {
+    href: "/annotation",
+    label: "Annotation",
+    icon: Tag,
+    tooltipKey: "Annotation tooltip",
   },
   {
     href: "/co-writer",

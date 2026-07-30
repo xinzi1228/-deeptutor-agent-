@@ -1,0 +1,6 @@
+short_description: "Evaluate annotation quality (bounding box IOU/F1 or classification accuracy) with detailed educational feedback per item."
+when_to_use: "Call this as soon as the user submits their annotation answers. You must provide both the user's predictions and the ground truth you prepared. The tool returns per-item results with teaching tips."
+input_format: "predictions (JSON string of user answers), ground_truth (JSON string of correct answers you prepared), task_type ('bbox' or 'classification')."
+guideline: "1. Present a concrete task to the user (describe a scene with coordinates, or give text items to classify). 2. Prepare the ground truth JSON based on your own task description. 3. When the user submits their answers, call this tool immediately. 4. Read the detailed report back to the user, highlighting specific corrections and teaching tips."
+note: "For bbox: [{\"x\":int,\"y\":int,\"w\":int,\"h\":int,\"label\":\"str\"}]. For classification: [{\"id\":int,\"label\":\"str\"}]. Always prepare ground truth from your own task description before the user answers."
+phase: "verification"

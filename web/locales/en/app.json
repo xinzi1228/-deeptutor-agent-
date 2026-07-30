@@ -2763,5 +2763,10 @@
   "codex.oauth.expired": "Codex sign-in expired. Start it again.",
   "codex.oauth.denied": "Codex authorization was denied.",
   "codex.oauth.requestFailed": "The Codex request failed. Try again.",
-  "codex.oauth.modelCount": "Models: {{count}}"
+  "codex.oauth.modelCount": "Models: {{count}}",
+  "Annotation": "Annotation",
+  "Annotation tooltip": "Data annotation workspace",
+  "annotation.title": "Annotation Workspace",
+  "annotation.subtitle": "Label Studio embedded workspace for data annotation",
+  "annotation.openInNewTab": "Open in new tab"
 }

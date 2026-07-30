@@ -1,0 +1,6 @@
+short_description: "Fetch annotations from a Label Studio project and evaluate quality against ground truth."
+when_to_use: "Use when the user has finished annotating and wants their work checked. Pulls annotations from Label Studio and computes IOU/F1/accuracy."
+input_format: "project_id (integer Label Studio project ID), task_type ('bbox' or 'classification')."
+guideline: "After the user indicates they've completed annotation, call this tool to fetch results and provide quantitative feedback. Present scores clearly and highlight specific areas for improvement."
+note: "Projects must have ground truth predictions set up for comparison. Without ground truth, only the annotation results will be shown without scoring."
+phase: "verification"

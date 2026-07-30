@@ -1,0 +1,6 @@
+short_description: "从Label Studio项目获取标注结果并与标准答案对比评估。"
+when_to_use: "当用户完成标注后需要检查质量时使用。从Label Studio拉取标注结果，计算IOU/F1/准确率。"
+input_format: "project_id（Label Studio项目ID），task_type（bbox或classification）。"
+guideline: "用户标注完成后调用此工具获取结果并提供定量反馈。清晰呈现分数，指出具体需要改进的地方。"
+note: "项目需预先设置标准答案(predictions)才能对比评估。没有标准答案时仅显示标注结果不评分。"
+phase: "verification"

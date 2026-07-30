@@ -2763,5 +2763,10 @@
   "codex.oauth.expired": "Codex 登录已超时，请重新开始。",
   "codex.oauth.denied": "Codex 授权被拒绝。",
   "codex.oauth.requestFailed": "Codex 请求失败，请重试。",
-  "codex.oauth.modelCount": "模型：{{count}}"
+  "codex.oauth.modelCount": "模型：{{count}}",
+  "Annotation": "数据标注",
+  "Annotation tooltip": "数据标注工作台",
+  "annotation.title": "标注工作台",
+  "annotation.subtitle": "内嵌 Label Studio 数据标注工作区",
+  "annotation.openInNewTab": "新窗口打开"
 }

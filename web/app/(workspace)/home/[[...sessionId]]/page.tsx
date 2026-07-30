@@ -923,6 +923,24 @@ export default function ChatPage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Detect pending annotation results from the annotation tool page
+  const annotationAutoSendRef = useRef(false);
+  useEffect(() => {
+    if (annotationAutoSendRef.current) return;
+    if (!state.sessionId) return;
+    if (state.isStreaming) return;
+    try {
+      const pendingMsg = localStorage.getItem("annotation_pending_message");
+      const pendingTime = Number(localStorage.getItem("annotation_pending_time") || "0");
+      if (pendingMsg && Date.now() - pendingTime < 30000) {
+        annotationAutoSendRef.current = true;
+        localStorage.removeItem("annotation_pending_message");
+        localStorage.removeItem("annotation_pending_time");
+        sendMessage(pendingMsg);
+      }
+    } catch {}
+  }, [state.sessionId, state.isStreaming, sendMessage]);
+
   // When URL param changes (sidebar navigation), load the corresponding session
   const prevSessionIdParam = useRef(sessionIdParam);
   useEffect(() => {

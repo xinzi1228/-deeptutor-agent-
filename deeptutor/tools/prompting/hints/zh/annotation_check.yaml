@@ -1,0 +1,6 @@
+short_description: "通过对比预测结果与标准答案来评估标注质量（IOU/F1/准确率）。"
+when_to_use: "当用户完成标注任务后需要定量反馈时使用——支持目标检测框和分类任务。"
+input_format: "predictions（用户标注的JSON字符串），ground_truth（正确答案的JSON字符串），task_type（'bbox'或'classification'），可选的iou_threshold。"
+guideline: "在用户提交标注后调用此工具。清晰地呈现结果——高亮正确匹配，用具体的位置/尺寸反馈解释错误，并将错误与注释指南中的标注原则联系起来。"
+note: "目标检测框格式：[{\"x\":int,\"y\":int,\"w\":int,\"h\":int,\"label\":\"str\"}]。分类格式：[{\"id\":int,\"label\":\"str\"}]。"
+phase: "verification"

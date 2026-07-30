@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标注练习工具</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: system-ui; background:#1a1a2e; color:#eee; display:flex; height:100vh; }
+.sidebar { width:280px; background:#16213e; padding:16px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
+.sidebar h2 { font-size:13px; color:#888; text-transform:uppercase; margin-bottom:2px; }
+.sidebar select, .sidebar button { width:100%; padding:8px; border-radius:6px; border:1px solid #333; background:#0f3460; color:#eee; cursor:pointer; font-size:13px; }
+.sidebar button:hover { background:#1a508b; }
+.sidebar button.primary { background:#2563eb; border-color:#2563eb; }
+.sidebar button.primary:hover { background:#1d4ed8; }
+.sidebar button.coach { background:#7c3aed; border-color:#7c3aed; }
+.sidebar button.coach:hover { background:#6d28d9; }
+.label-btns { display:flex; flex-direction:column; gap:6px; }
+.label-btn { padding:8px 12px; border:2px solid #333; border-radius:6px; background:transparent; color:#ccc; cursor:pointer; text-align:left; font-size:13px; }
+.label-btn.selected { border-color:#4fc3f7; background:rgba(79,195,247,0.15); color:#4fc3f7; }
+.main-area { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; position:relative; }
+canvas { border:1px solid #444; cursor:crosshair; border-radius:8px; max-width:100%; max-height:72vh; }
+.info { margin-top:8px; font-size:12px; color:#888; text-align:center; min-height:20px; }
+.result-panel { width:320px; background:#16213e; padding:16px; overflow-y:auto; display:none; }
+.result-panel.show { display:block; }
+.result-panel h2 { font-size:14px; color:#888; text-transform:uppercase; margin-bottom:10px; }
+.score-card { background:#0f3460; border-radius:10px; padding:14px; margin-bottom:10px; }
+.score-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #1e293b; }
+.score-row:last-child { border:none; }
+.score-label { font-size:12px; color:#94a3b8; }
+.score-value { font-size:20px; font-weight:700; }
+.score-value.good { color:#4ade80; }
+.score-value.warn { color:#fbbf24; }
+.score-value.bad { color:#f87171; }
+.fb-item { padding:8px 10px; border-radius:6px; font-size:12px; margin-bottom:6px; border-left:3px solid; line-height:1.4; }
+.fb-item.correct { background:rgba(74,222,128,0.08); border-color:#4ade80; }
+.fb-item.wrong { background:rgba(248,113,113,0.08); border-color:#f87171; }
+.fb-item.missed { background:rgba(251,191,36,0.08); border-color:#fbbf24; }
+.fb-item.extra { background:rgba(250,204,21,0.08); border-color:#facc15; }
+.fb-item .icon-text { font-size:13px; font-weight:600; }
+.summary { padding:10px; border-radius:8px; font-size:12px; margin-bottom:10px; }
+.summary.good { background:rgba(74,222,128,0.1); border:1px solid #4ade80; }
+.summary.warn { background:rgba(251,191,36,0.1); border:1px solid #fbbf24; }
+.summary.bad { background:rgba(248,113,113,0.1); border:1px solid #f87171; }
+.legend { display:flex; gap:10px; font-size:10px; color:#888; margin-bottom:8px; flex-wrap:wrap; }
+.legend span { display:flex; align-items:center; gap:3px; }
+.legend .dot { width:10px; height:10px; border-radius:2px; display:inline-block; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>选择任务</h2>
+  <select id="taskSelect" onchange="loadTask()">
+    <option value="task1">任务1: 街景找车 (1辆)</option>
+    <option value="task2">任务2: 停车场找车 (4辆)</option>
+    <option value="task3">任务3: 车辆特写 (1辆)</option>
+    <option value="task4">任务4: 找马 (4匹)</option>
+  </select>
+  
+  <h2>选择标签</h2>
+  <div class="label-btns" id="labelBtns"></div>
+  
+  <button class="primary" onclick="checkAnnotation()">检查标注</button>
+  <button onclick="undoBox()">撤销</button>
+  <button onclick="clearBoxes()">清除全部</button>
+  <button class="coach" id="btnCoach" onclick="askCoach()" style="display:none">问Coach：帮我分析</button>
+</div>
+
+<div class="main-area">
+  <canvas id="canvas"></canvas>
+  <div class="info" id="info">在图片上拖动画框，选好标签后点「检查标注」</div>
+</div>
+
+<div class="result-panel" id="resultPanel">
+  <div class="legend">
+    <span><span class="dot" style="background:#4ade80"></span> 匹配</span>
+    <span><span class="dot" style="background:#f87171"></span> 标签错</span>
+    <span><span class="dot" style="background:#fbbf24"></span> 漏标/多余</span>
+  </div>
+  <div id="resultContent"></div>
+</div>
+
+<script>
+const TASKS = {
+  task1: { url:'/images/car2.jpeg', labels:['car'], w:640, h:430, desc:'街景 — 找到车并画框',
+    gt: [{"x":207,"y":140,"w":353,"h":273,"label":"car"}] },
+  task2: { url:'/images/car4.jpeg', labels:['car'], w:1080, h:659, desc:'停车场 — 找到所有车 (多辆)',
+    gt: [{"x":187,"y":351,"w":144,"h":140,"label":"car"},{"x":431,"y":308,"w":89,"h":109,"label":"car"},{"x":664,"y":409,"w":138,"h":137,"label":"car"},{"x":564,"y":141,"w":71,"h":35,"label":"car"}] },
+  task3: { url:'/images/car1.jpeg', labels:['car'], w:2048, h:1536, desc:'车辆特写 — 画出整车轮廓',
+    gt: [{"x":527,"y":52,"w":871,"h":813,"label":"car"}] },
+  task4: { url:'/images/2.jpeg', labels:['horse'], w:720, h:480, desc:'找马',
+    gt: [{"x":0,"y":157,"w":88,"h":116,"label":"horse"},{"x":433,"y":74,"w":181,"h":358,"label":"horse"},{"x":26,"y":121,"w":292,"h":295,"label":"horse"},{"x":313,"y":130,"w":116,"h":291,"label":"horse"}] },
+};
+
+const COLORS = { car:'#E74C3C', horse:'#8E44AD' };
+const LABEL_CN = { car:'车', horse:'马' };
+
+let currentTask = 'task1', selectedLabel = '', boxes = [], drawing = null, start = null, checkResult = null;
+let img = new Image();
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const resultPanel = document.getElementById('resultPanel');
+const resultContent = document.getElementById('resultContent');
+
+function loadTask() {
+  currentTask = document.getElementById('taskSelect').value;
+  const t = TASKS[currentTask];
+  selectedLabel = t.labels[0];
+  boxes = []; checkResult = null;
+  resultPanel.classList.remove('show');
+  document.getElementById('btnCoach').style.display = 'none';
+  renderLabels();
+  img.onload = () => { canvas.width = t.w; canvas.height = t.h; draw(); };
+  img.src = t.url;
+  document.getElementById('info').textContent = t.desc;
+}
+
+function renderLabels() {
+  const t = TASKS[currentTask];
+  document.getElementById('labelBtns').innerHTML = t.labels.map(l => {
+    const c = COLORS[l] || '#888', cn = LABEL_CN[l] || l;
+    return `<button class="label-btn${selectedLabel===l?' selected':''}" onclick="selectLabel('${l}')" style="border-left:4px solid ${c}">${cn} (${l})</button>`;
+  }).join('');
+}
+
+function selectLabel(l) { selectedLabel = l; renderLabels(); }
+
+function calcIOU(a, b) {
+  const ix = Math.max(0, Math.min(a.x+a.w, b.x+b.w) - Math.max(a.x, b.x));
+  const iy = Math.max(0, Math.min(a.y+a.h, b.y+b.h) - Math.max(a.y, b.y));
+  const u = (a.w*a.h) + (b.w*b.h) - ix*iy;
+  return u > 0 ? (ix*iy)/u : 0;
+}
+
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,0,0);
+  
+  // Draw user boxes
+  boxes.forEach(b => {
+    ctx.strokeStyle = COLORS[b.label]||'#888'; ctx.lineWidth = 2;
+    ctx.strokeRect(b.x,b.y,b.w,b.h);
+    ctx.fillStyle = (COLORS[b.label]||'#888')+'15'; ctx.fillRect(b.x,b.y,b.w,b.h);
+  });
+  
+  // Draw GT after check
+  if (checkResult) {
+    checkResult.gt.forEach((gt, gj) => {
+      const matched = checkResult.matchedGt && checkResult.matchedGt.includes(gj);
+      ctx.setLineDash(matched ? [] : [8,4]);
+      ctx.strokeStyle = matched ? '#4ade80' : '#fbbf24';
+      ctx.lineWidth = matched ? 3 : 2.5;
+      ctx.strokeRect(gt.x, gt.y, gt.w, gt.h);
+      ctx.setLineDash([]);
+      if (!matched) {
+        ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 14px system-ui';
+        const txt = '漏标!';
+        ctx.fillText(txt, gt.x+4, gt.y-6);
+      }
+    });
+  }
+  
+  if (drawing) {
+    ctx.strokeStyle = COLORS[selectedLabel]||'#888'; ctx.lineWidth = 3;
+    ctx.strokeRect(drawing.x, drawing.y, drawing.w, drawing.h);
+    ctx.fillStyle = (COLORS[selectedLabel]||'#888')+'20';
+    ctx.fillRect(drawing.x, drawing.y, drawing.w, drawing.h);
+  }
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (checkResult) return;
+  const r = canvas.getBoundingClientRect();
+  start = { x:(e.clientX-r.left)*canvas.width/r.width, y:(e.clientY-r.top)*canvas.height/r.height };
+  drawing = { x:start.x, y:start.y, w:0, h:0 };
+});
+canvas.addEventListener('mousemove', e => {
+  if (!drawing) return;
+  const r = canvas.getBoundingClientRect();
+  const mx = (e.clientX-r.left)*canvas.width/r.width, my = (e.clientY-r.top)*canvas.height/r.height;
+  drawing.x = Math.min(start.x,mx); drawing.y = Math.min(start.y,my);
+  drawing.w = Math.abs(mx-start.x); drawing.h = Math.abs(my-start.y);
+  draw();
+});
+canvas.addEventListener('mouseup', () => {
+  if (!drawing || drawing.w < 8 || drawing.h < 8) { drawing = null; draw(); return; }
+  boxes.push({ x:Math.round(drawing.x), y:Math.round(drawing.y), w:Math.round(drawing.w), h:Math.round(drawing.h), label:selectedLabel });
+  drawing = null; draw();
+});
+
+function undoBox() { boxes.pop(); checkResult = null; draw(); renderResults(); }
+function clearBoxes() { boxes = []; checkResult = null; draw(); renderResults(); }
+
+function checkAnnotation() {
+  if (boxes.length === 0) { alert('请先在图片上画框'); return; }
+  const t = TASKS[currentTask], gt = t.gt;
+  
+  const pairs = [];
+  boxes.forEach((p, pi) => gt.forEach((g, gj) => {
+    if (p.label !== g.label) return;
+    const iou = calcIOU(p, g);
+    if (iou >= 0.5) pairs.push({ iou, pi, gj });
+  }));
+  pairs.sort((a,b) => b.iou - a.iou);
+  
+  const mPred = new Set(), mGt = new Set(), matches = [];
+  pairs.forEach(({iou, pi, gj}) => {
+    if (!mPred.has(pi) && !mGt.has(gj)) { matches.push({ pred_idx:pi, gt_idx:gj, iou }); mPred.add(pi); mGt.add(gj); }
+  });
+  
+  const tp = matches.length, fp = boxes.length - tp, fn = gt.length - tp;
+  const precision = tp / boxes.length || 0, recall = tp / gt.length || 0;
+  const f1 = (2*precision*recall)/(precision+recall) || 0;
+  
+  checkResult = { matches, gt, precision, recall, f1, tp, fp, fn, matchedPred: [...mPred], matchedGt: [...mGt] };
+  draw();
+  renderResults();
+  document.getElementById('btnCoach').style.display = 'block';
+}
+
+function positionHint(x, y) {
+  // Make coordinates human-readable
+  const cw = canvas.width, ch = canvas.height;
+  let hPos = x < cw/3 ? '左侧' : x > 2*cw/3 ? '右侧' : '中央';
+  let vPos = y < ch/3 ? '上部' : y > 2*ch/3 ? '下部' : '中部';
+  return `${vPos}${hPos}`;
+}
+
+function renderResults() {
+  if (!checkResult) { resultPanel.classList.remove('show'); return; }
+  resultPanel.classList.add('show');
+  
+  const r = checkResult, t = TASKS[currentTask];
+  const f1c = r.f1 >= 0.7 ? 'good' : r.f1 >= 0.4 ? 'warn' : 'bad';
+  const pc = r.precision >= 0.7 ? 'good' : r.precision >= 0.4 ? 'warn' : 'bad';
+  const rc = r.recall >= 0.7 ? 'good' : r.recall >= 0.4 ? 'warn' : 'bad';
+  const sc = r.f1 >= 0.7 ? 'good' : r.f1 >= 0.4 ? 'warn' : 'bad';
+  const msg = r.f1 >= 0.7 ? '标注质量不错！可以试试更难的题。' : r.f1 >= 0.4 ? '还需要改进，注意漏掉的目标。' : '偏差较大，建议仔细重新标注。';
+  
+  let html = `
+    <div class="score-card">
+      <div class="score-row"><span class="score-label">精确率 Precision</span><span class="score-value ${pc}">${(r.precision*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">召回率 Recall</span><span class="score-value ${rc}">${(r.recall*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">F1 分数</span><span class="score-value ${f1c}">${(r.f1*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">正确 / 应标</span><span style="font-size:15px;color:#e2e8f0">${r.tp} / ${r.gt.length}</span></div>
+    </div>
+    <div class="summary ${sc}">${msg}</div>`;
+  
+  const mps = new Set(r.matchedPred || []), mgs = new Set(r.matchedGt || []);
+  
+  r.matches.forEach(m => {
+    const pred = boxes[m.pred_idx];
+    const cn = LABEL_CN[pred.label] || pred.label;
+    html += `<div class="fb-item correct"><span class="icon-text">匹配: ${cn}</span> — IOU=${m.iou.toFixed(2)}</div>`;
+  });
+  
+  boxes.forEach((pred, pi) => {
+    if (mps.has(pi)) return;
+    const bestMatch = r.gt.find(g => calcIOU(pred, g) >= 0.5);
+    const cn = LABEL_CN[pred.label] || pred.label;
+    if (bestMatch) {
+      const bcn = LABEL_CN[bestMatch.label] || bestMatch.label;
+      html += `<div class="fb-item wrong"><span class="icon-text">标签错了:</span> 你标了「${cn}」，实际应该是「${bcn}」。位置是对的，改下标签就行。</div>`;
+    } else {
+      html += `<div class="fb-item extra"><span class="icon-text">多余框:</span> 你画的「${cn}」在图上没有对应目标。图上黄色虚线框标出了你漏掉的目标。</div>`;
+    }
+  });
+  
+  r.gt.forEach((g, gj) => {
+    if (mgs.has(gj)) return;
+    const cn = LABEL_CN[g.label] || g.label;
+    const hint = positionHint(g.x, g.y);
+    html += `<div class="fb-item missed"><span class="icon-text">漏标:</span> 图片${hint}有一个「${cn}」你没标出来。看图上黄色虚线框的位置。</div>`;
+  });
+  
+  resultContent.innerHTML = html;
+}
+
+// ── Ask Coach ──
+function askCoach() {
+  if (!checkResult) return;
+  const t = TASKS[currentTask];
+  
+  // Build a structured message for the Coach
+  const pct = (checkResult.f1 * 100).toFixed(0);
+  const pText = checkResult.f1 >= 0.7 ? '不错' : checkResult.f1 >= 0.4 ? '一般' : '需要改进';
+  
+  const msg = `我刚完成了「${t.desc.split('—')[0]}」标注练习：
+- 精确率: ${(checkResult.precision*100).toFixed(0)}%
+- 召回率: ${(checkResult.recall*100).toFixed(0)}%  
+- F1分数: ${pct}% (${pText})
+- 正确: ${checkResult.tp}/${checkResult.gt.length}
+- 我画的框: ${JSON.stringify(boxes)}
+请帮我分析一下哪里需要改进，推荐下一步学什么。`;
+  
+  // Save to localStorage for the chat page to read
+  localStorage.setItem('annotation_last_result', JSON.stringify({
+    taskId: currentTask,
+    taskTitle: t.desc,
+    f1: checkResult.f1,
+    precision: checkResult.precision,
+    recall: checkResult.recall,
+    tp: checkResult.tp,
+    total: checkResult.gt.length,
+    boxes: boxes,
+    message: msg,
+    time: Date.now()
+  }));
+  
+  // Also save the message separately for easy sending
+  localStorage.setItem('annotation_pending_message', msg);
+  localStorage.setItem('annotation_pending_time', String(Date.now()));
+  
+  // Navigate to chat
+  try {
+    window.parent.location.href = '/home';
+  } catch(e) {
+    window.top.location.href = '/home';
+  }
+}
+
+// 检测是否从chat切回来时带有上一次的结果
+function checkStoredResult() {
+  const stored = localStorage.getItem('annotation_last_result');
+  if (stored) {
+    document.getElementById('btnCoach').style.display = 'block';
+    document.getElementById('info').textContent = '上次检查有结果，点「问Coach」让AI帮你分析';
+  }
+}
+
+loadTask();
+checkStoredResult();
+</script>
+</body>
+</html>

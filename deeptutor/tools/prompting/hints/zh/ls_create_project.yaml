@@ -1,0 +1,6 @@
+short_description: "在Label Studio中创建标注项目，设置标签和任务类型。"
+when_to_use: "当用户想开始新的标注练习，需要创建Label Studio项目时使用。"
+input_format: "title（项目名称），labels（标签JSON数组），task_type（bbox或classification），可选description。"
+guideline: "在用户开始标注之前调用此工具准备标注工作区。工具返回项目URL供用户打开开始标注。"
+note: "需要Label Studio运行在http://localhost:8080，且设置LABEL_STUDIO_API_TOKEN环境变量。"
+phase: "setup"

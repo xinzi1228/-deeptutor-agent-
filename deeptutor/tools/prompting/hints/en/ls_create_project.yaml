@@ -1,0 +1,6 @@
+short_description: "Create a new annotation project in Label Studio with specified labels and task type."
+when_to_use: "Use when the user wants to start a new annotation practice session and needs a Label Studio project set up with the correct labels."
+input_format: "title (project name), labels (JSON array like '[\"cat\",\"dog\"]'), task_type ('bbox' or 'classification'), optional description."
+guideline: "Call this tool to prepare the annotation workspace before the user starts labeling. The tool returns a project URL that the user can open to begin annotating."
+note: "The user must have Label Studio running at http://localhost:8080 and the LABEL_STUDIO_API_TOKEN environment variable set."
+phase: "setup"
