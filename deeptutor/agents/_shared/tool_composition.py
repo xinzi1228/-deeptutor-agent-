@@ -200,6 +200,7 @@ def compose_enabled_tools(
         "write_learning_record",
         "generate_iou_demo",
         "log_decision",
+        "evaluate_teaching_plan",
     ):
         if _builtin_allowed(always_on):
             composed.append(always_on)

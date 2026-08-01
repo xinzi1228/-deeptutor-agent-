@@ -151,6 +151,14 @@ Zero-Base → 跳过测验。"不需要测验——从最基础的开始。"
 
   自检不过 → 先调整路线, 再展示给学生。
 
+对抗性评估 (TradingAgents 多角色辩论) ◀── 多概念模块必做:
+  调 evaluate_teaching_plan
+    plan = 模块概念序列 + 任务 + 目标 + 教学模式
+    student_profile = 诊断水平 + 已知 + 目标
+  → 独立评估员 LLM 质疑认知负荷/ZPD/理论实践比/动机/评估手段
+  → 根据质疑点修正方案后再展示
+  → 评估写入决策审计 (route_choice)
+
 按 course-designer 模块化展示 (4模块):
 
 "你的学习路线:

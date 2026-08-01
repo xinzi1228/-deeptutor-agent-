@@ -209,6 +209,11 @@ write_memory JSON (15+ 字段, synapse 四维模型)
 模块完成 → 生成学习参考 (teach skill):
   核心概念 + 练习成绩 + 薄弱点 + 下次继续口令
 
+模块完成 → 对抗性评估下一模块方案 (TradingAgents):
+  调 evaluate_teaching_plan 审查下一模块的概念/任务/目标
+  → 独立评估员质疑 → 修正后再推进
+  不评估单知识点, 只评估跨概念模块
+
 展示 Mini进度图
 ```
 
