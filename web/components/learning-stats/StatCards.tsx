@@ -1,13 +1,14 @@
 "use client";
 
-import { Target, BarChart3, BookOpen, Flag } from "lucide-react";
-import type { ProfileOverview } from "@/lib/learning-stats-api";
+import { Target, BarChart3, BookOpen, Flag, Eye } from "lucide-react";
+import type { ProfileOverview, ForesightStats } from "@/lib/learning-stats-api";
 
 interface StatCardsProps {
   overview: ProfileOverview | null;
+  foresight?: ForesightStats | null;
 }
 
-export function StatCards({ overview }: StatCardsProps) {
+export function StatCards({ overview, foresight }: StatCardsProps) {
   if (!overview) return null;
 
   const cards = [
@@ -41,8 +42,17 @@ export function StatCards({ overview }: StatCardsProps) {
     },
   ];
 
+  if (foresight && (foresight.total > 0 || foresight.verified > 0)) {
+    cards.push({
+      icon: Eye,
+      label: "预测命中率",
+      value: foresight.hit_rate != null ? `${Math.round(foresight.hit_rate * 100)}%` : "—",
+      sub: `${foresight.hits}/${foresight.verified} 已验证, ${foresight.open} 待验证`,
+    });
+  }
+
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       {cards.map((card) => (
         <div
           key={card.label}

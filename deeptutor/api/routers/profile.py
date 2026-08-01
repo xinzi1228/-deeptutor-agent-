@@ -127,3 +127,28 @@ async def reflect() -> dict[str, Any]:
         pass
 
     return {"reflect": result}
+
+
+@router.get("/episodes")
+async def episodes(days: int = 14) -> dict[str, Any]:
+    """Learning records grouped into daily episodes (EverOS timeline)."""
+    from deeptutor.services.learning_records import LearningRecordStore
+
+    rows = LearningRecordStore().episodes(days=max(1, min(days, 90)))
+    return {"episodes": rows}
+
+
+@router.get("/foresights")
+async def foresights() -> dict[str, Any]:
+    """Foresight prediction statistics (hit rate of coach predictions)."""
+    from deeptutor.services.learning_records import LearningStats
+
+    return LearningStats().foresight_stats()
+
+
+@router.get("/facts")
+async def facts() -> dict[str, Any]:
+    """Atomic facts: knowledge points evidenced as mastered (EverOS atomic_facts)."""
+    from deeptutor.services.learning_records import LearningRecordStore
+
+    return LearningRecordStore().facts()

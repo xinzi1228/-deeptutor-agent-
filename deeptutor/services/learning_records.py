@@ -372,6 +372,84 @@ class LearningRecordStore:
         self._write_all(records)
         return target
 
+    # ── episodes (EverOS: daily-log grouping for a timeline view) ──────────
+
+    def episodes(self, days: int = 14) -> list[dict[str, Any]]:
+        """Group active records into daily episodes, newest first.
+
+        Returns ``[{"date": "YYYY-MM-DD", "records": [...], "count": n}, ...]``
+        with one entry per day that has at least one record.
+        """
+        from datetime import date as _date
+
+        by_day: dict[str, list[dict[str, Any]]] = {}
+        for r in self.list_records():  # active only
+            day = (r.get("timestamp") or "")[:10]
+            if not day:
+                continue
+            by_day.setdefault(day, []).append(r)
+
+        episodes = []
+        for day in sorted(by_day.keys(), reverse=True):
+            group = by_day[day]
+            episodes.append(
+                {"date": day, "records": group, "count": len(group)}
+            )
+            if len(episodes) >= days:
+                break
+        return episodes
+
+    # ── atomic facts (EverOS: standalone mastered-fact layer) ──────────────
+
+    def _fact_file(self) -> Path:
+        return self._root / "facts.jsonl"
+
+    def list_facts(self) -> list[dict[str, Any]]:
+        path = self._fact_file()
+        if not path.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                    if isinstance(row, dict):
+                        rows.append(row)
+                except json.JSONDecodeError:
+                    continue
+        return rows
+
+    def facts(self) -> dict[str, Any]:
+        """Derive atomic facts from active records (EverOS atomic_facts).
+
+        A fact is one ``knowledge_point`` that the learner has evidenced as
+        mastered (practice F1 ≥ 0.7 OR theory readiness advance). Returning
+        the derived set is enough for the skill tree / dashboard; we do not
+        duplicate storage — the records are the source of truth.
+        """
+        mastered: dict[str, str] = {}
+        for e in [
+            r for r in self.list_records(scope="progress")
+            if r.get("type") == "annotation_exercise"
+        ]:
+            if float(e.get("f1") or 0) >= 0.7:
+                for kp in (e.get("knowledge_points") or []):
+                    mastered[kp] = "practice"
+        for e in [
+            r for r in self.list_records(scope="progress")
+            if r.get("type") == "theory_mastered"
+        ]:
+            if e.get("readiness") in ("advance", "advance_with_caution") and e.get("knowledge_point"):
+                mastered[e["knowledge_point"]] = "theory"
+        facts = [
+            {"knowledge_point": kp, "evidence": src}
+            for kp, src in sorted(mastered.items())
+        ]
+        return {"facts": facts, "count": len(facts)}
+
     async def _mirror_recent_summary(self, record: dict[str, Any]) -> None:
         """Append a one-line human summary to L3 recent.md for ``read_memory``."""
         summary = _summary_line(record)
@@ -577,6 +655,20 @@ class LearningStats:
             return result
 
         return {"tree": _build(tree)}
+
+    def foresight_stats(self) -> dict[str, Any]:
+        """Verified-foresight summary: how often the coach's predictions hold."""
+        records = self._store.list_records(include_archived=False)
+        with_foresight = [r for r in records if r.get("foresight")]
+        verified = [r for r in with_foresight if r.get("foresight_verified")]
+        hits = [r for r in verified if r.get("foresight_hit")]
+        return {
+            "total": len(with_foresight),
+            "verified": len(verified),
+            "hits": len(hits),
+            "hit_rate": round(len(hits) / len(verified), 2) if verified else None,
+            "open": len(with_foresight) - len(verified),
+        }
 
 
 __all__ = [

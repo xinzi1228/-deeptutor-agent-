@@ -69,6 +69,20 @@ export interface TeachingEvaluation {
   timestamp?: string;
 }
 
+export interface Episode {
+  date: string;
+  count: number;
+  records: Record<string, any>[];
+}
+
+export interface ForesightStats {
+  total: number;
+  verified: number;
+  hits: number;
+  hit_rate: number | null;
+  open: number;
+}
+
 async function fetchJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API ${url} returned ${res.status}`);
@@ -101,6 +115,14 @@ export function getEvaluations(): Promise<{ evaluations: TeachingEvaluation[] }>
 
 export function getCoursePlan(): Promise<{ plan: CoursePlan }> {
   return fetchJSON(`${API_BASE}/course-plan`);
+}
+
+export function getEpisodes(): Promise<{ episodes: Episode[] }> {
+  return fetchJSON(`${API_BASE}/episodes`);
+}
+
+export function getForesightStats(): Promise<ForesightStats> {
+  return fetchJSON(`${API_BASE}/foresights`);
 }
 
 export async function reflectMemory(): Promise<{ reflect: { clusters_merged: number; records_archived: number; active_records: number } }> {

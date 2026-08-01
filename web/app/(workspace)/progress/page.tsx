@@ -10,6 +10,8 @@ import {
   getDecisions,
   getEvaluations,
   getCoursePlan,
+  getEpisodes,
+  getForesightStats,
   reflectMemory,
   type ProfileOverview,
   type RadarDimension,
@@ -18,6 +20,8 @@ import {
   type DecisionLog,
   type CoursePlan,
   type TeachingEvaluation,
+  type Episode,
+  type ForesightStats,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
 import { RadarChart } from "@/components/learning-stats/RadarChart";
@@ -25,6 +29,7 @@ import { F1Curve } from "@/components/learning-stats/F1Curve";
 import { SkillTree } from "@/components/learning-stats/SkillTree";
 import { DecisionLog as DecisionLogPanel } from "@/components/learning-stats/DecisionLog";
 import { EvaluationPanel } from "@/components/learning-stats/EvaluationPanel";
+import { Timeline } from "@/components/learning-stats/Timeline";
 
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
@@ -36,12 +41,14 @@ export default function ProgressPage() {
   const [decisions, setDecisions] = useState<DecisionLog[]>([]);
   const [evaluations, setEvaluations] = useState<TeachingEvaluation[]>([]);
   const [coursePlan, setCoursePlan] = useState<CoursePlan | null>(null);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [foresight, setForesight] = useState<ForesightStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, radar, f1, tree, dec, ev, plan] = await Promise.all([
+        const [ov, radar, f1, tree, dec, ev, plan, ep, fs] = await Promise.all([
           getLearningOverview(),
           getRadarDimensions(),
           getF1Trend(),
@@ -49,6 +56,8 @@ export default function ProgressPage() {
           getDecisions(),
           getEvaluations(),
           getCoursePlan().catch(() => ({ plan: null as any })),
+          getEpisodes(),
+          getForesightStats(),
         ]);
         if (cancelled) return;
         setOverview(ov.overview);
@@ -58,6 +67,8 @@ export default function ProgressPage() {
         setDecisions(dec.decisions);
         setEvaluations(ev.evaluations);
         setCoursePlan(plan.plan || null);
+        setEpisodes(ep.episodes);
+        setForesight(fs);
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load");
       } finally {
@@ -111,7 +122,7 @@ export default function ProgressPage() {
         </button>
       </div>
 
-      <StatCards overview={overview} />
+      <StatCards overview={overview} foresight={foresight} />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-3 lg:col-span-3">
@@ -152,6 +163,8 @@ export default function ProgressPage() {
       </div>
 
       <EvaluationPanel evaluations={evaluations} />
+
+      <Timeline episodes={episodes} />
     </div>
   );
 }

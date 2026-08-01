@@ -94,6 +94,19 @@ _TOOLS = [
         {"limit": {"type": "integer", "description": "返回条数, 默认 10"}},
     ),
     _tool(
+        "get_atomic_facts",
+        "原子事实: 已被证据确认掌握的知识点列表。",
+    ),
+    _tool(
+        "get_foresight_stats",
+        "预测命中率统计 (Coach 预测有多少命中)。",
+    ),
+    _tool(
+        "get_episodes",
+        "按日分组的学习记录时间线。",
+        {"days": {"type": "integer", "description": "返回天数, 默认 14"}},
+    ),
+    _tool(
         "get_annotation_task",
         "获取标注练习任务",
         {"task_id": {"type": "string", "description": "task1-task9"}},
@@ -150,6 +163,13 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
         if name == "get_teaching_evaluations":
             limit = int(args.get("limit") or 10)
             return _json_text(_store().list_evaluations(limit=limit))
+        if name == "get_atomic_facts":
+            return _json_text(_store().facts())
+        if name == "get_foresight_stats":
+            return _json_text(_stats().foresight_stats())
+        if name == "get_episodes":
+            days = int(args.get("days") or 14)
+            return _json_text({"episodes": _store().episodes(days=days)})
         if name == "get_annotation_task":
             from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 
