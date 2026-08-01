@@ -139,8 +139,76 @@ class KnowledgeGraphStore:
             return None
         return data if isinstance(data, dict) else None
 
+    # ------------------------------------------------------------ incremental
+
+    def incremental_update(
+        self, record: dict, *, tree: dict | None = None, bank: dict | None = None
+    ) -> dict:
+        """Update the persisted graph with one learning record (idempotent).
+
+        If no graph file exists yet, a minimal graph is built from the ontology
+        (default tree/bank loaders) plus this record.
+        """
+        from deeptutor.services.learning_records import LearningRecordStore
+
+        edge_type = _classify(record)
+        if edge_type is None:
+            return self.get() or {}
+
+        graph = self.get()
+        if graph is None:
+            if tree is None:
+                tree = _load_competency_tree()
+            if bank is None:
+                bank = _load_bank()
+            records = LearningRecordStore().list_records()
+            graph = self.build(tree=tree, bank=bank, records=records)
+
+        target = _resolve_target(record, _unwrap_tree(tree) if tree is not None else {}, graph)
+        if target is None:
+            return graph
+
+        learner_id = "learner:default"
+        edges = graph.setdefault("edges", [])
+        # drop any prior mastered/struggling edge on this target (reclassification)
+        edges = [
+            e
+            for e in edges
+            if not (
+                e.get("source") == learner_id
+                and e.get("type") in ("mastered", "struggling")
+                and e.get("target") == target
+            )
+        ]
+        edge = {
+            "source": learner_id,
+            "type": edge_type,
+            "target": target,
+            "evidence": record.get("type", "practice"),
+            "ts": record.get("timestamp", ""),
+        }
+        if record.get("f1") is not None:
+            edge["f1"] = record["f1"]
+        edges.append(edge)
+        graph["edges"] = edges
+        graph["built_at"] = record.get("timestamp") or graph.get("built_at")
+        self.save(graph)
+        return graph
+
 
 # --------------------------------------------------------------- helpers
+
+def _load_competency_tree() -> dict:
+    from deeptutor.tools.competency_tool import _load_competency_tree as _load
+
+    return _load()
+
+
+def _load_bank() -> dict:
+    from deeptutor.tools.task_bank_tool import _load_bank as _load
+
+    return _load() or {}
+
 
 def _iter_task_groups(tree: dict):
     for group in tree.get("children", []):
@@ -188,6 +256,35 @@ def _record_target(rec: dict, tree: dict) -> str | None:
         skill_id = _find_skill_id_by_name(tree, kp)
         if skill_id:
             return skill_id
+        return kp
+    task_id = rec.get("task_id")
+    if task_id:
+        return task_id
+    return None
+
+
+def _unwrap_tree(tree: dict) -> dict:
+    if isinstance(tree, dict) and "tree" in tree:
+        return tree["tree"]
+    return tree
+
+
+def _resolve_target(rec: dict, tree: dict, graph: dict | None) -> str | None:
+    """Resolve a record to a trace-edge target — skill ID when possible.
+
+    Prefers the competency tree, then falls back to the graph's own Skill
+    nodes (so an existing graph can be incrementally updated without
+    re-loading the tree), then to the raw knowledge_point / task_id name.
+    """
+    kp = rec.get("knowledge_point")
+    if kp:
+        skill_id = _find_skill_id_by_name(tree, kp)
+        if skill_id:
+            return skill_id
+        if graph:
+            for node_id, node in graph.get("nodes", {}).items():
+                if node.get("type") == "Skill" and node.get("name") == kp:
+                    return node_id
         return kp
     task_id = rec.get("task_id")
     if task_id:

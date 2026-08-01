@@ -263,3 +263,64 @@ def test_get_corrupt_returns_none(tmp_path) -> None:
     store._file.parent.mkdir(parents=True, exist_ok=True)
     store._file.write_bytes(b"not json")
     assert store.get() is None
+
+
+# ------------------------------------------------------------- incremental
+
+
+def test_incremental_update_no_duplicate(tmp_path) -> None:
+    store = KnowledgeGraphStore(root=tmp_path)
+    store.save(KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=SAMPLE_BANK, records=SAMPLE_RECORDS))
+
+    record = {
+        "type": "annotation_exercise",
+        "task_id": "task2",
+        "knowledge_point": "遮挡目标处理",
+        "f1": 0.9,
+        "readiness": "advance",
+        "timestamp": "2026-08-01T00:00:00+00:00",
+    }
+    store.incremental_update(record)
+    g1 = store.incremental_update(record)  # same record twice → idempotent
+    edges = [(e["source"], e["type"], e["target"]) for e in g1["edges"]]
+    mastered_targets = [(s, t) for (s, typ, t) in edges if typ == "mastered" and s == "learner:default"]
+    assert mastered_targets.count(("learner:default", "skill-1-1-2")) == 1
+
+
+def test_incremental_update_reclassifies_skill(tmp_path) -> None:
+    store = KnowledgeGraphStore(root=tmp_path)
+    store.save(KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=SAMPLE_BANK, records=SAMPLE_RECORDS))
+    # 遮挡目标处理 was struggling (f1=0.65); now f1=0.9 → mastered, struggling must disappear
+    store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "task_id": "task2",
+            "knowledge_point": "遮挡目标处理",
+            "f1": 0.9,
+            "readiness": "advance",
+            "timestamp": "2026-08-02T00:00:00+00:00",
+        }
+    )
+    g = store.get()
+    edges = [(e["source"], e["type"], e["target"]) for e in g["edges"]]
+    assert ("learner:default", "mastered", "skill-1-1-2") in edges
+    assert ("learner:default", "struggling", "skill-1-1-2") not in edges
+
+
+def test_incremental_update_no_graph_builds_from_records(tmp_path) -> None:
+    store = KnowledgeGraphStore(root=tmp_path)
+    # no graph file exists; record targets a skill — resolve via explicit ontology
+    store.incremental_update(
+        {
+            "type": "theory_mastered",
+            "knowledge_point": "遮挡目标处理",
+            "readiness": "advance",
+            "timestamp": "2026-08-03T00:00:00+00:00",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+    )
+    g = store.get()
+    assert g is not None
+    edges = [(e["source"], e["type"], e["target"]) for e in g["edges"]]
+    assert ("learner:default", "mastered", "skill-1-1-2") in edges
