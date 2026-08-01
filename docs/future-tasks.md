@@ -144,3 +144,25 @@ Phase1 每个模块的最后一个知识点 readiness=advance 时 → 触发 les
 - `deeptutor/services/persona/presets/annotation-coach/PERSONA.md` — 技能注册表
 - `deeptutor/services/persona/presets/annotation-coach/references/flow-theory.md` — 用法标注
 - `docs/skills-inventory.md` — 完整 skill 清单
+
+---
+
+## 已完成: 学习者知识图谱 (cognee 借鉴)
+
+> 设计: docs/specs/knowledge-graph-design.md | 计划: docs/specs/knowledge-graph-implementation-plan.md
+
+### 已实现
+- KnowledgeGraphStore (build/incremental_update/get/save) — 派生索引, JSONL 唯一 truth
+- GraphQueryService (risk_path/concepts/mastery) — 确定性图查询
+- GraphQueryTool (graph_query) — 第 12 个 always-on 教学工具 + LLM 解释层 (失败降级)
+- write_learning_record 落盘后自动增量更新图谱
+- MCP 暴露 get_knowledge_graph / query_risk_path
+
+### 从"不做"移除的待办 (YAGNI 暂缓, 数据积累后可做)
+- 错误模式关联查询 (需 ≥2 次 confirmed 错误数据积累)
+- REST API + 前端图谱风险面板 (个人中心已有 skill_tree/radar, 图谱面板锦上添花)
+- 引入 cognee 库 (当前轻量方案足够; 若图查询复杂度超限再评估)
+
+### 潜在增强 (未来)
+- risk_path 的 LLM 解释可接入更丰富上下文 (历史错误模式)
+- 图谱节点可增加"练习次数"维度
