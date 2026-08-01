@@ -65,7 +65,10 @@ class GetAnnotationTaskTool(BaseTool):
                 f"- predictions: 用户提交的 JSON\n"
                 f"- ground_truth: {gt_json}\n"
                 f"- task_type: bbox\n\n"
-                f"完成后续推荐: {task.get('next_task','请根据F1分数决定')}"
+                f"完成后续推荐: {task.get('next_task','请根据F1分数决定')}\n\n"
+                f"---\n"
+                f"[必做] 展示任务后调用 `log_decision` 记录推荐理由 "
+                f"(kind=task_recommendation, target={tid}, 依据 readiness)。"
             )
         else:
             items_text = "\n".join(f"  {i['id']}. {i['text']}" for i in task.get("items", []))

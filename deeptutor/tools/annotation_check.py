@@ -260,6 +260,15 @@ class AnnotationCheckTool(BaseTool):
         else:
             content = _bbox_report(predictions, ground_truth)
 
+        # 落盘保障 (回归发现: Coach 多轮对话中会漏记录): 评测后必须写学习记录
+        content += (
+            "\n\n---\n"
+            "[必做] 请立即调用 `write_learning_record` 记录本次练习: "
+            "type=annotation_exercise, 带上 f1/precision/recall/readiness/knowledge_points, "
+            "并调用 `log_decision` 记录推进判定依据。然后 `write_learning_record` 中附带 "
+            "foresight 预测学生下一步。"
+        )
+
         return ToolResult(content=content)
 
     def get_prompt_hints(self, language: str = "en") -> Any:
