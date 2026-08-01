@@ -11,10 +11,13 @@ resume from the last checkpoint on the next conversation.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
 from deeptutor.tools.prompting import load_prompt_hints
+
+logger = logging.getLogger(__name__)
 
 
 class WriteLearningRecordTool(BaseTool):
@@ -88,9 +91,9 @@ class WriteLearningRecordTool(BaseTool):
             from deeptutor.services.knowledge_graph import KnowledgeGraphStore
 
             KnowledgeGraphStore().incremental_update(persisted)
-        except Exception:
+        except Exception as exc:
             # graph is a derived index — failure must not break record persistence
-            pass
+            logger.warning("graph incremental_update failed for record: %s", exc)
 
         kind = persisted.get("type")
         return ToolResult(
