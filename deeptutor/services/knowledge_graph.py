@@ -33,6 +33,7 @@ class KnowledgeGraphStore:
     @staticmethod
     def build(*, tree: dict, bank: dict, records: list[dict]) -> dict:
         """Deterministic full rebuild from ontology + records. Pure function."""
+        tree = tree or {}
         nodes: dict[str, dict] = {}
         edges: list[dict] = []
         learner_id = "learner:default"
@@ -68,26 +69,35 @@ class KnowledgeGraphStore:
                 skill_id = _find_skill_id_by_name(tree, kp)
                 if skill_id:
                     edges.append({"source": task_id, "type": "requires", "target": skill_id})
-            edges.append(
-                {"source": task_id, "type": "belongs_to", "target": _task_group_for(tree, task)}
-            )
+            group_id = _task_group_for(tree, task)
+            if group_id is not None:
+                edges.append({"source": task_id, "type": "belongs_to", "target": group_id})
 
         # --- learner node ---
         nodes.setdefault(learner_id, {"type": "Learner", "name": "当前学习者"})
 
         # --- learning traces (mastered / struggling) ---
-        seen: set[tuple[str, str]] = set()
-        for rec in records:
+        latest: dict[str, tuple[tuple[str, int], str, dict]] = {}
+        for idx, rec in enumerate(records):
             target = _record_target(rec, tree)
             if not target:
                 continue
             edge_type = _classify(rec)
             if edge_type is None:
                 continue
-            key = (edge_type, target)
-            if key in seen:
+            key = (rec.get("timestamp", ""), idx)
+            if target not in latest or key >= latest[target][0]:
+                latest[target] = (key, edge_type, rec)
+
+        for idx, rec in enumerate(records):
+            target = _record_target(rec, tree)
+            if not target:
                 continue
-            seen.add(key)
+            edge_type = _classify(rec)
+            if edge_type is None:
+                continue
+            if latest[target][0] != (rec.get("timestamp", ""), idx):
+                continue
             edge = {
                 "source": learner_id,
                 "type": edge_type,
@@ -124,9 +134,10 @@ class KnowledgeGraphStore:
         if not self._file.exists():
             return None
         try:
-            return json.loads(self._file.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+            data = json.loads(self._file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             return None
+        return data if isinstance(data, dict) else None
 
 
 # --------------------------------------------------------------- helpers
@@ -150,7 +161,7 @@ def _find_skill_id_by_name(tree: dict, name: str) -> str | None:
     return None
 
 
-def _task_group_for(tree: dict, task: dict) -> str:
+def _task_group_for(tree: dict, task: dict) -> str | None:
     """Resolve a bank task to its competency-tree group via its knowledge points."""
     for kp in task.get("knowledge_points", []) or []:
         skill_id = _find_skill_id_by_name(tree, kp)
@@ -158,7 +169,7 @@ def _task_group_for(tree: dict, task: dict) -> str:
             group = _group_for_skill(tree, skill_id)
             if group is not None:
                 return group
-    return "unknown"
+    return None
 
 
 def _group_for_skill(tree: dict, skill_id: str) -> str | None:
@@ -196,10 +207,11 @@ def _classify(rec: dict) -> str | None:
         try:
             f1v = float(f1)
         except (TypeError, ValueError):
-            f1v = 0.0
-        if f1v >= MASTERED_F1:
-            return "mastered"
-        return "struggling"
+            f1v = None
+        if f1v is not None:
+            if f1v >= MASTERED_F1:
+                return "mastered"
+            return "struggling"
     readiness = rec.get("readiness")
     if readiness in ADVANCE_READINESS:
         return "mastered"
