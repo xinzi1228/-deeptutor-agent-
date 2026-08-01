@@ -450,6 +450,57 @@ class LearningRecordStore:
         ]
         return {"facts": facts, "count": len(facts)}
 
+
+class TeachingChangelog:
+    """Versioned record of coach-flow improvements (Self-Improving loop).
+
+    Each entry captures ONE applied fix to a teaching flow file: the target
+    file/section, what changed, why (from the adversarial review), and the new
+    version. Nothing is deleted — a ``previous`` snapshot is kept so flows are
+    rollback-able. Lives at ``workspace/learning/teaching_changelog.jsonl``.
+    """
+
+    def __init__(self) -> None:
+        from deeptutor.services.path_service import get_path_service
+
+        self._root = get_path_service().get_workspace_dir() / "learning"
+        self._file = self._root / "teaching_changelog.jsonl"
+
+    def list_changes(self, limit: int = 20) -> list[dict[str, Any]]:
+        if not self._file.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        with open(self._file, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                    if isinstance(row, dict):
+                        rows.append(row)
+                except json.JSONDecodeError:
+                    continue
+        return rows[-limit:]
+
+    async def record(self, change: dict[str, Any]) -> dict[str, Any]:
+        """Append one applied improvement (single-point fix + rationale)."""
+        if "timestamp" not in change:
+            change["timestamp"] = datetime.now(tz=timezone.utc).isoformat()
+        if "version" not in change:
+            change["version"] = len(self.list_changes(limit=100000)) + 1
+        self._root.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(change, ensure_ascii=False, separators=(",", ":"))
+        async with _lock_for(self._file):
+            from deeptutor.services.file_io import atomic_write_text
+
+            def _write() -> None:
+                existing = self._file.read_text(encoding="utf-8") if self._file.exists() else ""
+                atomic_write_text(self._file, existing + ("" if existing.endswith("\n") else "\n") + line + "\n")
+
+            await asyncio.to_thread(_write)
+        return change
+
     async def _mirror_recent_summary(self, record: dict[str, Any]) -> None:
         """Append a one-line human summary to L3 recent.md for ``read_memory``."""
         summary = _summary_line(record)
@@ -674,6 +725,7 @@ class LearningStats:
 __all__ = [
     "LearningRecordStore",
     "LearningStats",
+    "TeachingChangelog",
     "RECORD_TYPES",
     "validate_record",
 ]

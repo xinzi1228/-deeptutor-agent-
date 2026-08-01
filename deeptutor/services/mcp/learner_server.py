@@ -107,6 +107,11 @@ _TOOLS = [
         {"days": {"type": "integer", "description": "返回天数, 默认 14"}},
     ),
     _tool(
+        "get_teaching_changes",
+        "教学流程自改进日志 (版本化改动记录)。",
+        {"limit": {"type": "integer", "description": "返回条数, 默认 20"}},
+    ),
+    _tool(
         "get_annotation_task",
         "获取标注练习任务",
         {"task_id": {"type": "string", "description": "task1-task9"}},
@@ -170,6 +175,11 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
         if name == "get_episodes":
             days = int(args.get("days") or 14)
             return _json_text({"episodes": _store().episodes(days=days)})
+        if name == "get_teaching_changes":
+            from deeptutor.services.learning_records import TeachingChangelog
+
+            limit = int(args.get("limit") or 20)
+            return _json_text({"changes": TeachingChangelog().list_changes(limit=limit)})
         if name == "get_annotation_task":
             from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 

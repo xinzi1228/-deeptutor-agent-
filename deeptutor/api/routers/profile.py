@@ -152,3 +152,12 @@ async def facts() -> dict[str, Any]:
     from deeptutor.services.learning_records import LearningRecordStore
 
     return LearningRecordStore().facts()
+
+
+@router.get("/teaching-changes")
+async def teaching_changes(limit: int = 20) -> dict[str, Any]:
+    """Versioned teaching-flow improvement log (Self-Improving loop)."""
+    from deeptutor.services.learning_records import TeachingChangelog
+
+    rows = TeachingChangelog().list_changes(limit=max(1, min(limit, 100)))
+    return {"changes": rows}

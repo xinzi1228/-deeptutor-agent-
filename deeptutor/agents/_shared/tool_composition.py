@@ -202,6 +202,7 @@ def compose_enabled_tools(
         "log_decision",
         "evaluate_teaching_plan",
         "verify_foresight",
+        "improve_teaching_flow",
     ):
         if _builtin_allowed(always_on):
             composed.append(always_on)

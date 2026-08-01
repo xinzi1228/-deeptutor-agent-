@@ -27,6 +27,7 @@ from deeptutor.tools.iou_demo_tool import GenerateIouDemoTool
 from deeptutor.tools.log_decision_tool import LogDecisionTool
 from deeptutor.tools.evaluate_teaching_plan_tool import EvaluateTeachingPlanTool
 from deeptutor.tools.verify_foresight_tool import VerifyForesightTool
+from deeptutor.tools.improve_teaching_flow_tool import ImproveTeachingFlowTool
 from deeptutor.tools.label_studio_tool import (
     LabelStudioCheckTool,
     LabelStudioCreateProjectTool,
@@ -1602,6 +1603,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     LogDecisionTool,
     EvaluateTeachingPlanTool,
     VerifyForesightTool,
+    ImproveTeachingFlowTool,
     CronTool,
     # Image → GeoGebra figure reconstruction. User-toggleable in chat; the
     # solve loop capability force-mounts it for diagram problems.
@@ -1690,6 +1692,7 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "log_decision",
     "evaluate_teaching_plan",
     "verify_foresight",
+    "improve_teaching_flow",
     "ls_create_project",
     "ls_check_annotations",
     "competency_map",
@@ -1726,6 +1729,7 @@ __all__ = [
     "LogDecisionTool",
     "EvaluateTeachingPlanTool",
     "VerifyForesightTool",
+    "ImproveTeachingFlowTool",
     "BrainstormTool",
     "CodeExecutionTool",
     "ExecTool",
