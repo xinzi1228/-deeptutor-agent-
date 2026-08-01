@@ -88,16 +88,26 @@ class EvaluateTeachingPlanTool(BaseTool):
                 metadata={"error": str(exc)},
             )
 
-        # Mirror the critique into the decision audit trail.
+        # Mirror the critique into the decision audit trail + store the full
+        # evaluation for the progress "evaluation" panel.
         try:
             from deeptutor.services.learning_records import LearningRecordStore
 
-            await LearningRecordStore().append_decision(
+            store = LearningRecordStore()
+            await store.append_decision(
                 {
                     "kind": "route_choice",
                     "target": "teaching_plan_review",
                     "rationale": "独立评估员对抗性审查教学方案",
                     "evidence": {"plan": plan, "evaluation": answer[:500]},
+                }
+            )
+            await store.append_evaluation(
+                {
+                    "target": "teaching_plan_review",
+                    "plan": plan,
+                    "student_profile": student_profile,
+                    "evaluation": answer,
                 }
             )
         except Exception:

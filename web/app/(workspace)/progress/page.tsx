@@ -8,6 +8,7 @@ import {
   getF1Trend,
   getSkillTree,
   getDecisions,
+  getEvaluations,
   getCoursePlan,
   type ProfileOverview,
   type RadarDimension,
@@ -15,12 +16,14 @@ import {
   type SkillTreeNode,
   type DecisionLog,
   type CoursePlan,
+  type TeachingEvaluation,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
 import { RadarChart } from "@/components/learning-stats/RadarChart";
 import { F1Curve } from "@/components/learning-stats/F1Curve";
 import { SkillTree } from "@/components/learning-stats/SkillTree";
 import { DecisionLog as DecisionLogPanel } from "@/components/learning-stats/DecisionLog";
+import { EvaluationPanel } from "@/components/learning-stats/EvaluationPanel";
 
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
@@ -30,18 +33,20 @@ export default function ProgressPage() {
   const [f1Points, setF1Points] = useState<F1Point[]>([]);
   const [skillTree, setSkillTree] = useState<SkillTreeNode | null>(null);
   const [decisions, setDecisions] = useState<DecisionLog[]>([]);
+  const [evaluations, setEvaluations] = useState<TeachingEvaluation[]>([]);
   const [coursePlan, setCoursePlan] = useState<CoursePlan | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, radar, f1, tree, dec, plan] = await Promise.all([
+        const [ov, radar, f1, tree, dec, ev, plan] = await Promise.all([
           getLearningOverview(),
           getRadarDimensions(),
           getF1Trend(),
           getSkillTree(),
           getDecisions(),
+          getEvaluations(),
           getCoursePlan().catch(() => ({ plan: null as any })),
         ]);
         if (cancelled) return;
@@ -50,6 +55,7 @@ export default function ProgressPage() {
         setF1Points(f1.points);
         setSkillTree(tree.tree);
         setDecisions(dec.decisions);
+        setEvaluations(ev.evaluations);
         setCoursePlan(plan.plan || null);
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load");
@@ -130,6 +136,8 @@ export default function ProgressPage() {
           </div>
         )}
       </div>
+
+      <EvaluationPanel evaluations={evaluations} />
     </div>
   );
 }

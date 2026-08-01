@@ -62,6 +62,13 @@ export interface CoursePlan {
   dag: Record<string, string[]>;
 }
 
+export interface TeachingEvaluation {
+  plan: string;
+  student_profile?: string;
+  evaluation: string;
+  timestamp?: string;
+}
+
 async function fetchJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API ${url} returned ${res.status}`);
@@ -86,6 +93,10 @@ export function getSkillTree(): Promise<{ tree: SkillTreeNode }> {
 
 export function getDecisions(): Promise<{ decisions: DecisionLog[] }> {
   return fetchJSON(`${API_BASE}/decisions`);
+}
+
+export function getEvaluations(): Promise<{ evaluations: TeachingEvaluation[] }> {
+  return fetchJSON(`${API_BASE}/evaluations`);
 }
 
 export function getCoursePlan(): Promise<{ plan: CoursePlan }> {

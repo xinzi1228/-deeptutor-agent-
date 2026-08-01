@@ -89,3 +89,12 @@ async def decisions(limit: int = 20) -> dict[str, Any]:
 
     rows = LearningRecordStore().list_decisions(limit=max(1, min(limit, 100)))
     return {"decisions": rows}
+
+
+@router.get("/evaluations")
+async def evaluations(limit: int = 10) -> dict[str, Any]:
+    """Recent adversarial teaching-plan evaluations."""
+    from deeptutor.services.learning_records import LearningRecordStore
+
+    rows = LearningRecordStore().list_evaluations(limit=max(1, min(limit, 50)))
+    return {"evaluations": rows}

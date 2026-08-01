@@ -89,6 +89,11 @@ _TOOLS = [
         {"limit": {"type": "integer", "description": "返回条数, 默认 20"}},
     ),
     _tool(
+        "get_teaching_evaluations",
+        "最近的对抗性教学方案评估结果。",
+        {"limit": {"type": "integer", "description": "返回条数, 默认 10"}},
+    ),
+    _tool(
         "get_annotation_task",
         "获取标注练习任务",
         {"task_id": {"type": "string", "description": "task1-task9"}},
@@ -142,6 +147,9 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
         if name == "get_decision_log":
             limit = int(args.get("limit") or 20)
             return _json_text(_store().list_decisions(limit=limit))
+        if name == "get_teaching_evaluations":
+            limit = int(args.get("limit") or 10)
+            return _json_text(_store().list_evaluations(limit=limit))
         if name == "get_annotation_task":
             from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 
@@ -178,6 +186,7 @@ _RESOURCES = [
     Resource(uri="learner://brief", name="诊断 brief", mimeType="application/json"),
     Resource(uri="learner://skill-tree", name="能力图谱", mimeType="application/json"),
     Resource(uri="learner://course-plan", name="课程计划", mimeType="application/json"),
+    Resource(uri="learner://evaluations", name="教学方案评估", mimeType="application/json"),
 ]
 
 
@@ -206,6 +215,8 @@ async def read_resource(uri: Any) -> list[Any]:
         from deeptutor.services.course_plan import rebuild
 
         body = rebuild(force=False) or {"error": "no plan yet"}
+    elif key == "learner://evaluations":
+        body = _store().list_evaluations(limit=10)
     else:
         raise ValueError(f"unknown resource: {key}")
     return [
