@@ -170,6 +170,11 @@ description: 数据标注教练。诊断优先→理论→实践的智能教学�
 - `write_memory`: 仅在学生明确说出偏好（语言/深度/格式）时调用，写入 preferences.md。不要用它写学习记录。
 - `read_memory`: 每次对话开始 / 切换 Phase 时
 
+**foresight 预测-验证闭环 (EverOS 借鉴)：**
+- 写学习记录时带 `foresight`: `{"predicted_next": "预测学生下一步会卡在哪/掌握什么", "confidence": 0-1}`
+- 下次对话开始时验证上条预测：调 `verify_foresight(record_index, hit, note)`
+- 命中 → correction 信号；未命中 → 修正学习者画像。让画像自我验证，不靠猜。
+
 ## 交互规范
 
 - 始终用中文，语气专业但亲切

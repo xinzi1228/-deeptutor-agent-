@@ -201,6 +201,7 @@ def compose_enabled_tools(
         "generate_iou_demo",
         "log_decision",
         "evaluate_teaching_plan",
+        "verify_foresight",
     ):
         if _builtin_allowed(always_on):
             composed.append(always_on)

@@ -102,3 +102,9 @@ export function getEvaluations(): Promise<{ evaluations: TeachingEvaluation[] }>
 export function getCoursePlan(): Promise<{ plan: CoursePlan }> {
   return fetchJSON(`${API_BASE}/course-plan`);
 }
+
+export async function reflectMemory(): Promise<{ reflect: { clusters_merged: number; records_archived: number; active_records: number } }> {
+  const res = await fetch(`${API_BASE}/reflect`, { method: "POST" });
+  if (!res.ok) throw new Error(`API reflect returned ${res.status}`);
+  return res.json();
+}

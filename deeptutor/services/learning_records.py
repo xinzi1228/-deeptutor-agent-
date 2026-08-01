@@ -78,9 +78,17 @@ class LearningRecordStore:
         if record.get("error_pattern") and not record.get("pattern_status"):
             record["pattern_status"] = "unconfirmed"
 
-    def list_records(self, scope: str | None = None) -> list[dict[str, Any]]:
-        """Return all persisted records in insertion order, optionally by scope."""
+    def list_records(
+        self, scope: str | None = None, include_archived: bool = False
+    ) -> list[dict[str, Any]]:
+        """Return persisted records in insertion order, optionally by scope.
+
+        Archived records (merged away by reflection) are excluded unless
+        ``include_archived=True``.
+        """
         records = self._read_records()
+        if not include_archived:
+            records = [r for r in records if not r.get("archived")]
         if scope:
             records = [r for r in records if r.get("scope") == scope]
         return records
@@ -237,6 +245,132 @@ class LearningRecordStore:
 
         await self._mirror_recent_summary(record)
         return record
+
+    def reflect(self) -> dict[str, Any]:
+        """Memory evolution (EverOS Reflection): merge / dedupe / archive.
+
+        Clusters active exercise + theory records by (type, task_id,
+        knowledge_point). For clusters with >1 record:
+          * keeps the LATEST as the canonical record (latest F1/metrics);
+          * merges error_pattern evidence from older records and promotes
+            ``pattern_status`` to ``confirmed`` when a pattern recurs ≥2×;
+          * merges knowledge_points (deduped);
+          * marks older records ``archived`` (excluded from stats).
+        ``reflect()`` is a pure in-memory transformation of the JSONL truth —
+        nothing is deleted, so it is reversible by un-archiving.
+        """
+        records = self._read_records()
+        active = [r for r in records if not r.get("archived")]
+        archived = [r for r in records if r.get("archived")]
+
+        clusters: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+        standalone: list[dict[str, Any]] = []
+        for r in active:
+            kind = r.get("type")
+            if kind in ("annotation_exercise", "theory_mastered"):
+                key = (kind, str(r.get("task_id", "")), str(r.get("knowledge_point", "")))
+                if key[1] or key[2]:  # needs a clustering anchor
+                    clusters.setdefault(key, []).append(r)
+                    continue
+            standalone.append(r)
+
+        merged_count = 0
+        archived_count = 0
+        out: list[dict[str, Any]] = []
+        for group in clusters.values():
+            if len(group) <= 1:
+                out.extend(group)
+                continue
+            group.sort(key=lambda x: x.get("timestamp", ""))
+            latest = dict(group[-1])
+            older = group[:-1]
+
+            # merge error_pattern evidence + promote repeated patterns
+            patterns: dict[str, int] = {}
+            evidence: list[Any] = []
+            for r in group:
+                ep = r.get("error_pattern")
+                if ep:
+                    patterns[ep] = patterns.get(ep, 0) + 1
+                for e in (r.get("pattern_evidence") or []):
+                    if e not in evidence:
+                        evidence.append(e)
+            if evidence:
+                latest["pattern_evidence"] = evidence
+                if any(v >= 2 for v in patterns.values()):
+                    latest["pattern_status"] = "confirmed"
+                else:
+                    latest.setdefault("pattern_status", "unconfirmed")
+
+            # merge knowledge_points
+            kps: set[str] = set()
+            for r in group:
+                kps.update(r.get("knowledge_points") or [])
+            if kps:
+                latest["knowledge_points"] = sorted(kps)
+
+            latest["merged_count"] = len(group)
+            for r in older:
+                r["archived"] = True
+                archived_count += 1
+            out.append(latest)
+            out.extend(older)  # archived records stay (reversible truth)
+            merged_count += 1
+
+        out.extend(standalone)
+        # preserve archived records so reflection stays reversible
+        out.extend(archived)
+        self._write_all(out)
+        return {
+            "clusters_merged": merged_count,
+            "records_archived": archived_count,
+            "active_records": len([r for r in out if not r.get("archived")]),
+        }
+
+    def _write_all(self, records: list[dict[str, Any]]) -> None:
+        """Rewrite the whole JSONL (truth-preserving). Called by reflect()."""
+        self._ensure_dir()
+        lines = [
+            json.dumps(r, ensure_ascii=False, separators=(",", ":"))
+            for r in records
+        ]
+        from deeptutor.services.file_io import atomic_write_text
+
+        atomic_write_text(self._file, "\n".join(lines) + ("\n" if lines else ""))
+
+    # ── foresights (EverOS: predict what's next, then verify) ──────────────
+
+    def open_foresights(self, limit: int = 1) -> list[dict[str, Any]]:
+        """Return the most recent records carrying an unresolved ``foresight``.
+
+        Each entry: ``{"index": <position in file>, "record": {...}}`` so the
+        caller can resolve it via :meth:`resolve_foresight`.
+        """
+        records = self._read_records()
+        open_items: list[dict[str, Any]] = []
+        for index, r in enumerate(records):
+            if r.get("foresight") and not r.get("foresight_verified"):
+                open_items.append({"index": index, "record": r})
+        return open_items[-limit:]
+
+    def resolve_foresight(
+        self, index: int, hit: bool, note: str = ""
+    ) -> dict[str, Any] | None:
+        """Mark an open foresight as verified (hit or miss).
+
+        Hits become a ``correction``-style learning signal: the record keeps
+        its foresight, gains ``foresight_verified=True`` + ``foresight_hit``.
+        """
+        records = self._read_records()
+        if not 0 <= index < len(records):
+            return None
+        target = records[index]
+        target["foresight_verified"] = True
+        target["foresight_hit"] = bool(hit)
+        if note:
+            target["foresight_note"] = note
+        self._write_all(records)
+        return target
 
     async def _mirror_recent_summary(self, record: dict[str, Any]) -> None:
         """Append a one-line human summary to L3 recent.md for ``read_memory``."""

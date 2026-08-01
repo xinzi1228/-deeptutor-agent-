@@ -98,3 +98,32 @@ async def evaluations(limit: int = 10) -> dict[str, Any]:
 
     rows = LearningRecordStore().list_evaluations(limit=max(1, min(limit, 50)))
     return {"evaluations": rows}
+
+
+@router.post("/reflect")
+async def reflect() -> dict[str, Any]:
+    """Manually trigger memory evolution (EverOS Reflection): merge duplicate
+    practice records, promote repeated error patterns to confirmed, archive
+    superseded entries. Reversible — nothing is deleted."""
+    from deeptutor.services.learning_records import LearningRecordStore
+
+    store = LearningRecordStore()
+    result = store.reflect()
+
+    # Mirror a one-line reflection summary into recent.md (async safe path).
+    try:
+        from deeptutor.services.memory import get_memory_store
+        from deeptutor.services.memory.trace import TraceEvent
+
+        memo = get_memory_store()
+        event = TraceEvent.new("chat", "memory_reflection", result)
+        await memo.emit(event)
+        summary = (
+            f"记忆整理: 合并 {result['clusters_merged']} 组重复记录, "
+            f"归档 {result['records_archived']} 条, 当前 {result['active_records']} 条活跃"
+        )
+        await memo.append_learning_summary(text=summary, ref=event.id)
+    except Exception:
+        pass
+
+    return {"reflect": result}

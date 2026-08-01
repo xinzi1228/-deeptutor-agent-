@@ -10,6 +10,7 @@ import {
   getDecisions,
   getEvaluations,
   getCoursePlan,
+  reflectMemory,
   type ProfileOverview,
   type RadarDimension,
   type F1Point,
@@ -95,6 +96,19 @@ export default function ProgressPage() {
             学习数据分析与能力评估
           </p>
         </div>
+        <button
+          onClick={async () => {
+            try {
+              await reflectMemory();
+              window.location.reload();
+            } catch (e: any) {
+              setError(e.message || "记忆整理失败");
+            }
+          }}
+          className="ml-auto rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-xs text-[var(--muted-foreground)] transition-colors hover:bg-[var(--border)]"
+        >
+          记忆整理
+        </button>
       </div>
 
       <StatCards overview={overview} />

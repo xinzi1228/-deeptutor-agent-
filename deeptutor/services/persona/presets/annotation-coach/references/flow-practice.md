@@ -36,6 +36,14 @@
 调 read_memory → 提取上次的 readiness + error_pattern + confidence + signal_type
 ← 判定逻辑见 decision-matrix.md §3 readiness_gate
 
+先验证上条 foresight (EverOS 预测-验证闭环) ◀── 硬约束:
+  若上条学习记录带 foresight 且未验证:
+    → 看学生本次表现是否印证预测
+    → 调 verify_foresight(record_index, hit, note)
+    → 命中→记 correction 信号; 未命中→修正学习者画像
+  记录本次的 foresight (预测学生下一步会怎样):
+    write_learning_record 时带 "foresight": {"predicted_next": "...", "confidence": 0-1}
+
 选任务的动作（根据 readiness）:
   advance → 升难度或同难度下一个未做任务
   advance_with_caution → 同难度新任务 + 标注"开头先check"
