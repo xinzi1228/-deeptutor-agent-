@@ -201,6 +201,11 @@ Alex 只问小白问题:
 
 write_memory JSON (15+ 字段, synapse 四维模型)
 
+调 log_decision 记录 readiness 判定依据 (lumen 决策审计):
+  kind=readiness_judgment, target=readiness,
+  rationale="teach_back={} confidence={} 无重复错误模式",
+  evidence=[teach_back_score, confidence, error_type, near_transfer]
+
 模块完成 → 生成学习参考 (teach skill):
   核心概念 + 练习成绩 + 薄弱点 + 下次继续口令
 

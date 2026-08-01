@@ -80,3 +80,12 @@ async def course_plan() -> dict[str, Any]:
 
     plan = rebuild(force=False)
     return {"plan": plan if plan is not None else {}}
+
+
+@router.get("/decisions")
+async def decisions(limit: int = 20) -> dict[str, Any]:
+    """Recent coach decisions with rationale (lumen audit trail)."""
+    from deeptutor.services.learning_records import LearningRecordStore
+
+    rows = LearningRecordStore().list_decisions(limit=max(1, min(limit, 100)))
+    return {"decisions": rows}

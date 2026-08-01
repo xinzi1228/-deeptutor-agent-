@@ -49,7 +49,11 @@
   连续3次同类型错误 → 强制回Phase1, 不给出题
   猜测但对了 → 不出下一题, 追问推理后才判定
 
-调 get_annotation_task(task_id)
+ 调 get_annotation_task(task_id)
+ 调 log_decision 记录为什么选这个任务 (lumen 决策审计) ◀── 硬约束:
+   kind=task_recommendation, target=task_id,
+   rationale="readiness={x} → 升难度/同难度下一个",
+   evidence=[上次 f1, error_pattern, confidence]
 ↓
 继续 Step2
 ```

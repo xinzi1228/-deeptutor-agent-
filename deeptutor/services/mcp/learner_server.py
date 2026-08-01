@@ -84,6 +84,11 @@ _TOOLS = [
         {"force": {"type": "boolean", "description": "True 强制重建"}},
     ),
     _tool(
+        "get_decision_log",
+        "最近的教练决策审计日志 (为什么推荐这个任务)。",
+        {"limit": {"type": "integer", "description": "返回条数, 默认 20"}},
+    ),
+    _tool(
         "get_annotation_task",
         "获取标注练习任务",
         {"task_id": {"type": "string", "description": "task1-task9"}},
@@ -134,6 +139,9 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
 
             force = bool(args.get("force") or False)
             return _json_text(rebuild(force=force) or {"error": "build failed"})
+        if name == "get_decision_log":
+            limit = int(args.get("limit") or 20)
+            return _json_text(_store().list_decisions(limit=limit))
         if name == "get_annotation_task":
             from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 

@@ -114,6 +114,46 @@ class LearningRecordStore:
         except (json.JSONDecodeError, OSError):
             return None
 
+    # ── decision audit log (lumen: audit every agent decision) ────────────
+
+    def _decision_file(self) -> Path:
+        return self._root / "decisions.jsonl"
+
+    def list_decisions(self, limit: int = 20) -> list[dict[str, Any]]:
+        path = self._decision_file()
+        if not path.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                    if isinstance(row, dict):
+                        rows.append(row)
+                except json.JSONDecodeError:
+                    continue
+        return rows[-limit:]
+
+    async def append_decision(self, decision: dict[str, Any]) -> dict[str, Any]:
+        """Append one coach decision with its rationale (audit trail)."""
+        if "timestamp" not in decision:
+            decision["timestamp"] = datetime.now(tz=timezone.utc).isoformat()
+        self._ensure_dir()
+        line = json.dumps(decision, ensure_ascii=False, separators=(",", ":"))
+        path = self._decision_file()
+        async with _lock_for(path):
+            from deeptutor.services.file_io import atomic_write_text
+
+            def _write() -> None:
+                existing = path.read_text(encoding="utf-8") if path.exists() else ""
+                atomic_write_text(path, existing + ("" if existing.endswith("\n") else "\n") + line + "\n")
+
+            await asyncio.to_thread(_write)
+        return decision
+
     def _read_records(self) -> list[dict[str, Any]]:
         if not self._file.exists():
             return []

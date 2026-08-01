@@ -39,6 +39,29 @@ export interface SkillTreeNode {
   children?: SkillTreeNode[];
 }
 
+export interface DecisionLog {
+  kind: string;
+  target: string;
+  rationale: string;
+  evidence?: unknown;
+  timestamp?: string;
+}
+
+export interface CoursePlanModule {
+  name: string;
+  concepts: string[];
+  tasks: string[];
+  target: string;
+}
+
+export interface CoursePlan {
+  plan_id: string;
+  teaching_mode: string;
+  goal_type: string;
+  modules: CoursePlanModule[];
+  dag: Record<string, string[]>;
+}
+
 async function fetchJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API ${url} returned ${res.status}`);
@@ -59,4 +82,12 @@ export function getF1Trend(): Promise<{ points: F1Point[] }> {
 
 export function getSkillTree(): Promise<{ tree: SkillTreeNode }> {
   return fetchJSON(`${API_BASE}/skill-tree`);
+}
+
+export function getDecisions(): Promise<{ decisions: DecisionLog[] }> {
+  return fetchJSON(`${API_BASE}/decisions`);
+}
+
+export function getCoursePlan(): Promise<{ plan: CoursePlan }> {
+  return fetchJSON(`${API_BASE}/course-plan`);
 }
