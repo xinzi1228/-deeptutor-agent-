@@ -310,6 +310,7 @@ def test_incremental_update_reclassifies_skill(tmp_path) -> None:
 def test_incremental_update_no_graph_builds_from_records(tmp_path) -> None:
     store = KnowledgeGraphStore(root=tmp_path)
     # no graph file exists; record targets a skill — resolve via explicit ontology
+    # explicit records=[] keeps the test deterministic (no real-workspace dependency)
     store.incremental_update(
         {
             "type": "theory_mastered",
@@ -319,8 +320,147 @@ def test_incremental_update_no_graph_builds_from_records(tmp_path) -> None:
         },
         tree=SAMPLE_TREE,
         bank=SAMPLE_BANK,
+        records=[],
     )
     g = store.get()
     assert g is not None
     edges = [(e["source"], e["type"], e["target"]) for e in g["edges"]]
     assert ("learner:default", "mastered", "skill-1-1-2") in edges
+
+
+def test_incremental_update_skips_older_record(tmp_path) -> None:
+    store = KnowledgeGraphStore(root=tmp_path)
+    store.save(KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=SAMPLE_BANK, records=[]))
+    # newer record first → mastered
+    store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "task_id": "task1",
+            "knowledge_point": "边界框绘制规范",
+            "f1": 0.9,
+            "readiness": "advance",
+            "timestamp": "2026-08-10T00:00:00+00:00",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+        records=[],
+    )
+    # then an OLDER record → must be skipped so the graph stays consistent
+    # with a full rebuild (latest record wins)
+    store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "task_id": "task1",
+            "knowledge_point": "边界框绘制规范",
+            "f1": 0.65,
+            "readiness": "needs_review",
+            "timestamp": "2026-08-01T00:00:00+00:00",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+        records=[],
+    )
+    g = store.get()
+    edges = [
+        e
+        for e in g["edges"]
+        if e["source"] == "learner:default" and e["target"] == "skill-1-1-1"
+    ]
+    assert len(edges) == 1
+    assert edges[0]["type"] == "mastered"
+    assert edges[0]["ts"] == "2026-08-10T00:00:00+00:00"
+
+
+def test_incremental_update_skips_older_record_without_timestamp_applies(tmp_path) -> None:
+    store = KnowledgeGraphStore(root=tmp_path)
+    store.save(KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=SAMPLE_BANK, records=[]))
+    store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "task_id": "task1",
+            "knowledge_point": "边界框绘制规范",
+            "f1": 0.9,
+            "readiness": "advance",
+            "timestamp": "2026-08-10T00:00:00+00:00",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+        records=[],
+    )
+    # a record without a timestamp is treated as newest → it replaces the edge
+    store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "task_id": "task1",
+            "knowledge_point": "边界框绘制规范",
+            "f1": 0.55,
+            "readiness": "needs_review",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+        records=[],
+    )
+    g = store.get()
+    edges = [
+        e
+        for e in g["edges"]
+        if e["source"] == "learner:default" and e["target"] == "skill-1-1-1"
+    ]
+    assert len(edges) == 1
+    assert edges[0]["type"] == "struggling"
+
+
+def test_incremental_update_unclassifiable_returns_persisted_graph(tmp_path) -> None:
+    store = KnowledgeGraphStore(root=tmp_path)
+    g = store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "knowledge_point": "边界框绘制规范",
+            "f1": "abc",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+        records=[],
+    )
+    assert isinstance(g, dict)
+    assert g.get("schema_version") == 1
+    assert "learner:default" in g["nodes"]
+    assert not any(
+        e["source"] == "learner:default" and e["type"] in ("mastered", "struggling")
+        for e in g["edges"]
+    )
+    assert store.get() == g
+
+
+def test_incremental_update_does_not_regress_built_at(tmp_path) -> None:
+    store = KnowledgeGraphStore(root=tmp_path)
+    store.save(KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=SAMPLE_BANK, records=[]))
+    store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "task_id": "task1",
+            "knowledge_point": "边界框绘制规范",
+            "f1": 0.9,
+            "readiness": "advance",
+            "timestamp": "2026-08-01T00:00:00+00:00",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+        records=[],
+    )
+    # newer built_at must survive an older record applied to a different target
+    store.incremental_update(
+        {
+            "type": "annotation_exercise",
+            "task_id": "task2",
+            "knowledge_point": "遮挡目标处理",
+            "f1": 0.65,
+            "readiness": "needs_review",
+            "timestamp": "2020-01-01T00:00:00+00:00",
+        },
+        tree=SAMPLE_TREE,
+        bank=SAMPLE_BANK,
+        records=[],
+    )
+    g = store.get()
+    assert g["built_at"] == "2026-08-01T00:00:00+00:00"

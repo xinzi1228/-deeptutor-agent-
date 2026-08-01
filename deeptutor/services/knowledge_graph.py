@@ -15,6 +15,9 @@ from deeptutor.services.path_service import get_path_service
 MASTERED_F1 = 0.7
 ADVANCE_READINESS = ("advance", "advance_with_caution")
 
+LEARNER_ID = "learner:default"
+TRACE_EDGE_TYPES = ("mastered", "struggling")
+
 SCHEMA_VERSION = 1
 
 
@@ -36,7 +39,7 @@ class KnowledgeGraphStore:
         tree = tree or {}
         nodes: dict[str, dict] = {}
         edges: list[dict] = []
-        learner_id = "learner:default"
+        learner_id = LEARNER_ID
         if isinstance(tree, dict) and "tree" in tree:
             tree = tree["tree"]
 
@@ -142,18 +145,26 @@ class KnowledgeGraphStore:
     # ------------------------------------------------------------ incremental
 
     def incremental_update(
-        self, record: dict, *, tree: dict | None = None, bank: dict | None = None
+        self,
+        record: dict,
+        *,
+        tree: dict | None = None,
+        bank: dict | None = None,
+        records: list[dict] | None = None,
     ) -> dict:
         """Update the persisted graph with one learning record (idempotent).
 
-        If no graph file exists yet, a minimal graph is built from the ontology
-        (default tree/bank loaders) plus this record.
+        When no graph file exists yet, the graph is fully rebuilt from all
+        persisted learning records (``LearningRecordStore`` unless ``records``
+        is passed) plus the ontology, then this record is applied on top.
+
+        A record older than the existing trace edge on the same target is
+        skipped, so an incrementally updated graph stays consistent with a
+        full rebuild (latest record wins). Records without a timestamp are
+        treated as newest and always applied. An unclassifiable record leaves
+        the persisted graph unchanged.
         """
         from deeptutor.services.learning_records import LearningRecordStore
-
-        edge_type = _classify(record)
-        if edge_type is None:
-            return self.get() or {}
 
         graph = self.get()
         if graph is None:
@@ -161,37 +172,54 @@ class KnowledgeGraphStore:
                 tree = _load_competency_tree()
             if bank is None:
                 bank = _load_bank()
-            records = LearningRecordStore().list_records()
+            if records is None:
+                records = LearningRecordStore().list_records()
             graph = self.build(tree=tree, bank=bank, records=records)
+            self.save(graph)
 
+        edge_type = _classify(record)
         target = _resolve_target(record, _unwrap_tree(tree) if tree is not None else {}, graph)
-        if target is None:
+        if edge_type is None or target is None:
             return graph
 
-        learner_id = "learner:default"
-        edges = graph.setdefault("edges", [])
-        # drop any prior mastered/struggling edge on this target (reclassification)
+        existing_ts = ""
+        for e in graph.get("edges", []):
+            if (
+                e.get("source") == LEARNER_ID
+                and e.get("type") in TRACE_EDGE_TYPES
+                and e.get("target") == target
+            ):
+                existing_ts = e.get("ts", "")
+                break
+        record_ts = record.get("timestamp", "")
+        if record_ts and existing_ts and record_ts < existing_ts:
+            return graph
+
         edges = [
             e
-            for e in edges
+            for e in graph.get("edges", [])
             if not (
-                e.get("source") == learner_id
-                and e.get("type") in ("mastered", "struggling")
+                e.get("source") == LEARNER_ID
+                and e.get("type") in TRACE_EDGE_TYPES
                 and e.get("target") == target
             )
         ]
         edge = {
-            "source": learner_id,
+            "source": LEARNER_ID,
             "type": edge_type,
             "target": target,
             "evidence": record.get("type", "practice"),
-            "ts": record.get("timestamp", ""),
+            "ts": record_ts,
         }
         if record.get("f1") is not None:
             edge["f1"] = record["f1"]
         edges.append(edge)
         graph["edges"] = edges
-        graph["built_at"] = record.get("timestamp") or graph.get("built_at")
+        existing_built_at = graph.get("built_at")
+        if record_ts and existing_built_at:
+            graph["built_at"] = max(record_ts, existing_built_at)
+        elif record_ts:
+            graph["built_at"] = record_ts
         self.save(graph)
         return graph
 
