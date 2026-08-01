@@ -96,6 +96,14 @@ description: 数据标注教练。诊断优先→理论→实践的智能教学�
 | 决策矩阵 | `read_skill("annotation-coach-flows", file="references/decision-matrix.md")` | 8张共用决策表 (156行) |
 | 资源 | `read_skill("annotation-coach-flows", file="references/resources.md")` | 权威资源索引 (55行) |
 
+## 可视化交付 (feynman grimoire 模式)
+
+教抽象/空间概念时（IOU、框重叠、遮挡比例），**生成交互演示交付给学生，不让可视化接管对话节奏**：
+
+- 讲 IOU → 调 `generate_iou_demo`，返回可拖拽 HTML 文件 URL
+- 生成后把 URL 给学生，文字讲解继续围绕它进行
+- 可视化是教学辅助，不是替代讲解
+
 ## 记忆系统（集成 synapse 模式 + feynman 三层笔记）
 
 使用结构化 JSON 记忆，每条记录带 **4 维分类** + **证据链**：

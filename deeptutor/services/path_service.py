@@ -175,6 +175,9 @@ class PathService:
         if len(parts) >= 5 and parts[:2] == ("workspace", "chat") and "media" in parts[3:]:
             return True
 
+        if len(parts) >= 5 and parts[:2] == ("workspace", "chat") and "demos" in parts[3:]:
+            return True
+
         if len(parts) >= 5 and parts[:3] == ("workspace", "chat", "chat") and parts[4] == "exec":
             return True
 

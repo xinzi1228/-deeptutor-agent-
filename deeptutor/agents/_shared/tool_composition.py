@@ -198,6 +198,7 @@ def compose_enabled_tools(
         "get_annotation_task",
         "annotation_check",
         "write_learning_record",
+        "generate_iou_demo",
     ):
         if _builtin_allowed(always_on):
             composed.append(always_on)
