@@ -20,6 +20,25 @@ TRACE_EDGE_TYPES = ("mastered", "struggling")
 
 SCHEMA_VERSION = 1
 
+# task_bank.json 知识点名称 → competency_tree.json 技能规范名 的语义等价别名。
+# 仅代码层映射，不改动原始数据（任务展示依赖原始 kp 名称）。
+KP_TO_SKILL_ALIASES = {
+    "最小外接矩形原则": "边界框绘制规范",
+    "最小外接矩形": "边界框绘制规范",
+    "漏标预防": "边界框绘制规范",
+    "精确定位": "边界框绘制规范",
+    "多目标检测": "小目标标注策略",
+    "由大到小标注技巧": "小目标标注策略",
+    "缩放辅助标注": "小目标标注策略",
+    "完整性原则": "标注一致性检验",
+    "相似目标区分": "细粒度分类",
+    "细粒度观察": "细粒度分类",
+    "图像分类基础": "单标签分类",
+    "遮挡目标处理原则": "遮挡目标处理",
+    "遮挡比例判定": "遮挡目标处理",
+    "像素级微调": "边缘细节处理",
+}
+
 
 class KnowledgeGraphStore:
     """Build, persist, and incrementally update the learner knowledge graph."""
@@ -254,6 +273,11 @@ def _find_skill_id_by_name(tree: dict, name: str) -> str | None:
     for skill in _iter_skills(tree):
         if skill.get("name") == name:
             return skill["id"]
+    canonical = KP_TO_SKILL_ALIASES.get(name)
+    if canonical:
+        for skill in _iter_skills(tree):
+            if skill.get("name") == canonical:
+                return skill["id"]
     return None
 
 
@@ -345,4 +369,4 @@ def _classify(rec: dict) -> str | None:
     return None
 
 
-__all__ = ["KnowledgeGraphStore", "MASTERED_F1"]
+__all__ = ["KnowledgeGraphStore", "MASTERED_F1", "KP_TO_SKILL_ALIASES"]

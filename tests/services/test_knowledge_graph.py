@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from deeptutor.services.knowledge_graph import KnowledgeGraphStore
+from deeptutor.services.knowledge_graph import KnowledgeGraphStore, _find_skill_id_by_name
 
 SAMPLE_TREE = {
     "tree": {
@@ -98,6 +98,28 @@ def test_build_seeds_ontology_edges() -> None:
     assert ("skill-1-1-2", "prerequisite", "skill-1-1-1") in edges
     assert ("task1", "requires", "skill-1-1-1") in edges
     assert ("task2", "belongs_to", "task-group-1") in edges
+
+
+def test_find_skill_id_by_name_uses_alias() -> None:
+    skill_id = _find_skill_id_by_name(SAMPLE_TREE["tree"], "遮挡目标处理原则")
+    assert skill_id == "skill-1-1-2"
+
+
+def test_build_resolves_requires_via_alias() -> None:
+    bank = {
+        **SAMPLE_BANK,
+        "taskX": {
+            "title": "遮挡目标处理任务",
+            "type": "bbox",
+            "difficulty": "medium",
+            "knowledge_points": ["遮挡目标处理原则", "最小外接矩形原则"],
+        },
+    }
+    g = KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=bank, records=[])
+    edges = {(e["source"], e["type"], e["target"]) for e in g["edges"]}
+    assert ("taskX", "requires", "skill-1-1-2") in edges
+    assert ("taskX", "requires", "skill-1-1-1") in edges
+    assert g["nodes"]["skill-1-1-2"]["type"] == "Skill"
 
 
 def test_build_marks_mastered_and_struggling() -> None:
