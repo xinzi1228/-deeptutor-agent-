@@ -201,23 +201,14 @@ write_learning_record 记录诊断结果:
   "timestamp": "..."
 }
 
-生成有界诊断 brief (lumen 有界 intake 契约) ◀── 硬约束:
-  brief = {
-    "goal": mission, "goal_type": goal_type,
-    "diagnosed_level": ...,
-    "teaching_mode": ...,
-    "modules": ["标注基础","进阶技能","质量管控","工具进阶"],
-    "priority_domains": [...],
-    "estimated_days": "按模式调整"
-  }
-  存 workspace/learning/brief.json
-  下次会话 get_brief 直接恢复路线, 不用重走诊断
-
-自动建课 (lumen 可重跑建课) ◀── 硬约束:
-  调 /api/v1/profile/course-plan 或 rebuild() 生成 4 模块课程计划
-  → 概念序列 + 练习任务 + 前置 DAG, 确定性可重跑
-  → 幂等: 已有计划则复用, force=True 才重建
+生成有界诊断 brief + 自动建课 (lumen 有界 intake) ◀── 硬约束:
+  调 `finalize_diagnosis(goal_type, teaching_mode, diagnosed_level, mission)`
+  → 一次调用完成两件事:
+    1. 存 brief 到 workspace/learning/brief.json (下次会话恢复路线)
+    2. 用 rebuild(force=True) 生成 4 模块课程计划
+      (概念序列 + 练习任务 + 前置 DAG, 确定性可重跑)
   展示给学生的路线来自 course_plan, 不是手写
+  不调 finalize_diagnosis = 诊断未完成
 
 根据教学模式加载目标流程:
   Zero-Base → Phase1 (beginner_foundation 入口)
