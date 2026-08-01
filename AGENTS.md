@@ -218,6 +218,7 @@ Pydantic models per capability: `ChatRequestConfig`, `DeepSolveRequestConfig`,
 | `capability_registry.py` | Loads built-in + plugin capabilities, singleton |
 | `tool_registry.py` | Registers tools, resolves aliases, OpenAI schema gen, prompt via `ToolPromptComposer` |
 | `deferred_tools.py` | Progressive disclosure — MCP tools loaded on-demand via `load_tools` |
+| `mcp/learner_server.py` | Learner-state MCP **server** (stdio): exposes learning records / radar / skill-tree / task bank / IOU check to external MCP clients via `python -m deeptutor.services.mcp.learner_server` |
 
 ### `bootstrap/builtin_capabilities.py`
 
