@@ -60,3 +60,34 @@ decisions 有 route_choice + task_recommendation。
 
 **遗留**: Coach 的"记录"仍依赖 prompt/工具提示, 非系统强制。
 若需 100% 保证, 可在 turn 结束时做后端兜底(检测里程碑未记录则自动补)。
+
+---
+
+## 五、知识图谱端到端回归（第二轮, 2026-08-01）
+
+在知识图谱功能上线后重跑整体回归（5 回合真实对话, 干净基线）。
+
+### 验证结果
+
+| 回合 | 工具 | 阶段 |
+|------|------|------|
+| 1 | read_memory, read_skill | 诊断启动 |
+| 2 | competency_map, job_analysis, log_decision, **finalize_diagnosis** | 诊断→落盘 brief+建课 |
+| 3 | generate_iou_demo, get_annotation_task | 理论教学+任务分发 |
+| 4 | annotation_check, get_annotation_task, log_decision, **write_learning_record** | 评测→记录闭环 |
+| 5 | (无工具) | 反馈收尾 |
+
+### 数据产物（全绿）
+
+- records.jsonl 698B — 1 条 annotation_exercise (F1=1.0, advance)
+- decisions.jsonl 809B — route_choice + task_recommendation
+- brief.json 202B / course_plan.json 2820B
+- **knowledge_graph.json 6598B** — mastered→`skill-1-1-1`(skill ID), 43 节点/52 边
+- `risk_path(skill-1-1-1)`: 下游影响 11 个（基础技能被所有任务依赖）— 图谱正确建立"技能→下游任务"关系
+
+### 发现与教训
+
+1. **图谱管线端到端工作**: 评测→write_learning_record→incremental_update→mastered 边(skill ID)。
+2. **回归脚本清理段必须含 knowledge_graph.json** — 首轮未删导致读到历史旧图（built_at=旧时间戳），产生"图谱有边但 records 空"的假象。
+3. **`_load_graph()` 的 short-circuit 是双刃剑**: 干净时高效, 但残留旧图会返回过期状态。回归基线必须清理。
+4. 干净基线下回合 4 完整落盘（annotation_check + write_learning_record + log_decision），此前"评测不落盘"部分源于残留图干扰 + LLM 上下文随机性。
