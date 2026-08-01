@@ -84,6 +84,14 @@ class WriteLearningRecordTool(BaseTool):
         except Exception as exc:
             return ToolResult(content=f"Error: failed to persist record — {exc}", success=False)
 
+        try:
+            from deeptutor.services.knowledge_graph import KnowledgeGraphStore
+
+            KnowledgeGraphStore().incremental_update(persisted)
+        except Exception:
+            # graph is a derived index — failure must not break record persistence
+            pass
+
         kind = persisted.get("type")
         return ToolResult(
             content=(
