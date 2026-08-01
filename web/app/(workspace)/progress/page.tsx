@@ -15,6 +15,7 @@ import {
   getForesightStats,
   getCoachMetrics,
   reflectMemory,
+  getKnowledgeGraph,
   type ProfileOverview,
   type RadarDimension,
   type F1Point,
@@ -25,6 +26,7 @@ import {
   type Episode,
   type ForesightStats,
   type CoachMetrics,
+  type KnowledgeGraphData,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
 import { RadarChart } from "@/components/learning-stats/RadarChart";
@@ -34,6 +36,7 @@ import { DecisionLog as DecisionLogPanel } from "@/components/learning-stats/Dec
 import { EvaluationPanel } from "@/components/learning-stats/EvaluationPanel";
 import { Timeline } from "@/components/learning-stats/Timeline";
 import { CoachMetricsPanel } from "@/components/learning-stats/CoachMetrics";
+import { KnowledgeGraphPanel } from "@/components/learning-stats/KnowledgeGraphPanel";
 
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
@@ -48,12 +51,13 @@ export default function ProgressPage() {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [foresight, setForesight] = useState<ForesightStats | null>(null);
   const [coachMetrics, setCoachMetrics] = useState<CoachMetrics | null>(null);
+  const [knowledgeGraph, setKnowledgeGraph] = useState<KnowledgeGraphData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, radar, f1, tree, dec, ev, plan, ep, fs, cm] = await Promise.all([
+        const [ov, radar, f1, tree, dec, ev, plan, ep, fs, cm, kg] = await Promise.all([
           getLearningOverview(),
           getRadarDimensions(),
           getF1Trend(),
@@ -64,6 +68,7 @@ export default function ProgressPage() {
           getEpisodes(),
           getForesightStats(),
           getCoachMetrics(),
+          getKnowledgeGraph().catch(() => null),
         ]);
         if (cancelled) return;
         setOverview(ov.overview);
@@ -76,6 +81,7 @@ export default function ProgressPage() {
         setEpisodes(ep.episodes);
         setForesight(fs);
         setCoachMetrics(cm);
+        setKnowledgeGraph(kg);
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load");
       } finally {
@@ -147,6 +153,13 @@ export default function ProgressPage() {
         <h3 className="text-sm font-semibold">F1 成长曲线</h3>
         <F1Curve points={f1Points} />
       </div>
+
+      {knowledgeGraph && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold">知识图谱</h3>
+          <KnowledgeGraphPanel data={knowledgeGraph} />
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DecisionLogPanel decisions={decisions} />

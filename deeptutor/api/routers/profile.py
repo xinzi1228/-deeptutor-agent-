@@ -72,6 +72,56 @@ async def skill_tree_progress() -> dict[str, Any]:
     return LearningStats().skill_tree()
 
 
+@router.get("/knowledge-graph")
+async def knowledge_graph() -> dict[str, Any]:
+    """Learner knowledge graph: mastery snapshot + per-skill risk chains.
+
+    Reads the persisted graph (built incrementally from learning records) and
+    returns the learner's mastered/struggling skills plus, for each struggling
+    skill, its missing prerequisites and affected downstream skills/tasks —
+    the "风险链" used to personalise teaching.
+    """
+    from deeptutor.services.graph_query import GraphQueryService
+    from deeptutor.services.knowledge_graph import KnowledgeGraphStore
+
+    graph = KnowledgeGraphStore().get()
+    if not graph:
+        return {"graph": None, "mastery": {"mastered": [], "struggling": []}, "risk_chains": []}
+
+    svc = GraphQueryService(graph)
+    mastery = svc.mastery_snapshot()
+    risk_chains = []
+    for item in mastery["struggling"]:
+        risk = svc.risk_path(item["id"])
+        risk_chains.append(
+            {
+                "target": risk["target"],
+                "name": risk["target_name"],
+                "missing_prereqs": risk["missing_prereqs"],
+                "affected_downstream": risk["affected_downstream"],
+                "confidence": risk["confidence"],
+            }
+        )
+    # also surface risk chains for not-yet-touched core skills (first 3 by id)
+    touched = {x["id"] for x in mastery["mastered"] + mastery["struggling"]}
+    for node_id, node in graph.get("nodes", {}).items():
+        if node.get("type") != "Skill" or node_id in touched:
+            continue
+        risk = svc.risk_path(node_id)
+        if risk["missing_prereqs"] or risk["struggling"]:
+            risk_chains.append(
+                {
+                    "target": risk["target"],
+                    "name": risk["target_name"],
+                    "missing_prereqs": risk["missing_prereqs"],
+                    "affected_downstream": risk["affected_downstream"],
+                    "confidence": risk["confidence"],
+                }
+            )
+    risk_chains.sort(key=lambda x: x["name"])
+    return {"graph": {"nodes": len(graph.get("nodes", {})), "edges": len(graph.get("edges", []))}, "mastery": mastery, "risk_chains": risk_chains}
+
+
 @router.get("/course-plan")
 async def course_plan() -> dict[str, Any]:
     """Return the persisted course plan, rebuilding from the latest brief if

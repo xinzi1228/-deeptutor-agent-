@@ -57,20 +57,11 @@ export default function AnnotationPage() {
             sandbox="allow-scripts allow-same-origin allow-top-navigation allow-popups"
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-4 text-[var(--muted-foreground)]">
-            <Wrench className="h-16 w-16" />
-            <div className="text-center">
-              <p className="text-sm font-medium">
-                {t("annotation.proRequiresLS")}
-              </p>
-              <p className="mt-1 text-xs">
-                {t("annotation.proHint")}
-              </p>
-              <p className="mt-4 rounded-lg bg-[var(--card)] px-4 py-3 font-mono text-xs">
-                label-studio start --port 8080
-              </p>
-            </div>
-          </div>
+          <iframe
+            src="http://localhost:8080"
+            className="h-full w-full border-0"
+            title="Label Studio"
+          />
         )}
       </div>
     </div>

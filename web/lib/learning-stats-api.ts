@@ -115,6 +115,29 @@ export function getSkillTree(): Promise<{ tree: SkillTreeNode }> {
   return fetchJSON(`${API_BASE}/skill-tree`);
 }
 
+export interface RiskNode {
+  id: string;
+  name: string;
+}
+
+export interface RiskChain {
+  target: string;
+  name: string;
+  missing_prereqs: RiskNode[];
+  affected_downstream: RiskNode[];
+  confidence: string;
+}
+
+export interface KnowledgeGraphData {
+  graph: { nodes: number; edges: number } | null;
+  mastery: { mastered: RiskNode[]; struggling: RiskNode[] };
+  risk_chains: RiskChain[];
+}
+
+export function getKnowledgeGraph(): Promise<KnowledgeGraphData> {
+  return fetchJSON(`${API_BASE}/knowledge-graph`);
+}
+
 export function getDecisions(): Promise<{ decisions: DecisionLog[] }> {
   return fetchJSON(`${API_BASE}/decisions`);
 }
