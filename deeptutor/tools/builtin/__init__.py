@@ -1712,6 +1712,7 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "verify_foresight",
     "improve_teaching_flow",
     "finalize_diagnosis",
+    "graph_query",
     "ls_create_project",
     "ls_check_annotations",
     "competency_map",
