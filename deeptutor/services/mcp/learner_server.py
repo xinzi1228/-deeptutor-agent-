@@ -102,6 +102,10 @@ _TOOLS = [
         "预测命中率统计 (Coach 预测有多少命中)。",
     ),
     _tool(
+        "get_coach_metrics",
+        "教练成功指标 (F1提升/foresight命中/自改进次数等)。",
+    ),
+    _tool(
         "get_episodes",
         "按日分组的学习记录时间线。",
         {"days": {"type": "integer", "description": "返回天数, 默认 14"}},
@@ -172,6 +176,8 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
             return _json_text(_store().facts())
         if name == "get_foresight_stats":
             return _json_text(_stats().foresight_stats())
+        if name == "get_coach_metrics":
+            return _json_text(_stats().coach_metrics())
         if name == "get_episodes":
             days = int(args.get("days") or 14)
             return _json_text({"episodes": _store().episodes(days=days)})

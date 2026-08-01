@@ -13,6 +13,7 @@ import {
   getCoursePlanDocx,
   getEpisodes,
   getForesightStats,
+  getCoachMetrics,
   reflectMemory,
   type ProfileOverview,
   type RadarDimension,
@@ -23,6 +24,7 @@ import {
   type TeachingEvaluation,
   type Episode,
   type ForesightStats,
+  type CoachMetrics,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
 import { RadarChart } from "@/components/learning-stats/RadarChart";
@@ -31,6 +33,7 @@ import { SkillTree } from "@/components/learning-stats/SkillTree";
 import { DecisionLog as DecisionLogPanel } from "@/components/learning-stats/DecisionLog";
 import { EvaluationPanel } from "@/components/learning-stats/EvaluationPanel";
 import { Timeline } from "@/components/learning-stats/Timeline";
+import { CoachMetricsPanel } from "@/components/learning-stats/CoachMetrics";
 
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
@@ -44,12 +47,13 @@ export default function ProgressPage() {
   const [coursePlan, setCoursePlan] = useState<CoursePlan | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [foresight, setForesight] = useState<ForesightStats | null>(null);
+  const [coachMetrics, setCoachMetrics] = useState<CoachMetrics | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, radar, f1, tree, dec, ev, plan, ep, fs] = await Promise.all([
+        const [ov, radar, f1, tree, dec, ev, plan, ep, fs, cm] = await Promise.all([
           getLearningOverview(),
           getRadarDimensions(),
           getF1Trend(),
@@ -59,6 +63,7 @@ export default function ProgressPage() {
           getCoursePlan().catch(() => ({ plan: null as any })),
           getEpisodes(),
           getForesightStats(),
+          getCoachMetrics(),
         ]);
         if (cancelled) return;
         setOverview(ov.overview);
@@ -70,6 +75,7 @@ export default function ProgressPage() {
         setCoursePlan(plan.plan || null);
         setEpisodes(ep.episodes);
         setForesight(fs);
+        setCoachMetrics(cm);
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load");
       } finally {
@@ -124,6 +130,8 @@ export default function ProgressPage() {
       </div>
 
       <StatCards overview={overview} foresight={foresight} />
+
+      <CoachMetricsPanel metrics={coachMetrics} />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-3 lg:col-span-3">

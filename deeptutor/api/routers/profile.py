@@ -156,6 +156,14 @@ async def foresights() -> dict[str, Any]:
     return LearningStats().foresight_stats()
 
 
+@router.get("/coach-metrics")
+async def coach_metrics() -> dict[str, Any]:
+    """Coach success metrics (agency-agents KPI borrowing)."""
+    from deeptutor.services.learning_records import LearningStats
+
+    return LearningStats().coach_metrics()
+
+
 @router.get("/facts")
 async def facts() -> dict[str, Any]:
     """Atomic facts: knowledge points evidenced as mastered (EverOS atomic_facts)."""

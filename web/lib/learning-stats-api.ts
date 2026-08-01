@@ -83,6 +83,16 @@ export interface ForesightStats {
   open: number;
 }
 
+export interface CoachMetrics {
+  f1_growth: number | null;
+  latest_f1: number | null;
+  pattern_confirmation_rate: number | null;
+  foresight_hit_rate: number | null;
+  teaching_improvements: number;
+  decision_audit_entries: number;
+  tasks_completed: number;
+}
+
 async function fetchJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API ${url} returned ${res.status}`);
@@ -127,6 +137,10 @@ export function getEpisodes(): Promise<{ episodes: Episode[] }> {
 
 export function getForesightStats(): Promise<ForesightStats> {
   return fetchJSON(`${API_BASE}/foresights`);
+}
+
+export function getCoachMetrics(): Promise<CoachMetrics> {
+  return fetchJSON(`${API_BASE}/coach-metrics`);
 }
 
 export async function reflectMemory(): Promise<{ reflect: { clusters_merged: number; records_archived: number; active_records: number } }> {

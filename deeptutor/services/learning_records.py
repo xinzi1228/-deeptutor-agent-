@@ -450,6 +450,25 @@ class LearningRecordStore:
         ]
         return {"facts": facts, "count": len(facts)}
 
+    async def _mirror_recent_summary(self, record: dict[str, Any]) -> None:
+        """Append a one-line human summary to L3 recent.md for ``read_memory``."""
+        summary = _summary_line(record)
+        if not summary:
+            return
+        try:
+            from deeptutor.services.memory import get_memory_store
+            from deeptutor.services.memory.trace import TraceEvent
+
+            store = get_memory_store()
+            event = TraceEvent.new("chat", "learning_record_written", record)
+            await store.emit(event)
+            await store.append_learning_summary(
+                text=summary,
+                ref=event.id,
+            )
+        except Exception as exc:  # never let mirroring break the write
+            logger.warning("Failed to mirror learning summary into recent.md: %s", exc)
+
 
 class TeachingChangelog:
     """Versioned record of coach-flow improvements (Self-Improving loop).
@@ -500,25 +519,6 @@ class TeachingChangelog:
 
             await asyncio.to_thread(_write)
         return change
-
-    async def _mirror_recent_summary(self, record: dict[str, Any]) -> None:
-        """Append a one-line human summary to L3 recent.md for ``read_memory``."""
-        summary = _summary_line(record)
-        if not summary:
-            return
-        try:
-            from deeptutor.services.memory import get_memory_store
-            from deeptutor.services.memory.trace import TraceEvent
-
-            store = get_memory_store()
-            event = TraceEvent.new("chat", "learning_record_written", record)
-            await store.emit(event)
-            await store.append_learning_summary(
-                text=summary,
-                ref=event.id,
-            )
-        except Exception as exc:  # never let mirroring break the write
-            logger.warning("Failed to mirror learning summary into recent.md: %s", exc)
 
 
 def _summary_line(record: dict[str, Any]) -> str:
@@ -719,6 +719,56 @@ class LearningStats:
             "hits": len(hits),
             "hit_rate": round(len(hits) / len(verified), 2) if verified else None,
             "open": len(with_foresight) - len(verified),
+        }
+
+    def coach_metrics(self) -> dict[str, Any]:
+        """Coach success metrics (agency-agents Success Metrics borrowing).
+
+        All derived from the existing learning store — nothing new to persist.
+        """
+        progress = self._progress()
+        exercises = self._exercises(progress)
+
+        # F1 growth: first vs latest practice
+        f1s = [float(e.get("f1") or 0) for e in exercises if e.get("f1")]
+        f1_growth = None
+        if len(f1s) >= 2 and f1s[0] > 0:
+            f1_growth = round((f1s[-1] - f1s[0]) / f1s[0], 3)
+
+        # pattern confirmation: count records with confirmed patterns
+        patterns_confirmed = sum(
+            1 for e in exercises if e.get("pattern_status") == "confirmed"
+        )
+        patterns_total = sum(
+            1 for e in exercises if e.get("error_pattern")
+        )
+
+        # teaching self-improvement: changelog versions
+        from deeptutor.services.learning_records import TeachingChangelog
+
+        try:
+            improvements = len(TeachingChangelog().list_changes(limit=100000))
+        except Exception:
+            improvements = 0
+
+        # decision audit completeness
+        try:
+            decisions = len(self._store.list_decisions(limit=100000))
+        except Exception:
+            decisions = 0
+
+        foresight = self.foresight_stats()
+
+        return {
+            "f1_growth": f1_growth,
+            "latest_f1": f1s[-1] if f1s else None,
+            "pattern_confirmation_rate": (
+                round(patterns_confirmed / patterns_total, 2) if patterns_total else None
+            ),
+            "foresight_hit_rate": foresight["hit_rate"],
+            "teaching_improvements": improvements,
+            "decision_audit_entries": decisions,
+            "tasks_completed": len(exercises),
         }
 
 
