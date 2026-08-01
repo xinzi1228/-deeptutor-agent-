@@ -12,6 +12,53 @@ from typing import Dict, List, Optional
 from deeptutor.services.rag.service import RAGService
 
 
+def assess_relevance(result: dict, query: str) -> dict:
+    """Corrective-RAG relevance check (awesome-llm-apps CRAG borrowing).
+
+    Inspects the retrieval result's sources: empty/no sources or uniformly
+    low scores ⇒ low relevance, with a rewritten-query suggestion. The LLM
+    caller should retry with the suggested query, or admit the KB lacks the
+    content rather than fabricating an answer.
+
+    Returns ``{"relevant": bool, "reason": str, "suggested_query": str}``.
+    """
+    sources = result.get("sources") or []
+    answer = (result.get("answer") or result.get("content") or "").strip()
+
+    def _score(item) -> float:
+        try:
+            return float(item.get("score") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    scored = [item for item in sources if isinstance(item, dict) and "score" in item]
+    if scored:
+        best = max(_score(item) for item in scored)
+        if best < 0.3:
+            return {
+                "relevant": False,
+                "reason": f"检索来源相关性低 (最高分 {best:.2f}), 不足以支撑回答",
+                "suggested_query": f"{query} 标注 规范 定义",
+            }
+    if not sources:
+        if answer:
+            return {
+                "relevant": True,
+                "reason": "无引用来源但生成了回答(可能是引擎 fallback)",
+                "suggested_query": query,
+            }
+        return {
+            "relevant": False,
+            "reason": "检索无结果, 知识库可能不含该内容",
+            "suggested_query": f"{query} 标注 规范 定义",
+        }
+    return {
+        "relevant": True,
+        "reason": "检索来源充足",
+        "suggested_query": query,
+    }
+
+
 async def rag_search(
     query: str,
     kb_name: str,

@@ -10,6 +10,7 @@ import {
   getDecisions,
   getEvaluations,
   getCoursePlan,
+  getCoursePlanDocx,
   getEpisodes,
   getForesightStats,
   reflectMemory,
@@ -143,7 +144,20 @@ export default function ProgressPage() {
         <DecisionLogPanel decisions={decisions} />
         {coursePlan && (
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
-            <h3 className="mb-3 text-sm font-semibold">课程计划</h3>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">课程计划</h3>
+              <button
+                onClick={async () => {
+                  try {
+                    const d = await getCoursePlanDocx();
+                    if (d.docx.url) window.open(d.docx.url, "_blank");
+                  } catch {}
+                }}
+                className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--muted-foreground)] transition-colors hover:bg-[var(--border)]"
+              >
+                下载手册
+              </button>
+            </div>
             <ul className="space-y-2">
               {coursePlan.modules.map((m) => (
                 <li key={m.name} className="text-xs">

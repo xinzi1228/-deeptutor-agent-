@@ -82,6 +82,16 @@ async def course_plan() -> dict[str, Any]:
     return {"plan": plan if plan is not None else {}}
 
 
+@router.get("/course-plan/docx")
+async def course_plan_docx() -> dict[str, Any]:
+    """Generate the 学习路径手册 .docx and return its download URL."""
+    from deeptutor.services.course_plan import CoursePlanStore, rebuild
+
+    plan = rebuild(force=False) or {}
+    artifact = CoursePlanStore().export_docx(plan)
+    return {"docx": artifact}
+
+
 @router.get("/decisions")
 async def decisions(limit: int = 20) -> dict[str, Any]:
     """Recent coach decisions with rationale (lumen audit trail)."""

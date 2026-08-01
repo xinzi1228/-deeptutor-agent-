@@ -148,10 +148,24 @@ class RAGTool(_PromptHintsMixin, BaseTool):
             **extra_kwargs,
         )
         content = result.get("answer") or result.get("content", "")
+
+        # Corrective-RAG relevance check: flag low-relevance retrievals so the
+        # coach retries with a rewritten query instead of fabricating.
+        from deeptutor.tools.rag_tool import assess_relevance
+
+        relevance = assess_relevance(result, query)
+        metadata = dict(result)
+        metadata["relevance"] = relevance
+        if not relevance["relevant"]:
+            content = (
+                f"(RAG 相关性检查: {relevance['reason']}。建议改写查询重试: "
+                f"「{relevance['suggested_query']}」)\n\n{content}"
+            )
+
         return ToolResult(
             content=content,
             sources=_rag_sources(result, query=query, kb_name=kb_name),
-            metadata=result,
+            metadata=metadata,
         )
 
 

@@ -117,6 +117,10 @@ export function getCoursePlan(): Promise<{ plan: CoursePlan }> {
   return fetchJSON(`${API_BASE}/course-plan`);
 }
 
+export function getCoursePlanDocx(): Promise<{ docx: { url: string | null; path: string } }> {
+  return fetchJSON(`${API_BASE}/course-plan/docx`);
+}
+
 export function getEpisodes(): Promise<{ episodes: Episode[] }> {
   return fetchJSON(`${API_BASE}/episodes`);
 }
