@@ -201,53 +201,68 @@ class LabelStudioCheckTool(BaseTool):
         task_type = kwargs.get("task_type", "bbox")
 
         try:
-            export_data = await _ls_request(
-                "GET",
-                f"/api/projects/{project_id}/export?exportType=JSON",
-            )
+            # Label Studio export collapses ``predictions`` to a list of IDs
+            # (no ground-truth result), so read tasks via the tasks API which
+            # returns full prediction objects. Paginated to cover large projects.
+            tasks_data: list[dict[str, Any]] = []
+            page = 1
+            while True:
+                batch = await _ls_request(
+                    "GET",
+                    f"/api/projects/{project_id}/tasks?page={page}&page_size=100",
+                )
+                if not batch or not isinstance(batch, list):
+                    break
+                tasks_data.extend(batch)
+                if len(batch) < 100:
+                    break
+                page += 1
 
             all_results: list[str] = []
             total_f1 = 0.0
             task_count = 0
+            missing_gt = 0
+            no_annotation = 0
 
-            for task in export_data:
+            for task in tasks_data:
                 annotations = task.get("annotations", [])
                 if not annotations:
+                    no_annotation += 1
                     continue
 
                 latest = annotations[-1]
                 pred_results = latest.get("result", [])
-                gt_results = task.get("predictions", [{}])[0].get("result", []) if task.get("predictions") else []
+
+                # predictions may be full dicts (tasks API) — pick the first
+                # one that actually carries a result payload.
+                gt_results: list[Any] = []
+                for p in (task.get("predictions") or []):
+                    if isinstance(p, dict) and p.get("result"):
+                        gt_results = p["result"]
+                        break
 
                 if not gt_results:
-                    all_results.append(
-                        f"Task {task.get('id', '?')}: No ground truth configured. Skipping."
-                    )
+                    missing_gt += 1
                     continue
 
                 if task_type == "bbox":
-                    pred_boxes = [
-                        {
-                            "x": int(r["value"]["x"]),
-                            "y": int(r["value"]["y"]),
-                            "w": int(r["value"]["width"]),
-                            "h": int(r["value"]["height"]),
-                            "label": r["value"].get("rectanglelabels", ["unknown"])[0],
-                        }
-                        for r in pred_results
-                        if r.get("type") == "rectanglelabels"
-                    ]
-                    gt_boxes = [
-                        {
-                            "x": int(r["value"]["x"]),
-                            "y": int(r["value"]["y"]),
-                            "w": int(r["value"]["width"]),
-                            "h": int(r["value"]["height"]),
-                            "label": r["value"].get("rectanglelabels", ["unknown"])[0],
-                        }
-                        for r in gt_results
-                        if r.get("type") == "rectanglelabels"
-                    ]
+                    def _boxes(results: list[Any]) -> list[dict[str, Any]]:
+                        out = []
+                        for r in results:
+                            if r.get("type") != "rectanglelabels":
+                                continue
+                            v = r.get("value", {})
+                            out.append({
+                                "x": float(v.get("x", 0)),
+                                "y": float(v.get("y", 0)),
+                                "w": float(v.get("width", 0)),
+                                "h": float(v.get("height", 0)),
+                                "label": (v.get("rectanglelabels") or ["unknown"])[0],
+                            })
+                        return out
+
+                    pred_boxes = _boxes(pred_results)
+                    gt_boxes = _boxes(gt_results)
                     check = _bbox_dict(pred_boxes, gt_boxes)
                     all_results.append(
                         f"Task {task.get('id', '?')}: "
@@ -278,10 +293,18 @@ class LabelStudioCheckTool(BaseTool):
                     task_count += 1
 
             if task_count == 0:
+                if missing_gt:
+                    return ToolResult(
+                        content=(
+                            f"项目 {project_id} 有标注但缺 ground truth "
+                            f"({missing_gt} 个任务)。请先在 Label Studio 为任务导入 predictions 作为真值。"
+                        ),
+                        success=False,
+                    )
                 return ToolResult(
                     content=(
-                        f"No annotated tasks found in project {project_id}. "
-                        f"Make sure the user has submitted annotations."
+                        f"No annotated tasks found in project {project_id} "
+                        f"({no_annotation} 个任务未标注)。Make sure the user has submitted annotations."
                     ),
                 )
 
@@ -291,6 +314,13 @@ class LabelStudioCheckTool(BaseTool):
                 + "\n".join(all_results)
                 + f"\n\nAverage F1/Accuracy: {avg_score:.0%}"
             )
+            if missing_gt:
+                summary += (
+                    f"\n\n注: {missing_gt} 个任务有标注但缺 ground truth (predictions)，已跳过。"
+                    f"请在 Label Studio 为这些任务导入 predictions 作为真值。"
+                )
+            if no_annotation:
+                summary += f"\n注: {no_annotation} 个任务尚无标注。"
 
             return ToolResult(
                 content=summary,

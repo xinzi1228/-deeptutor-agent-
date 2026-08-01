@@ -185,10 +185,13 @@ def _bbox_dict(predictions: list[dict], ground_truth: list[dict], iou_threshold:
             matched_pred.add(pi)
             matched_gt.add(gj)
     tp = len(matched_pred)
+    precision = tp / len(predictions) if predictions else 0
+    recall = tp / len(ground_truth) if ground_truth else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
     return {
-        "precision": round(tp / len(predictions), 4) if predictions else 0,
-        "recall": round(tp / len(ground_truth), 4) if ground_truth else 0,
-        "f1": 0,  # computed below
+        "precision": round(precision, 4),
+        "recall": round(recall, 4),
+        "f1": round(f1, 4),
         "matched_count": tp,
         "extra_count": len(predictions) - tp,
         "missed_count": len(ground_truth) - tp,
