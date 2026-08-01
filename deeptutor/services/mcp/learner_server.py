@@ -111,6 +111,15 @@ _TOOLS = [
         {"days": {"type": "integer", "description": "返回天数, 默认 14"}},
     ),
     _tool(
+        "get_knowledge_graph",
+        "学习者知识图谱摘要 (节点/边计数 + 掌握/挣扎学习痕迹)。",
+    ),
+    _tool(
+        "query_risk_path",
+        "风险链查询: 查技能/任务的前置缺失与下游受影响范围。",
+        {"target": {"type": "string", "description": "技能 id 或任务 id"}},
+    ),
+    _tool(
         "get_teaching_changes",
         "教学流程自改进日志 (版本化改动记录)。",
         {"limit": {"type": "integer", "description": "返回条数, 默认 20"}},
@@ -181,6 +190,34 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
         if name == "get_episodes":
             days = int(args.get("days") or 14)
             return _json_text({"episodes": _store().episodes(days=days)})
+        if name == "get_knowledge_graph":
+            from deeptutor.services.knowledge_graph import KnowledgeGraphStore
+
+            graph = KnowledgeGraphStore().get()
+            if not graph:
+                return _json_text({"error": "graph not built yet"})
+            nodes = graph.get("nodes", {})
+            edges = graph.get("edges", [])
+            learner = "learner:default"
+            traces = [e for e in edges if e.get("source") == learner]
+            return _json_text(
+                {
+                    "node_count": len(nodes),
+                    "edge_count": len(edges),
+                    "trace_count": len(traces),
+                    "mastered": [e["target"] for e in traces if e["type"] == "mastered"],
+                    "struggling": [e["target"] for e in traces if e["type"] == "struggling"],
+                }
+            )
+        if name == "query_risk_path":
+            from deeptutor.services.graph_query import GraphQueryService
+            from deeptutor.services.knowledge_graph import KnowledgeGraphStore
+
+            graph = KnowledgeGraphStore().get()
+            if not graph:
+                return _json_text({"error": "graph not built yet"})
+            target = args.get("target", "")
+            return _json_text(GraphQueryService(graph).risk_path(target))
         if name == "get_teaching_changes":
             from deeptutor.services.learning_records import TeachingChangelog
 
