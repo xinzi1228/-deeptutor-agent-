@@ -205,6 +205,12 @@ write_learning_record 记录诊断结果:
   存 workspace/learning/brief.json
   下次会话 get_brief 直接恢复路线, 不用重走诊断
 
+自动建课 (lumen 可重跑建课) ◀── 硬约束:
+  调 /api/v1/profile/course-plan 或 rebuild() 生成 4 模块课程计划
+  → 概念序列 + 练习任务 + 前置 DAG, 确定性可重跑
+  → 幂等: 已有计划则复用, force=True 才重建
+  展示给学生的路线来自 course_plan, 不是手写
+
 根据教学模式加载目标流程:
   Zero-Base → Phase1 (beginner_foundation 入口)
   Standard → Phase1 (标准入口)

@@ -79,6 +79,11 @@ _TOOLS = [
         "最近一次诊断产生的学习路线 brief。",
     ),
     _tool(
+        "get_course_plan",
+        "确定性课程计划 (4 模块: 概念+任务+DAG)。缺省时从 brief 自动重建。",
+        {"force": {"type": "boolean", "description": "True 强制重建"}},
+    ),
+    _tool(
         "get_annotation_task",
         "获取标注练习任务",
         {"task_id": {"type": "string", "description": "task1-task9"}},
@@ -124,6 +129,11 @@ async def call_tool(name: str, arguments: dict[str, Any] | None) -> list[TextCon
         if name == "get_learner_brief":
             brief = _store().get_brief()
             return _json_text(brief or {"error": "no brief yet"})
+        if name == "get_course_plan":
+            from deeptutor.services.course_plan import rebuild
+
+            force = bool(args.get("force") or False)
+            return _json_text(rebuild(force=force) or {"error": "build failed"})
         if name == "get_annotation_task":
             from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 
@@ -159,6 +169,7 @@ _RESOURCES = [
     Resource(uri="learner://records", name="学习记录", mimeType="application/json"),
     Resource(uri="learner://brief", name="诊断 brief", mimeType="application/json"),
     Resource(uri="learner://skill-tree", name="能力图谱", mimeType="application/json"),
+    Resource(uri="learner://course-plan", name="课程计划", mimeType="application/json"),
 ]
 
 
@@ -183,6 +194,10 @@ async def read_resource(uri: Any) -> list[Any]:
         body = _store().get_brief() or {"error": "no brief yet"}
     elif key == "learner://skill-tree":
         body = _stats().skill_tree()
+    elif key == "learner://course-plan":
+        from deeptutor.services.course_plan import rebuild
+
+        body = rebuild(force=False) or {"error": "no plan yet"}
     else:
         raise ValueError(f"unknown resource: {key}")
     return [

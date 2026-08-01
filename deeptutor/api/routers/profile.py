@@ -70,3 +70,13 @@ async def f1_trend() -> dict[str, Any]:
 @router.get("/skill-tree")
 async def skill_tree_progress() -> dict[str, Any]:
     return LearningStats().skill_tree()
+
+
+@router.get("/course-plan")
+async def course_plan() -> dict[str, Any]:
+    """Return the persisted course plan, rebuilding from the latest brief if
+    absent (lumen-style re-runnable build)."""
+    from deeptutor.services.course_plan import rebuild
+
+    plan = rebuild(force=False)
+    return {"plan": plan if plan is not None else {}}
