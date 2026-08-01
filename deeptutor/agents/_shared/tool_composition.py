@@ -204,6 +204,7 @@ def compose_enabled_tools(
         "verify_foresight",
         "improve_teaching_flow",
         "finalize_diagnosis",
+        "graph_query",
     ):
         if _builtin_allowed(always_on):
             composed.append(always_on)

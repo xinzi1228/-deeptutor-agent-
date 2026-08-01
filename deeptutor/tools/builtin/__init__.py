@@ -29,6 +29,7 @@ from deeptutor.tools.evaluate_teaching_plan_tool import EvaluateTeachingPlanTool
 from deeptutor.tools.verify_foresight_tool import VerifyForesightTool
 from deeptutor.tools.improve_teaching_flow_tool import ImproveTeachingFlowTool
 from deeptutor.tools.finalize_diagnosis_tool import FinalizeDiagnosisTool
+from deeptutor.tools.graph_tool import GraphQueryTool
 from deeptutor.tools.label_studio_tool import (
     LabelStudioCheckTool,
     LabelStudioCreateProjectTool,
@@ -1620,6 +1621,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     VerifyForesightTool,
     ImproveTeachingFlowTool,
     FinalizeDiagnosisTool,
+    GraphQueryTool,
     CronTool,
     # Image → GeoGebra figure reconstruction. User-toggleable in chat; the
     # solve loop capability force-mounts it for diagram problems.
@@ -1748,6 +1750,7 @@ __all__ = [
     "VerifyForesightTool",
     "ImproveTeachingFlowTool",
     "FinalizeDiagnosisTool",
+    "GraphQueryTool",
     "BrainstormTool",
     "CodeExecutionTool",
     "ExecTool",
