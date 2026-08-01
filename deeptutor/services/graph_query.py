@@ -101,7 +101,8 @@ class GraphQueryService:
             return result
 
         snap = self.mastery_snapshot()
-        struggling_ids = {x["id"] for x in snap["struggling"]}
+        struggling_by_id = {x["id"]: x for x in snap["struggling"]}
+        struggling_ids = set(struggling_by_id)
         mastered_ids = {x["id"] for x in snap["mastered"]}
         target_skills = self._target_skills(target)
 
@@ -119,11 +120,15 @@ class GraphQueryService:
                 stack.append(e["target"])
 
         involved = set(target_skills) | visited
-        result["struggling"] = [
-            {"id": s, "name": self._name(s)}
-            for s in struggling_ids
-            if s in involved
-        ]
+        result["struggling"] = []
+        for s in struggling_ids:
+            if s not in involved:
+                continue
+            entry = {"id": s, "name": self._name(s)}
+            f1 = struggling_by_id[s].get("f1")
+            if f1 is not None:
+                entry["f1"] = f1
+            result["struggling"].append(entry)
         result["missing_prereqs"].sort(key=lambda x: x["id"])
         result["struggling"].sort(key=lambda x: x["id"])
 

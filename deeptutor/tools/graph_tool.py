@@ -51,11 +51,7 @@ class GraphQueryTool(BaseTool):
 
         from deeptutor.services.graph_query import GraphQueryService
 
-        graph = await _load_graph(
-            tree=_load_competency_tree(),
-            bank=_load_bank() or {},
-            records=_list_records(),
-        )
+        graph = await _load_graph()
         if not graph or not graph.get("nodes"):
             return ToolResult(
                 content="知识图谱尚未构建。请先完成诊断（finalize_diagnosis）并记录学习记录。",
@@ -72,12 +68,13 @@ class GraphQueryTool(BaseTool):
         else:
             data = svc.risk_path(target)
             content = _format_risk_path(data)
-            try:
-                explanation = await _explain_risk(query=data, target=target)
-            except Exception:
-                explanation = None
-            if explanation:
-                content = f"{content}\n\n{explanation}"
+            if data.get("confidence") == "high":
+                try:
+                    explanation = await _explain_risk(query=data, target=target)
+                except Exception:
+                    explanation = None
+                if explanation:
+                    content = f"{content}\n\n{explanation}"
 
         return ToolResult(content=content, metadata=data)
 
@@ -140,18 +137,26 @@ def _list_records() -> list[dict]:
 async def _load_graph(
     *, tree: dict | None = None, bank: dict | None = None, records: list[dict] | None = None
 ) -> dict | None:
-    """Return persisted graph, or rebuild from JSONL records on the fly."""
+    """Return persisted graph, or rebuild from JSONL records on the fly.
+
+    The tree/bank/records inputs are only loaded (from args or lazy loaders)
+    when no graph is persisted — the common per-turn path is a single
+    ``store.get()``.
+    """
     from deeptutor.services.knowledge_graph import KnowledgeGraphStore
 
     store = KnowledgeGraphStore()
     graph = store.get()
     if graph:
         return graph
-    tree = tree or {}
+    if tree is None:
+        tree = _load_competency_tree()
+    if bank is None:
+        bank = _load_bank() or {}
+    if records is None:
+        records = _list_records()
     if isinstance(tree, dict) and "tree" in tree:
         tree = tree["tree"]
-    bank = bank or {}
-    records = records or []
     if not tree.get("children"):
         return None
     graph = KnowledgeGraphStore.build(tree=tree, bank=bank, records=records)
@@ -167,7 +172,7 @@ async def _explain_risk(query: dict, target: str) -> str | None:
     prompt = (
         f"你是数据标注教学教练。基于以下知识图谱风险链结果，用中文给学生解释"
         f"为什么'{query.get('target_name', target)}'有学习风险，并给出先补什么、再练什么的建议。"
-        f"语气鼓励但具体。\n\n风险链数据:\n{context}"
+        f"语气鼓励但具体。只依据以下风险链数据，不得虚构 F1 数值或前置技能。\n\n风险链数据:\n{context}"
     )
     result = await reason(query=prompt, max_tokens=200, temperature=0.3)
     answer = (result or {}).get("answer", "").strip()

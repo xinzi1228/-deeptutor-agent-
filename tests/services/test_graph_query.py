@@ -41,6 +41,15 @@ def test_risk_path_unknown_target_returns_empty() -> None:
     assert not r["affected_downstream"]
 
 
+def test_risk_path_struggling_carries_f1() -> None:
+    svc = GraphQueryService(_graph())
+    r = svc.risk_path("task2")
+    struggling = {x["id"]: x for x in r["struggling"]}
+    assert struggling["skill-1-1-2"]["f1"] == 0.65
+    # mastered skills are never f1-tagged in the struggling list
+    assert all("f1" not in x for x in r["missing_prereqs"])
+
+
 def test_risk_path_finds_missing_prereq() -> None:
     # build a graph where 遮挡目标处理 has no learning trace but requires 边界框绘制规范
     records = []  # no learning records → nothing mastered
