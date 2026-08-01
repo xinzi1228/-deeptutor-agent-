@@ -22,6 +22,7 @@ import {
   PenLine,
   Settings,
   Tag,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -71,6 +72,12 @@ const PRIMARY_NAV: NavEntry[] = [
     label: "Annotation",
     icon: Tag,
     tooltipKey: "Annotation tooltip",
+  },
+  {
+    href: "/progress",
+    label: "Progress",
+    icon: TrendingUp,
+    tooltipKey: "Progress tooltip",
   },
   {
     href: "/co-writer",

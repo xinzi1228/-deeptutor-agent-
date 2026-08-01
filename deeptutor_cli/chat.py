@@ -33,9 +33,11 @@ class ChatState:
     tools: list[str] = field(default_factory=list)
     knowledge_bases: list[str] = field(default_factory=list)
     language: str = "en"
+    persona: str = ""
     notebook_references: list[dict[str, Any]] = field(default_factory=list)
     history_references: list[str] = field(default_factory=list)
     config: dict[str, Any] = field(default_factory=dict)
+    pending_message: str | None = None
 
 
 def register(app: typer.Typer) -> None:
@@ -49,6 +51,7 @@ def register(app: typer.Typer) -> None:
         notebook_ref: list[str] = typer.Option([], "--notebook-ref", help="Notebook references."),
         history_ref: list[str] = typer.Option([], "--history-ref", help="Referenced session ids."),
         language: str = typer.Option("en", "--language", "-l", help="Response language."),
+        persona: str = typer.Option("", "--persona", "-p", help="Active persona name."),
         config: list[str] = typer.Option([], "--config", help="Initial config key=value."),
         config_json: str | None = typer.Option(
             None, "--config-json", help="Initial config as JSON."
@@ -70,6 +73,7 @@ def register(app: typer.Typer) -> None:
             tools=list(tool),
             knowledge_bases=list(kb),
             language=language,
+            persona=persona,
             notebook_references=_parse_notebook_refs(notebook_ref),
             history_references=[item.strip() for item in history_ref if item.strip()],
             config=initial_config,
@@ -98,6 +102,7 @@ async def _chat_repl(state: ChatState) -> None:
         state.tools = list(preferences.get("tools") or state.tools)
         state.knowledge_bases = list(preferences.get("knowledge_bases") or state.knowledge_bases)
         state.language = str(preferences.get("language") or state.language)
+        state.persona = str(preferences.get("persona") or state.persona)
         state.notebook_references = list(
             preferences.get("notebook_references") or state.notebook_references
         )
@@ -116,6 +121,10 @@ async def _chat_repl(state: ChatState) -> None:
             "  /kb <name>|none\n"
             "  /history add <id> | /history clear\n"
             "  /notebook add <ref> | /notebook clear\n"
+            "  /progress — 学习进度仪表盘\n"
+            "  /concept-map — 能力图谱掌握状态\n"
+            "  /resume — 从断点继续学习\n"
+            "  /challenge — 出一道迁移挑战题\n"
             "  /show last|<n> — expand a tool result or captured thinking\n"
             "  /refs  /config show|set|clear",
             title="deeptutor chat",
@@ -157,8 +166,14 @@ async def _chat_repl(state: ChatState) -> None:
                     continue
                 should_continue = _apply_command(user_input, state)
                 if should_continue:
-                    continue
-                break
+                    if state.pending_message:
+                        # /resume /challenge injected a coaching message — send it.
+                        user_input = state.pending_message
+                        state.pending_message = None
+                    else:
+                        continue
+                else:
+                    break
 
             request = TurnRequest(
                 content=user_input,
@@ -167,6 +182,7 @@ async def _chat_repl(state: ChatState) -> None:
                 tools=list(state.tools),
                 knowledge_bases=list(state.knowledge_bases),
                 language=state.language,
+                persona=state.persona,
                 config=dict(state.config),
                 notebook_references=list(state.notebook_references),
                 history_references=list(state.history_references),
@@ -195,6 +211,18 @@ def _apply_command(raw: str, state: ChatState) -> bool:
         return True
     if command == "/status":
         _print_state(state)
+        return True
+    if command == "/progress":
+        _print_progress()
+        return True
+    if command == "/concept-map":
+        _print_concept_map()
+        return True
+    if command == "/resume":
+        state.pending_message = "继续上次的学习进度，从断点接着学。"
+        return True
+    if command == "/challenge":
+        state.pending_message = "给我出一道迁移挑战题来测试我当前的水平。"
         return True
     if command in {"/new", "/clear"}:
         state.session_id = None
@@ -283,6 +311,72 @@ def _read_repl_input() -> str:
         return "\n".join(lines).strip()
 
 
+def _print_progress() -> None:
+    """Print the learning-progress dashboard (local query, no LLM)."""
+    try:
+        from deeptutor.services.learning_records import LearningStats
+
+        stats = LearningStats()
+        ov = stats.overview()
+    except Exception as exc:
+        console.print(f"[red]Failed to load learning progress:[/] {exc}")
+        return
+
+    console.print(Panel.fit(
+        "[bold]学习进度[/]\n"
+        f"任务: {ov['tasks_passed']}/{ov['total_tasks_completed']} 通过"
+        f" ({ov['pass_rate']:.0%}) | 理论: {ov['total_theory_mastered']} 个知识点"
+        f" | 最新 F1: {ov['latest_f1'] if ov['latest_f1'] is not None else '—'}",
+        title="Progress",
+    ))
+
+    try:
+        radar = stats.radar()
+        lines = [f"  {d['name']}: {d['score']}/100" for d in radar["dimensions"]]
+        console.print(Panel.fit("\n".join(lines), title="Radar"))
+    except Exception:
+        pass
+
+    try:
+        trend = stats.f1_trend()
+        pts = trend["points"]
+        if pts:
+            curve = " → ".join(f"{p['task_id']}={p['f1']:.0f}%" for p in pts)
+            console.print(Panel.fit(f"[bold]F1 曲线[/]\n  {curve}", title="Trend"))
+        else:
+            console.print("[dim]暂无 F1 数据 — 完成标注任务后出现[/]")
+    except Exception:
+        pass
+
+
+def _print_concept_map() -> None:
+    """Print the competency map with mastered status (local query, no LLM)."""
+    try:
+        from deeptutor.services.learning_records import LearningStats
+
+        tree = LearningStats().skill_tree().get("tree")
+    except Exception as exc:
+        console.print(f"[red]Failed to load concept map:[/] {exc}")
+        return
+
+    def walk(node, depth: int = 0) -> None:
+        pad = "  " * depth
+        leaf = node.get("level") == 4
+        if leaf:
+            mark = "✓" if node.get("mastered") else "·"
+            console.print(f"  {pad}{mark} {node['name']}")
+            return
+        count = ""
+        if "mastered_count" in node:
+            count = f" [{node['mastered_count']}/{node['total_leaves']}]"
+        console.print(f"  {pad}▸ {node['name']}{count}")
+        for child in node.get("children", []):
+            walk(child, depth + 1)
+
+    console.print("[bold]能力图谱[/]")
+    walk(tree)
+
+
 def _print_state(state: ChatState) -> None:
     console.print(
         "[dim]"
@@ -290,6 +384,7 @@ def _print_state(state: ChatState) -> None:
         f"capability={state.capability} "
         f"tools={_format_list(state.tools)} "
         f"kb={_format_list(state.knowledge_bases)} "
+        f"persona={state.persona or '(none)'} "
         f"history={_format_list(state.history_references)} "
         f"notebook_refs={_format_notebook_refs(state.notebook_references)} "
         f"language={state.language} "

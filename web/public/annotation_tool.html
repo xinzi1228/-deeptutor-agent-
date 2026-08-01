@@ -51,12 +51,16 @@ canvas { border:1px solid #444; cursor:crosshair; border-radius:8px; max-width:1
 
 <div class="sidebar">
   <h2>选择任务</h2>
-  <select id="taskSelect" onchange="loadTask()">
-    <option value="task1">任务1: 街景找车 (1辆)</option>
-    <option value="task2">任务2: 停车场找车 (4辆)</option>
-    <option value="task3">任务3: 车辆特写 (1辆)</option>
-    <option value="task4">任务4: 找马 (4匹)</option>
-  </select>
+   <select id="taskSelect" onchange="loadTask()">
+     <option value="task1">任务1: 街景找车 (★简单)</option>
+     <option value="task2">任务2: 停车场找车 (★★中等)</option>
+     <option value="task3">任务3: 车辆特写 (★简单)</option>
+     <option value="task4">任务4: 找马 (★★中等)</option>
+     <option value="task5">任务5: 动物分类 (★简单-NEW)</option>
+     <option value="task6">任务6: 遮挡场景 (★★★困难)</option>
+     <option value="task7">任务7: 密集小目标 (★★★困难)</option>
+     <option value="task8">任务8: 精度挑战 (★★★困难)</option>
+   </select>
   
   <h2>选择标签</h2>
   <div class="label-btns" id="labelBtns"></div>
@@ -83,18 +87,26 @@ canvas { border:1px solid #444; cursor:crosshair; border-radius:8px; max-width:1
 
 <script>
 const TASKS = {
-  task1: { url:'/images/car2.jpeg', labels:['car'], w:640, h:430, desc:'街景 — 找到车并画框',
+  task1: { url:'/images/car2.jpeg', labels:['car'], w:640, h:430, desc:'街景 — 找到车并画框 (1辆)', difficulty:'简单',
     gt: [{"x":207,"y":140,"w":353,"h":273,"label":"car"}] },
-  task2: { url:'/images/car4.jpeg', labels:['car'], w:1080, h:659, desc:'停车场 — 找到所有车 (多辆)',
+  task2: { url:'/images/car4.jpeg', labels:['car'], w:1080, h:659, desc:'停车场 — 找到所有车 (4辆)', difficulty:'中等',
     gt: [{"x":187,"y":351,"w":144,"h":140,"label":"car"},{"x":431,"y":308,"w":89,"h":109,"label":"car"},{"x":664,"y":409,"w":138,"h":137,"label":"car"},{"x":564,"y":141,"w":71,"h":35,"label":"car"}] },
-  task3: { url:'/images/car1.jpeg', labels:['car'], w:2048, h:1536, desc:'车辆特写 — 画出整车轮廓',
+  task3: { url:'/images/car1.jpeg', labels:['car'], w:2048, h:1536, desc:'车辆特写 — 画出整车轮廓', difficulty:'简单',
     gt: [{"x":527,"y":52,"w":871,"h":813,"label":"car"}] },
-  task4: { url:'/images/2.jpeg', labels:['horse'], w:720, h:480, desc:'找马',
+  task4: { url:'/images/2.jpeg', labels:['horse'], w:720, h:480, desc:'找马 — 标注所有马匹 (4匹)', difficulty:'中等',
     gt: [{"x":0,"y":157,"w":88,"h":116,"label":"horse"},{"x":433,"y":74,"w":181,"h":358,"label":"horse"},{"x":26,"y":121,"w":292,"h":295,"label":"horse"},{"x":313,"y":130,"w":116,"h":291,"label":"horse"}] },
+  task5: { url:'/images/car2.jpeg', labels:['car','not_car'], w:640, h:430, desc:'图片分类 — 判断图中是否有汽车', difficulty:'简单', type:'classification',
+    gt: {"label":"car"} },
+  task6: { url:'/images/car4.jpeg', labels:['car'], w:1080, h:659, desc:'遮挡场景 — 被遮挡的车也要标注 (4辆，含遮挡)', difficulty:'困难',
+    gt: [{"x":187,"y":351,"w":144,"h":140,"label":"car"},{"x":431,"y":308,"w":89,"h":109,"label":"car"},{"x":664,"y":409,"w":138,"h":137,"label":"car"},{"x":564,"y":141,"w":71,"h":35,"label":"car"}] },
+  task7: { url:'/images/car4.jpeg', labels:['car'], w:1080, h:659, desc:'密集目标 — 找出所有车辆，包括远处小的', difficulty:'困难',
+    gt: [{"x":187,"y":351,"w":144,"h":140,"label":"car"},{"x":431,"y":308,"w":89,"h":109,"label":"car"},{"x":664,"y":409,"w":138,"h":137,"label":"car"},{"x":564,"y":141,"w":71,"h":35,"label":"car"}] },
+  task8: { url:'/images/car1.jpeg', labels:['car'], w:2048, h:1536, desc:'精度挑战 — 框边距 ≤ 3px，IOU ≥ 0.95', difficulty:'困难',
+    gt: [{"x":527,"y":52,"w":871,"h":813,"label":"car"}] },
 };
 
-const COLORS = { car:'#E74C3C', horse:'#8E44AD' };
-const LABEL_CN = { car:'车', horse:'马' };
+const COLORS = { car:'#E74C3C', horse:'#8E44AD', not_car:'#95A5A6' };
+const LABEL_CN = { car:'车', horse:'马', not_car:'非车' };
 
 let currentTask = 'task1', selectedLabel = '', boxes = [], drawing = null, start = null, checkResult = null;
 let img = new Image();
@@ -106,6 +118,10 @@ const resultContent = document.getElementById('resultContent');
 function loadTask() {
   currentTask = document.getElementById('taskSelect').value;
   const t = TASKS[currentTask];
+  if (t.type === 'classification') {
+    loadClassificationTask(t);
+    return;
+  }
   selectedLabel = t.labels[0];
   boxes = []; checkResult = null;
   resultPanel.classList.remove('show');
@@ -113,7 +129,7 @@ function loadTask() {
   renderLabels();
   img.onload = () => { canvas.width = t.w; canvas.height = t.h; draw(); };
   img.src = t.url;
-  document.getElementById('info').textContent = t.desc;
+  document.getElementById('info').textContent = t.desc + ' (' + (t.difficulty||'') + ')';
 }
 
 function renderLabels() {
@@ -327,6 +343,79 @@ function checkStoredResult() {
     document.getElementById('btnCoach').style.display = 'block';
     document.getElementById('info').textContent = '上次检查有结果，点「问Coach」让AI帮你分析';
   }
+}
+
+// ========== 分类任务支持 ==========
+let classificationAnswer = null;
+let classificationConfidence = null;
+function loadClassificationTask(t) {
+  boxes = []; checkResult = null; classificationAnswer = null;
+  resultPanel.classList.remove('show');
+  document.getElementById('btnCoach').style.display = 'none';
+  
+  const main = document.querySelector('.main-area');
+  const labelsHtml = t.labels.map(l => {
+    const cn = LABEL_CN[l] || l;
+    return `<button class="classify-btn" onclick="selectClassification('${l}', this)" style="padding:12px 24px;margin:6px;border:2px solid #333;border-radius:8px;background:#0f3460;color:#eee;cursor:pointer;font-size:14px">${cn}</button>`;
+  }).join('');
+  
+  main.innerHTML = `
+    <div style="text-align:center">
+      <img src="${t.url}" style="max-width:70%;max-height:400px;border-radius:10px;border:1px solid #444" onerror="this.src='${t.url}'">
+      <h3 style="margin:16px 0 8px">${t.desc}</h3>
+      <p style="color:#888;font-size:12px;margin-bottom:12px">选择你认为正确的类别：</p>
+      <div id="classifyBtns">${labelsHtml}</div>
+      <div style="margin-top:12px">
+        <label style="font-size:12px;color:#888">置信度（选填）：</label>
+        <input type="range" min="1" max="10" value="8" id="confidence" style="vertical-align:middle;width:160px">
+        <span style="font-size:12px;color:#888" id="confLabel">80%</span>
+      </div>
+      <button class="primary" onclick="checkClassification()" style="margin-top:16px;padding:10px 32px;border-radius:8px;background:#2563eb;color:#eee;border:none;cursor:pointer;font-size:14px">提交分类</button>
+      <div id="classifyResult" style="margin-top:12px"></div>
+    </div>
+  `;
+  
+  document.getElementById('confidence').addEventListener('input', function() {
+    document.getElementById('confLabel').textContent = (this.value * 10) + '%';
+    classificationConfidence = this.value / 10;
+  });
+  
+  document.getElementById('info').textContent = t.desc + ' (' + (t.difficulty||'') + ') - 选择类别';
+}
+
+function selectClassification(label, btn) {
+  document.querySelectorAll('.classify-btn').forEach(b => b.style.borderColor = '#333');
+  btn.style.borderColor = '#4fc3f7';
+  classificationAnswer = label;
+}
+
+function checkClassification() {
+  if (!classificationAnswer) { alert('请先选择一个类别'); return; }
+  const gt = TASKS[currentTask].gt;
+  const isCorrect = classificationAnswer === gt.label;
+  const cn = LABEL_CN[classificationAnswer] || classificationAnswer;
+  const gtCn = LABEL_CN[gt.label] || gt.label;
+  
+  document.getElementById('classifyResult').innerHTML = isCorrect
+    ? `<div style="background:rgba(74,222,128,0.1);border:1px solid #4ade80;padding:16px;border-radius:8px">
+         <h3 style="color:#4ade80;margin:0">✓ 回答正确！</h3>
+         <p>你选择了「${cn}」，正确答案是「${gtCn}」</p>
+       </div>`
+    : `<div style="background:rgba(248,113,113,0.1);border:1px solid #f87171;padding:16px;border-radius:8px">
+         <h3 style="color:#f87171;margin:0">✗ 回答错误</h3>
+         <p>你选择了「${cn}」，正确答案是「${gtCn}」</p>
+         <p style="color:#888;font-size:12px">提示：仔细观察图片内容再做判断</p>
+       </div>`;
+  
+  const result = {
+    type: 'classification', taskTitle: TASKS[currentTask].desc,
+    accuracy: isCorrect ? '100%' : '0%', correct: isCorrect,
+    answer: classificationAnswer, correctAnswer: gt.label,
+    confidence: classificationConfidence || 0.8
+  };
+  localStorage.setItem('annotation_last_result', JSON.stringify(result));
+  document.getElementById('btnCoach').style.display = 'block';
+  document.getElementById('info').textContent = isCorrect ? '正确！点「问Coach」继续下一个任务' : '不正确。点「问Coach」了解为什么';
 }
 
 loadTask();

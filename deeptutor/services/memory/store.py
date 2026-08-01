@@ -256,6 +256,29 @@ class MemoryStore:
                 logger.info("write_memory %s id=%s reason=%s", op, target_id or "new", reason)
             return report
 
+    async def append_learning_summary(self, text: str, ref: str) -> ApplyReport:
+        """Append one short learning-record summary to L3 ``recent.md``.
+
+        Used by the annotation-coach's ``write_learning_record`` tool so the
+        next conversation can resume from the last checkpoint via
+        ``read_memory``. The canonical structured record lives in the JSONL
+        learning store; this is a compact human-readable mirror. The bullet
+        is capped at the standard 240-char entry limit.
+        """
+        path = paths.l3_file("recent")
+        async with self._lock_for(path):
+            doc = (
+                parse(path.read_text(encoding="utf-8"))
+                if path.exists()
+                else Document(title=_default_title("L3", "recent"))
+            )
+            section = "Learning Records"
+            report = ops_apply(doc, [AddOp(section=section, text=text, refs=[ref])])
+            if report.accepted:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                await asyncio.to_thread(_atomic_write, path, serialize(doc))
+            return report
+
     # ── Workbench overview ────────────────────────────────────────────────
 
     def overview(self) -> list[DocOverview]:

@@ -22,11 +22,14 @@ from deeptutor.tools.partner_memory import (
     PartnerSearchTool,
 )
 from deeptutor.tools.annotation_check import AnnotationCheckTool
+from deeptutor.tools.write_learning_record import WriteLearningRecordTool
 from deeptutor.tools.label_studio_tool import (
     LabelStudioCheckTool,
     LabelStudioCreateProjectTool,
 )
 from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
+from deeptutor.tools.competency_tool import CompetencyMapTool
+from deeptutor.tools.job_analysis_tool import JobAnalysisTool
 from deeptutor.tools.prompting import load_prompt_hints
 
 logger = logging.getLogger(__name__)
@@ -1588,6 +1591,9 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     GetAnnotationTaskTool,
     LabelStudioCreateProjectTool,
     LabelStudioCheckTool,
+    CompetencyMapTool,
+    JobAnalysisTool,
+    WriteLearningRecordTool,
     CronTool,
     # Image → GeoGebra figure reconstruction. User-toggleable in chat; the
     # solve loop capability force-mounts it for diagram problems.
@@ -1671,8 +1677,11 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "cron",
     "annotation_check",
     "get_annotation_task",
+    "write_learning_record",
     "ls_create_project",
     "ls_check_annotations",
+    "competency_map",
+    "job_analysis",
     "ask_user",
 )
 
@@ -1698,6 +1707,9 @@ __all__ = [
     "GetAnnotationTaskTool",
     "LabelStudioCreateProjectTool",
     "LabelStudioCheckTool",
+    "CompetencyMapTool",
+    "JobAnalysisTool",
+    "WriteLearningRecordTool",
     "BrainstormTool",
     "CodeExecutionTool",
     "ExecTool",

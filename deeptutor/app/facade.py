@@ -22,6 +22,7 @@ class TurnRequest:
     tools: list[str] = field(default_factory=list)
     knowledge_bases: list[str] = field(default_factory=list)
     language: str = "en"
+    persona: str = ""
     config: dict[str, Any] = field(default_factory=dict)
     notebook_references: list[dict[str, Any]] = field(default_factory=list)
     history_references: list[str] = field(default_factory=list)
@@ -36,6 +37,7 @@ class TurnRequest:
             "tools": list(self.tools),
             "knowledge_bases": list(self.knowledge_bases),
             "language": self.language,
+            "persona": self.persona,
             "config": dict(self.config),
             "notebook_references": list(self.notebook_references),
             "history_references": list(self.history_references),

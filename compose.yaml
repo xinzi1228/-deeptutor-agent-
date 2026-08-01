@@ -110,6 +110,39 @@ services:
       start_period: 10s
 
   # ----------------------------------------------------------
+  # Label Studio — annotation workspace for hands-on practice
+  # ----------------------------------------------------------
+  # The annotation-coach persona uses this as the student's
+  # "professional practice room". Students annotate real datasets
+  # in Label Studio, then the Coach evaluates via the annotation_check
+  # tool or fetches results via ls_check_annotations.
+  label-studio:
+    image: heartexlabs/label-studio:latest
+    container_name: deeptutor-label-studio
+    pull_policy: always
+    restart: unless-stopped
+    userns_mode: keep-id
+    read_only: false
+    ports:
+      - "127.0.0.1:${HOST_PORT_LABEL_STUDIO:-8080}:8080"
+    volumes:
+      - ./data/label-studio:/label-studio/data:U
+    environment:
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-http://localhost:8080}
+    networks:
+      - deeptutor
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://localhost:8080/health
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ----------------------------------------------------------
   # DeepTutor — backend (FastAPI :8001) + frontend (Next.js :3782)
   # ----------------------------------------------------------
   # Both run inside the same image, supervised by supervisord under the

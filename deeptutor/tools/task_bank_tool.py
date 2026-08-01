@@ -25,15 +25,15 @@ class GetAnnotationTaskTool(BaseTool):
             name="get_annotation_task",
             description=(
                 "Get a REAL annotation practice task with ground truth from the course dataset. "
-                "Available: task1 (1 car), task2 (4 cars), task3 (1 car closeup), "
-                "task4 (4 horses), task5 (animal classification)."
+                "9 tasks across 3 difficulty levels (easy/medium/hard) and 2 types (bbox/classification). "
+                "task1-4: bbox detection, task5/9: classification, task6-8: advanced bbox."
             ),
             parameters=[
                 ToolParameter(
                     name="task_id",
                     type="string",
-                    description="task1/task2/task3/task4/task5",
-                    enum=["task1", "task2", "task3", "task4", "task5"],
+                    description="task1-task9. easy: task1/3/5, medium: task2/4/9, hard: task6/7/8",
+                    enum=["task1", "task2", "task3", "task4", "task5", "task6", "task7", "task8", "task9"],
                 ),
             ],
         )
@@ -51,29 +51,34 @@ class GetAnnotationTaskTool(BaseTool):
 
         if task["type"] == "bbox":
             fmt = json.dumps(gt[0]) if gt else '{"x":0,"y":0,"w":100,"h":100,"label":"?"}'
+            kps = ", ".join(task.get("knowledge_points", []))
             content = (
-                f"## {task['title']} ({task['difficulty']}) — {task['object_count']} object(s)\n\n"
+                f"## {task['title']} — 难度: {task['difficulty']}\n\n"
                 f"![Task Image]({task['image_url']})\n\n"
                 f"{task['instruction']}\n\n"
-                f"**Labels**: {', '.join(task['labels'])}\n"
-                f"**Format**: each box as `{fmt}` in a JSON array. Example: `[{fmt}]`\n\n"
+                f"**标签**: {', '.join(task['labels'])} | **数量**: {task['object_count']} 个\n"
+                f"**格式**: 每个框 `{fmt}`，放入 JSON 数组。例: `[{fmt}]`\n"
+                f"**训练技能**: {kps}\n\n"
                 f"---\n"
-                f"Ground Truth (for scoring):\n```json\n{gt_json}\n```\n"
-                f"After user submits, call `annotation_check`:\n"
-                f"- predictions: user's JSON\n"
+                f"Ground Truth (用于评分):\n```json\n{gt_json}\n```\n"
+                f"评分时调用 `annotation_check`:\n"
+                f"- predictions: 用户提交的 JSON\n"
                 f"- ground_truth: {gt_json}\n"
                 f"- task_type: bbox\n\n"
-                f"Next task: {task.get('next_task','none')}"
+                f"完成后续推荐: {task.get('next_task','请根据F1分数决定')}"
             )
         else:
             items_text = "\n".join(f"  {i['id']}. {i['text']}" for i in task.get("items", []))
+            kps = ", ".join(task.get("knowledge_points", []))
             content = (
-                f"## {task['title']} ({task['difficulty']})\n\n"
+                f"## {task['title']} — 难度: {task['difficulty']}\n\n"
+                f"![Task Image]({task['image_url']})\n\n"
                 f"{task['instruction']}\n\n{items_text}\n\n"
-                f"**Labels**: {', '.join(task['labels'])}\n"
-                f"**Format**: `[{task['format']}, ...]`\n\n"
+                f"**标签**: {', '.join(task['labels'])}\n"
+                f"**训练技能**: {kps}\n\n"
                 f"Ground Truth:\n```json\n{gt_json}\n```\n"
-                f"After user submits, call `annotation_check` with task_type: classification"
+                f"评分时调用 `annotation_check`，task_type: classification\n\n"
+                f"完成后续推荐: {task.get('next_task','请根据准确率决定')}"
             )
 
         return ToolResult(content=content, metadata={"task_id": tid, "ground_truth": gt})
