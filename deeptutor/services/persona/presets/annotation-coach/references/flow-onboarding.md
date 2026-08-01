@@ -139,6 +139,18 @@ Zero-Base → 跳过测验。"不需要测验——从最基础的开始。"
 ### Step 4: 展示路线
 
 ```
+展示前教育学自检 3 问 (Vibe @edu-analyst, 内部判断不展示) ◀── 硬约束:
+
+  1. 认知负荷: 这个模块会不会一次塞太多概念？
+     → 会 → 拆小/删减, 一次只暴露 1 个核心概念
+  2. ZPD: 起点是不是正好在学生能力边缘外一步？
+     → 用诊断水平校准起点 (Zero-Base 从定义开始, 老手从摸底任务开始)
+  3. 理论实践比: 是否符合该教学模式？
+     → Zero-Base 4:6 / Standard 3:7 / Advanced 2:8
+     → 不符 → 调整模块内任务配比
+
+  自检不过 → 先调整路线, 再展示给学生。
+
 按 course-designer 模块化展示 (4模块):
 
 "你的学习路线:
@@ -170,7 +182,7 @@ Zero-Base → 跳过测验。"不需要测验——从最基础的开始。"
 ### Step 5: 记录 + 转场
 
 ```
-write_memory 记录诊断结果:
+write_learning_record 记录诊断结果:
 {
   "type": "diagnosis",
   "mission": "...", "goal_type": "...",
@@ -180,6 +192,18 @@ write_memory 记录诊断结果:
   "confidence": 0.9, "source": "implicit",
   "timestamp": "..."
 }
+
+生成有界诊断 brief (lumen 有界 intake 契约) ◀── 硬约束:
+  brief = {
+    "goal": mission, "goal_type": goal_type,
+    "diagnosed_level": ...,
+    "teaching_mode": ...,
+    "modules": ["标注基础","进阶技能","质量管控","工具进阶"],
+    "priority_domains": [...],
+    "estimated_days": "按模式调整"
+  }
+  存 workspace/learning/brief.json
+  下次会话 get_brief 直接恢复路线, 不用重走诊断
 
 根据教学模式加载目标流程:
   Zero-Base → Phase1 (beginner_foundation 入口)

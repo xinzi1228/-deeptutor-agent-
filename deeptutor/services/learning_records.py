@@ -88,6 +88,32 @@ class LearningRecordStore:
     def recent(self, limit: int = 10) -> list[dict[str, Any]]:
         return self.list_records()[-limit:]
 
+    def save_brief(self, brief: dict[str, Any]) -> Path:
+        """Persist a Phase-0 diagnosis brief (lumen-style intake contract).
+
+        Lives outside the records stream so course shape and learner state
+        stay separable. Returns the written file path.
+        """
+        self._ensure_dir()
+        path = self._root / "brief.json"
+        import json as _json
+
+        with open(path, "w", encoding="utf-8") as handle:
+            _json.dump(brief, handle, ensure_ascii=False, indent=2)
+        return path
+
+    def get_brief(self) -> dict[str, Any] | None:
+        """Load the latest diagnosis brief, or ``None`` if absent."""
+        path = self._root / "brief.json"
+        if not path.exists():
+            return None
+        try:
+            with open(path, encoding="utf-8") as handle:
+                data = json.load(handle)
+            return data if isinstance(data, dict) else None
+        except (json.JSONDecodeError, OSError):
+            return None
+
     def _read_records(self) -> list[dict[str, Any]]:
         if not self._file.exists():
             return []

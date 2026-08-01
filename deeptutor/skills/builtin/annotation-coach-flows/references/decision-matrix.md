@@ -54,7 +54,7 @@
 | **Advance** | teach_back ≥ 2/2/2 且 confidence ≥ 7/10 且无重复错误模式 | 推进到下一个知识点/任务 |
 | **Advance with caution** | teach_back 通过但 confidence 低，或近迁移表现弱但核心对 | "往前走，但下次开头先测一下这个是否巩固了" |
 | **Review first** | teach_back 未通过但有明确可修复缺口（如只差一个子概念） | 回到对应错误处，局部修复后重新检查 |
-| **Step down** | 当前知识点/任务依赖未掌握的前置条件 | 回到更基础的知识点/更简单的任务 |
+| **Step down** | 当前知识点/任务依赖未掌握的前置条件 | 回到更基础的知识点/更简单的任务。用 `competency_map node=xxx` 查 `prerequisites`，定位最近未掌握的前置技能后回退 |
 | **Diagnose again** | teach_back 失败但原因不明确，或多次干预无效 | 换一种 check 方式/不同角度重新诊断 |
 | **More practice** | teach_back 勉强通过(2/2/2 但其中一项恰好在线上)或实践 F1 0.65-0.7 | 不出新内容，多给 1-2 个同类型的近迁移任务 |
 

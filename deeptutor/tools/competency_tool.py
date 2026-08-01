@@ -228,6 +228,10 @@ def _format_tree_node(node: dict, indent: int = 0) -> str:
         lines = [f"{prefix}{marker} {node['name']}", f"{prefix}{node.get('description', '')}"]
     else:
         lines = [f"{prefix}{marker} **{node['name']}**: {node.get('description', '')}"]
+        prereq = node.get("prerequisites")
+        if prereq:
+            names = "、".join(p.get("name", p.get("id", "?")) for p in prereq)
+            lines.append(f"{prefix}  前置: {names}")
 
     if "children" in node:
         for child in node["children"]:
@@ -303,7 +307,8 @@ class CompetencyMapTool(BaseTool):
             )
 
         elif action == "node":
-            content = self._find_and_format_node(data["tree"], node_id) if node_id else "请指定 node_id"
+            found = self._find_node(data["tree"], node_id) if node_id else None
+            content = _format_tree_node(found) if found else "未找到节点: " + str(node_id or "")
 
         else:
             return ToolResult(content=f"Unknown action: {action}", success=False)
@@ -339,17 +344,17 @@ class CompetencyMapTool(BaseTool):
             count += self._count_skills(child)
         return count
 
-    def _find_and_format_node(self, node: dict, target_id: str) -> str:
+    def _find_node(self, node: dict, target_id: str) -> dict | None:
+        """Return the raw node by id, or None — used by the node action to
+        distinguish 'found' from 'not found' cleanly."""
         if node.get("id") == target_id:
-            return _format_tree_node(node)
-
+            return node
         for child in node.get("children", []):
-            result = self._find_and_format_node(child, target_id)
-            if result:
+            result = self._find_node(child, target_id)
+            if result is not None:
                 return result
         for skill in node.get("skills", []):
-            result = self._find_and_format_node(skill, target_id)
-            if result:
+            result = self._find_node(skill, target_id)
+            if result is not None:
                 return result
-
-        return f"未找到节点: {target_id}"
+        return None
