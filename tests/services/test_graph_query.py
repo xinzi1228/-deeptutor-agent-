@@ -48,3 +48,43 @@ def test_risk_path_finds_missing_prereq() -> None:
     r = svc.risk_path("skill-1-1-2")
     # prerequisites of skill-1-1-2 that aren't mastered → missing
     assert any(x["id"] == "skill-1-1-1" for x in r["missing_prereqs"])
+
+
+def test_risk_path_outputs_sorted_by_id() -> None:
+    # SAMPLE records → single struggling skill; ordering contract must be stable
+    svc = GraphQueryService(_graph())
+    r = svc.risk_path("task2")
+    assert [x["id"] for x in r["missing_prereqs"]] == sorted(
+        x["id"] for x in r["missing_prereqs"]
+    )
+    assert [x["id"] for x in r["struggling"]] == sorted(
+        x["id"] for x in r["struggling"]
+    )
+
+    # no records → nothing mastered/struggling → the whole prerequisite closure
+    # is missing; the output must be id-sorted, not DFS/pop-order
+    svc = GraphQueryService(KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=SAMPLE_BANK, records=[]))
+    r = svc.risk_path("task2")
+    assert [x["id"] for x in r["missing_prereqs"]] == ["skill-1-1-1", "skill-1-1-2"]
+
+    # both skills struggling → struggling is built from set iteration (hash-random
+    # order across PYTHONHASHSEED) so it must be re-sorted by id
+    records = [
+        {
+            "type": "annotation_exercise",
+            "task_id": "task1",
+            "knowledge_point": "边界框绘制规范",
+            "f1": 0.5,
+            "readiness": "needs_review",
+        },
+        {
+            "type": "annotation_exercise",
+            "task_id": "task2",
+            "knowledge_point": "遮挡目标处理",
+            "f1": 0.6,
+            "readiness": "needs_review",
+        },
+    ]
+    svc = GraphQueryService(KnowledgeGraphStore.build(tree=SAMPLE_TREE, bank=SAMPLE_BANK, records=records))
+    r = svc.risk_path("task2")
+    assert [x["id"] for x in r["struggling"]] == ["skill-1-1-1", "skill-1-1-2"]

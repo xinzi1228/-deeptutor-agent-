@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-LEARNER_ID = "learner:default"
+from deeptutor.services.knowledge_graph import LEARNER_ID
 
 
 class GraphQueryService:
@@ -56,9 +56,16 @@ class GraphQueryService:
                 struggling.append(info)
         mastered.sort(key=lambda x: x["id"])
         struggling.sort(key=lambda x: x["id"])
+        # next_suggested reserved for future suggestion logic (API contract)
         return {"mastered": mastered, "struggling": struggling, "next_suggested": []}
 
     def concepts(self, skill_id: str) -> dict:
+        """Return navigation info around a skill.
+
+        ``belongs_to`` is populated for task targets (task → group via the
+        ``belongs_to`` edge); skill → group membership is not currently
+        emitted, so a skill target yields an empty list here.
+        """
         prereqs = [
             {"id": e["target"], "name": self._name(e["target"])}
             for e in self._out(skill_id, "prerequisite")
@@ -98,7 +105,7 @@ class GraphQueryService:
         mastered_ids = {x["id"] for x in snap["mastered"]}
         target_skills = self._target_skills(target)
 
-        # walk prerequisite closure (2-hop) from the target's skills
+        # walk the full prerequisite closure from the target's skills
         visited: set[str] = set()
         stack = list(target_skills)
         while stack:
@@ -117,6 +124,8 @@ class GraphQueryService:
             for s in struggling_ids
             if s in involved
         ]
+        result["missing_prereqs"].sort(key=lambda x: x["id"])
+        result["struggling"].sort(key=lambda x: x["id"])
 
         affected: list[dict] = []
         for e in self._in(target, "prerequisite"):
@@ -130,11 +139,12 @@ class GraphQueryService:
                  "reason": f"依赖'{self._name(target)}'"}
             )
         result["affected_downstream"] = affected
+        result["affected_downstream"].sort(key=lambda x: x["id"])
         result["confidence"] = "high" if (result["missing_prereqs"] or result["struggling"]) else "low"
         return result
 
     def _target_skills(self, node_id: str) -> set[str]:
-        node = self._nodes.get(node_id, {})
+        node = self._nodes.get(node_id) or {}
         if node.get("type") == "Skill":
             return {node_id}
         # Task → required skills
