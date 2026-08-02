@@ -93,12 +93,25 @@ class FinalizeDiagnosisTool(BaseTool):
             return ToolResult(content=f"Error: failed to finalize diagnosis — {exc}", success=False)
 
         modules = [m.get("name") for m in (plan or {}).get("modules", [])]
+
+        from deeptutor.tools.chart_cards import progress_chart
+
+        chart = progress_chart(
+            completed=0,
+            total=len(modules),
+            modules=[{"name": m.get("name", ""), "done": 0, "total": 1} for m in (plan or {}).get("modules", [])],
+        )
         return ToolResult(
             content=(
                 f"诊断已落盘 (mode={teaching_mode}, goal={goal_type}).\n"
                 f"课程计划已生成: {', '.join(modules)}"
             ),
-            metadata={"brief_saved": True, "teaching_mode": teaching_mode, "modules": modules},
+            metadata={
+                "brief_saved": True,
+                "teaching_mode": teaching_mode,
+                "modules": modules,
+                "chart": chart,
+            },
         )
 
     def get_prompt_hints(self, language: str = "en") -> Any:
