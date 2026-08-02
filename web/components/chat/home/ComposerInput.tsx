@@ -13,9 +13,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Bot, Check, UserRound } from "lucide-react";
-import ChatSpaceMenu, {
-  type ChatSpaceSelectionCounts,
-} from "@/components/chat/space/ChatSpaceMenu";
+import type { ChatSpaceSelectionCounts } from "@/components/chat/space/ChatSpaceMenu";
 import { agentGlyph } from "@/components/agents/agent-icons";
 import { shouldSubmitOnEnter } from "@/lib/composer-keyboard";
 import { useAutoSizedTextarea } from "@/lib/use-auto-sized-textarea";
@@ -134,22 +132,9 @@ export const ComposerInput = memo(
       onSend,
       onInputChange,
       onPaste,
-      selectedCounts,
-      knowledgeAvailable,
-      personaAvailable,
       connectedAgents = [],
       selectedAgent = null,
       onSelectAgent,
-      onSelectAttach,
-      onSelectKnowledge,
-      onSelectNotebookPicker,
-      onSelectBookPicker,
-      onSelectHistoryPicker,
-      onSelectAgentsPicker,
-      agentsAvailable = true,
-      onSelectQuestionBankPicker,
-      onSelectPersonaPicker,
-      onSelectMemoryPicker,
       onOpenPersonaSelector,
       placeholder,
       minHeight = 28,
@@ -330,45 +315,6 @@ export const ComposerInput = memo(
       ],
     );
 
-    const handleSelectSpaceItem = useCallback(
-      (
-        key:
-          | "attach"
-          | "knowledge"
-          | "chat_history"
-          | "my_agents"
-          | "books"
-          | "notebooks"
-          | "question_bank"
-          | "persona"
-          | "memory",
-      ) => {
-        clearTrailingMention();
-        setShowAtPopup(false);
-        if (key === "attach") onSelectAttach();
-        else if (key === "knowledge") onSelectKnowledge?.();
-        else if (key === "chat_history") onSelectHistoryPicker();
-        else if (key === "my_agents") onSelectAgentsPicker?.();
-        else if (key === "books") onSelectBookPicker();
-        else if (key === "notebooks") onSelectNotebookPicker();
-        else if (key === "question_bank") onSelectQuestionBankPicker();
-        else if (key === "persona") onSelectPersonaPicker();
-        else if (key === "memory") onSelectMemoryPicker();
-      },
-      [
-        clearTrailingMention,
-        onSelectAttach,
-        onSelectKnowledge,
-        onSelectHistoryPicker,
-        onSelectAgentsPicker,
-        onSelectBookPicker,
-        onSelectNotebookPicker,
-        onSelectQuestionBankPicker,
-        onSelectPersonaPicker,
-        onSelectMemoryPicker,
-      ],
-    );
-
     // Close the @/slash popups on outside click. Without this, clicking
     // anywhere outside the popup or textarea left the menu hovering
     // indefinitely. We bind on mousedown so the close fires before a
@@ -447,21 +393,6 @@ export const ComposerInput = memo(
                 </div>
               )}
             </div>
-          </div>
-        )}
-        {showAtPopup && !agentMentionMode && (
-          <div
-            ref={popupRef}
-            className="absolute bottom-full left-0 z-[70] mb-2"
-          >
-            <ChatSpaceMenu
-              variant="mention"
-              selectedCounts={selectedCounts}
-              knowledgeAvailable={knowledgeAvailable}
-              personaAvailable={personaAvailable}
-              agentsAvailable={agentsAvailable}
-              onSelectItem={handleSelectSpaceItem}
-            />
           </div>
         )}
         {showSlashPopup && (

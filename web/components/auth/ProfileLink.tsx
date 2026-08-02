@@ -25,7 +25,7 @@ export function ProfileLink({ collapsed = false }: ProfileLinkProps) {
 
   if (!status?.username) return null;
 
-  const active = pathname.startsWith("/profile");
+  const active = pathname.startsWith("/settings");
   const avatar = (
     <UserAvatar
       username={status.username}
@@ -39,7 +39,7 @@ export function ProfileLink({ collapsed = false }: ProfileLinkProps) {
   if (collapsed) {
     return (
       <Link
-        href="/profile"
+        href="/settings"
         className={`rounded-lg p-2 transition-colors
           ${
             active
@@ -56,7 +56,7 @@ export function ProfileLink({ collapsed = false }: ProfileLinkProps) {
 
   return (
     <Link
-      href="/profile"
+      href="/settings"
       className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] transition-colors
         ${
           active
