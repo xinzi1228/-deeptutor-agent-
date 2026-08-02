@@ -6,20 +6,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useAppShell } from "@/context/AppShellContext";
 import {
-  BookOpen,
   BookText,
-  Bot,
   Brain,
   ChevronDown,
   Github,
-  HeartHandshake,
   House,
-  LayoutGrid,
-  Library,
   Lock,
   PanelLeftClose,
   PanelLeftOpen,
-  PenLine,
   Settings,
   Tag,
   TrendingUp,
@@ -51,23 +45,6 @@ const PRIMARY_NAV: NavEntry[] = [
     requires: "llm",
   },
   {
-    href: "/partners",
-    label: "Partners",
-    icon: HeartHandshake,
-    tooltipKey: "Partners tooltip",
-    requires: "llm",
-  },
-  {
-    // My Agents is its own top-level feature (pulled out of the Learning
-    // Space): connect a live local Claude Code / Codex to consult in chat,
-    // and manage imported agent conversations. Ungated — managing connections
-    // and imports needs no per-user model grant.
-    href: "/agents",
-    label: "My Agents",
-    icon: Bot,
-    tooltipKey: "Agents tooltip",
-  },
-  {
     href: "/annotation",
     label: "Annotation",
     icon: Tag,
@@ -79,47 +56,10 @@ const PRIMARY_NAV: NavEntry[] = [
     icon: TrendingUp,
     tooltipKey: "Progress tooltip",
   },
-  {
-    href: "/co-writer",
-    label: "Co-Writer",
-    icon: PenLine,
-    tooltipKey: "Co-Writer tooltip",
-    requires: "llm",
-  },
-  {
-    href: "/book",
-    label: "Book",
-    icon: Library,
-    tooltipKey: "Book tooltip",
-    requires: "llm",
-  },
-  {
-    href: "/space",
-    label: "Learning Space",
-    icon: LayoutGrid,
-    tooltipKey: "Space tooltip",
-  },
 ];
 
 const SECONDARY_NAV: NavEntry[] = [
-  {
-    // Memory is its own top-level console (pulled out of the Learning Space):
-    // a place to inspect and curate the tutor's long-term memory, not a daily
-    // workspace. Never gated — memory has no per-user model requirement.
-    href: "/memory",
-    label: "Memory",
-    icon: Brain,
-    tooltipKey: "Memory tooltip",
-  },
-  {
-    // Knowledge Center sits just above Settings: it's a console for managing
-    // KBs and retrieval engines, not a daily workspace. Never gated — embedding
-    // / search are shared admin infrastructure, no per-user model grant needed.
-    href: "/knowledge",
-    label: "Knowledge Center",
-    icon: BookOpen,
-    tooltipKey: "Knowledge tooltip",
-  },
+  { href: "/memory", label: "Memory", icon: Brain, tooltipKey: "Memory tooltip" },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 const GITHUB_REPO_URL = "https://github.com/HKUDS/DeepTutor";
