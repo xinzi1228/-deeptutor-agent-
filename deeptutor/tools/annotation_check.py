@@ -53,18 +53,24 @@ def check_edge_proximity(boxes: list[dict], image_size: tuple[int, int], thresho
     return checks
 
 
+def _contains(box_a: dict, box_b: dict) -> bool:
+    """True if box_a fully contains box_b."""
+    return (
+        box_a["x"] <= box_b["x"]
+        and box_a["y"] <= box_b["y"]
+        and box_a["x"] + box_a["w"] >= box_b["x"] + box_b["w"]
+        and box_a["y"] + box_a["h"] >= box_b["y"] + box_b["h"]
+    )
+
+
 def check_overlap(boxes: list[dict], iou_threshold: float = 0.5) -> list[dict]:
     """Flag heavily overlapping boxes (not nested) — likely duplicate annotations of the same object."""
     checks = []
     for i in range(len(boxes)):
         for j in range(i + 1, len(boxes)):
             iou = _calculate_iou(boxes[i], boxes[j])
-            # skip near-identical nested boxes (one inside the other) — treat as acceptable
-            a_area = boxes[i]["w"] * boxes[i]["h"]
-            b_area = boxes[j]["w"] * boxes[j]["h"]
-            smaller = min(a_area, b_area)
-            larger = max(a_area, b_area)
-            nested = smaller > 0 and (larger - smaller) / larger > 0.5 and iou >= 0.9
+            # skip nested boxes (one fully inside the other) — treat as acceptable
+            nested = _contains(boxes[i], boxes[j]) or _contains(boxes[j], boxes[i])
             if iou > iou_threshold and not nested:
                 checks.append({
                     "rule": "overlap",

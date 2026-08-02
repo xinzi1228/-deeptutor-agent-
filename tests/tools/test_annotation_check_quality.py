@@ -34,10 +34,20 @@ def test_overlap_triggers():
 
 def test_overlap_nested_not_flagged():
     boxes = [
-        {"x": 10, "y": 10, "w": 200, "h": 200, "label": "car"},
-        {"x": 50, "y": 50, "w": 60, "h": 60, "label": "car"},
+        {"x": 10, "y": 10, "w": 100, "h": 100, "label": "car"},
+        {"x": 15, "y": 15, "w": 90, "h": 90, "label": "car"},
     ]
     assert check_overlap(boxes, iou_threshold=0.5) == []
+
+
+def test_overlap_partial_high_iou_flagged():
+    boxes = [
+        {"x": 10, "y": 10, "w": 100, "h": 100, "label": "car"},
+        {"x": 40, "y": 10, "w": 100, "h": 100, "label": "car"},
+    ]
+    checks = check_overlap(boxes, iou_threshold=0.5)
+    assert len(checks) == 1
+    assert checks[0]["rule"] == "overlap"
 
 
 def test_tightness_triggers_on_wide_box():
