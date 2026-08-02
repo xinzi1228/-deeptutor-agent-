@@ -89,7 +89,7 @@ def test_judgment_report():
     ground_truth = [{"id": 1, "answer": True}, {"id": 2, "answer": False}]
     content = _judgment_report(predictions, ground_truth)
     assert "Accuracy" in content or "准确率" in content
-    assert "50%" in content or "0.5" in content
+    assert "100%" in content
 
 
 def test_standard_report_requires_valid_box():
@@ -100,6 +100,7 @@ def test_standard_report_requires_valid_box():
     ground_truth = [{"required_fields": ["x", "y", "w", "h", "label"]}]
     content = _standard_report(predictions, ground_truth)
     assert "合规率" in content or "invalid" in content.lower() or "合规" in content
+    assert "0%" in content or "0.0" in content
 
 
 def test_error_case_report():
@@ -110,3 +111,4 @@ def test_error_case_report():
     ground_truth = [{"id": 1, "is_error": True}, {"id": 2, "is_error": False}]
     content = _error_case_report(predictions, ground_truth)
     assert "检出" in content or "accuracy" in content.lower() or "准确" in content
+    assert "100%" in content

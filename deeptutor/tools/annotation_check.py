@@ -277,7 +277,7 @@ def _classify_report(predictions: list[dict], ground_truth: list[dict]) -> str:
 
 
 _TRUE_ANSWER_SYNONYMS = {"true", "correct", "right", "yes", "1", "对", "正确", "是"}
-_FALSE_ANSWER_SYNONYMS = {"false", "incorrect", "no", "0", "错", "错误", "否"}
+_FALSE_ANSWER_SYNONYMS = {"false", "wrong", "incorrect", "no", "0", "错", "错误", "否"}
 
 
 def _normalize_judgment(value: Any) -> str:
