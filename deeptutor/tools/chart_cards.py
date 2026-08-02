@@ -117,7 +117,7 @@ async def render_scorecard_png(
         ax.text(0, -0.8, " · ".join(feedback[:3]), fontsize=7, color="#6b7280")
 
         ax.set_title(
-            "练习成绩单" + (" ✓ 达标" if passed else " ✗ 待加强"), fontsize=12, color=color
+            "练习成绩单 " + ("[达标]" if passed else "[待加强]"), fontsize=12, color=color
         )
         ax.spines[["top", "right"]].set_visible(False)
 
