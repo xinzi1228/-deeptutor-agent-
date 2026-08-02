@@ -1,7 +1,7 @@
 {
   "_note": "教学专家角色索引（Source of truth）。coordinator + 6 experts。每个条目 file 指向角色文件。pytest 校验目录与索引双向一致 + frontmatter 完整。",
   "coordinator": {
-    "id": "annotation_coach",
+    "id": "annotation-coach",
     "label": "标注教练",
     "icon": "🎯",
     "color": "#3B82F6",

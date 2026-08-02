@@ -36,7 +36,7 @@ def test_manifest_exists():
 def test_manifest_has_coordinator_and_6_experts():
     manifest = _load_manifest()
     assert "coordinator" in manifest
-    assert manifest["coordinator"]["id"] == "annotation_coach"
+    assert manifest["coordinator"]["id"] == "annotation-coach"
     experts = manifest["experts"]
     assert len(experts) == 6
 
@@ -66,3 +66,9 @@ def test_frontmatter_name_matches_manifest_id():
     for entry in manifest["experts"]:
         fm = _frontmatter(EXPERT_DIR / f"{entry['id']}.md")
         assert fm.get("name") == entry["id"], f"{entry['id']} frontmatter name mismatch"
+
+
+def test_coordinator_frontmatter_name_matches():
+    manifest = _load_manifest()
+    fm = _frontmatter(BASE / manifest["coordinator"]["file"])
+    assert fm.get("name") == manifest["coordinator"]["id"], "coordinator frontmatter name mismatch"
