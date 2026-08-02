@@ -195,6 +195,7 @@ def compose_enabled_tools(
         "cron",
         "competency_map",
         "ability_radar",
+        "struggle_detect",
         "job_analysis",
         "get_annotation_task",
         "annotation_check",
