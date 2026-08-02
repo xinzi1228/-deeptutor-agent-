@@ -23,7 +23,7 @@ DeepTutor fork 被改造成「数据标注教学平台」。此前功能为**增
 
 | # | 维度 | 决策 |
 |---|------|------|
-| 1 | 实现方式 | 彻底移除无关功能代码（非可配置开关） |
+| 1 | 实现方式 | 彻底裁剪（非可配置开关）：删除 9 个路由目录 + 导航裁剪 + UI 入口裁剪 + 品牌重塑；**被保留页面依赖的共享组件代码保留**（避免 ts 崩溃） |
 | 2 | 前端保留页面 | Home / Annotation / Progress / Memory / Settings + 认证页(login/register) + admin(管理后台) |
 | 3 | 前端移除页面 | book / co-writer / partners / playground / space / agents / knowledge / notebook / profile |
 | 4 | 后端 capability | 只保留 `chat`，移除 6 个通用能力注册 |
@@ -63,6 +63,15 @@ web/app/(admin)/admin/
 ```
 
 **约束**：删除路由目录前，先 grep 被保留页面/共享组件对这些目录的引用，确保无断裂导入。共享组件（components/ 下）仅删除被移除页面独占的部分，其余保留。
+
+**重要发现（决定裁剪粒度）**：保留页面（Home/Memory）深度依赖待移除功能的共享组件——`ChatComposer`/`ChatMessages` 引用 book/space/notebook/agents/partners 选择器；`MemorySection` 渲染这些实体跳转。因此裁剪策略为：**删除路由目录（页面不可达）+ 导航裁剪 + 保留页面内 UI 入口裁剪 + 品牌重塑，共享组件代码保留**。
+
+### 3.1a 保留页面内的 UI 入口裁剪
+
+- `MemorySection.tsx`（Memory 页）：移除 co-writer/book/partners/space/knowledge 实体跳转分支（保留 session/home 相关）
+- `SessionActivityPanel.tsx`（Home 会话活动面板）：移除 space 路由链接
+- `ChatComposer`/`ChatMessages`：移除 book/space/notebook/agents/partners 选择器入口（ChatSpaceMenu/MyAgentsPicker/BookReferencePicker/QuestionBankPicker），教学会话不需要附加上下文选择
+- 共享组件文件本身保留（不物理删除，避免破坏其他引用），仅停止在 UI 中渲染/引用
 
 ### 3.2 侧边栏导航
 
@@ -136,6 +145,7 @@ BUILTIN_CAPABILITY_CLASSES: dict[str, str] = {
 | i18n 大量替换不完整/不一致 | 替换后 grep 残留 "DeepTutor" 校验 |
 | persona 删除影响 workspace 运行时副本 | 保留 annotation-coach 副本 |
 | 前端中间件/重定向逻辑依赖移除路由 | 实现时验证 404/redirect |
+| ChatComposer/Memory 裁剪破坏保留页交互 | 小步编辑 + tsc + 手动冒烟 |
 
 ## 6. 验证策略
 
