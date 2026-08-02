@@ -322,13 +322,20 @@ const AssistantMessage = memo(function AssistantMessage({
   );
 
   const chartCard = useMemo(() => {
-    const meta = resultEvent?.metadata as Record<string, unknown> | undefined;
-    if (!meta?.chart) return null;
-    return meta.chart as {
-      type: string;
-      data: Record<string, unknown>;
-    };
-  }, [resultEvent]);
+    for (let i = events.length - 1; i >= 0; i--) {
+      const ev = events[i];
+      if (ev.type !== "tool_result") continue;
+      const meta = (ev.metadata ?? {}) as Record<string, unknown>;
+      const toolMeta = (meta.tool_metadata ?? {}) as Record<string, unknown>;
+      if (toolMeta.chart) {
+        return toolMeta.chart as {
+          type: string;
+          data: Record<string, unknown>;
+        };
+      }
+    }
+    return null;
+  }, [events]);
 
   const outlinePreview = useMemo(() => {
     if (msg.capability !== "deep_research" || !resultEvent) return null;
