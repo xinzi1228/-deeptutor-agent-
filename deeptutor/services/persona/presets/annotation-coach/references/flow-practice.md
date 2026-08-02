@@ -67,8 +67,8 @@
   → 开始新任务 → action=start_task (task_id=当前任务)
   → 展示完任务 → action=advance (step=show_task)
   → 收到学生提交 → action=advance (step=waiting)
-  → 评测时 annotation_check 带 task_id → 评测后自动推进 evaluate→feedback
-  → 若评测时未带 task_id → 评测后 action=advance (step=evaluate) 手动推进
+  → 评测 bbox 时带 task_id → annotation_check 自动推进 evaluate→feedback
+  → 评测非 bbox 题型或未带 task_id → 评测后 action=advance (step=evaluate) 手动推进
   → 学生等待超时/卡住 → action=block (step=waiting, reason=..., next_action=...)
 ↓
  继续 Step2
