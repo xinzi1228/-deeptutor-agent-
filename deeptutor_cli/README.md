@@ -1,4 +1,4 @@
-# DeepTutor CLI
+# 标注星图 CLI
 
 Agent-first 的命令行界面。两条核心路径：
 
@@ -57,13 +57,7 @@ deeptutor run <capability> <message> [options]
 
 | Capability | 说明 |
 |------------|------|
-| `chat` | 对话（默认，可挂载工具） |
-| `deep_solve` | 多阶段深度解题 |
-| `deep_question` | 智能出题 |
-| `deep_research` | 多 agent 深度研究 |
-| `visualize` | 生成图表、图解、Mermaid、HTML 或 Manim 可视化 |
-| `math_animator` | 数学动画生成 |
-| `mastery_path` | 掌握式学习路径与测评循环 |
+| `chat` | 对话（默认，标注星图产品只注册此 capability） |
 
 ### 选项
 
@@ -82,36 +76,17 @@ deeptutor run <capability> <message> [options]
 ### 示例
 
 ```bash
-# 对话
-deeptutor run chat "什么是傅里叶变换？" -l zh
+# 对话（annotation-coach 标注教学）
+deeptutor run chat "我要练习车辆检测标注" -l zh
 
-# 深度解题
-deeptutor run deep_solve "证明 n^3-n 能被 6 整除" -t rag --kb math-textbook
+# 挂载知识库
+deeptutor run chat "讲一下 IOU 的计算" -t rag --kb my-kb -l zh
 
-# 简要回答
-deeptutor run deep_solve "求 sin(x) 的导数" --config detailed_answer=false
-
-# 智能出题
-deeptutor run deep_question "线性代数" --config num_questions=5 --config difficulty=hard
-
-# 仿真出题
-deeptutor run deep_question "模拟考试" --config mode=mimic --config paper_path=exam.json
-
-# 深度研究
-deeptutor run deep_research "Transformer 最新进展" \
-  --config-json '{"mode":"report","depth":"deep","sources":["web","papers"]}'
-
-# 可视化
-deeptutor run visualize "画出注意力机制的数据流图" --config render_mode=mermaid
-
-# 数学动画
-deeptutor run math_animator "展示正弦函数变换" --config quality=high
-
-# 掌握式学习
-deeptutor run mastery_path "带我系统掌握特征值和特征向量"
+# 完成一次标注练习并请求检查
+deeptutor run chat "帮我出一道车辆检测的迁移挑战题" -l zh
 
 # JSON 输出（适合 agent 解析）
-deeptutor run deep_solve "求解 x^2=4" -f json
+deeptutor run chat "车辆检测的标注规范是什么" -f json -l zh
 ```
 
 ---
@@ -256,19 +231,14 @@ Codex 令牌授权的是**你本人**的 ChatGPT 套餐，因此凭据只归当�
 
 ```bash
 # 1. 创建知识库
-deeptutor kb create calculus --doc 微积分教材.pdf
+deeptutor kb create annotation-guide --doc 标注规范.pdf
 
-# 2. 用知识库解题
-deeptutor run deep_solve "求 ∫sin(x)cos(x)dx" -t rag --kb calculus -l zh
+# 2. 用知识库对话学习
+deeptutor run chat "IOU 是什么？怎么算？" -t rag --kb annotation-guide -l zh
 
-# 3. 基于知识库出题
-deeptutor run deep_question "微积分" --kb calculus \
-  --config num_questions=5 --config difficulty=medium -l zh
+# 3. 开始标注练习（对话内自动走 annotation-coach 流程）
+deeptutor run chat "我要练习车辆检测标注" -l zh
 
-# 4. 深度研究某课题
-deeptutor run deep_research "注意力机制演进" \
-  --config-json '{"mode":"report","depth":"deep","sources":["papers","web"]}' -l zh
-
-# 5. 查看会话记录
+# 4. 查看会话记录
 deeptutor session list
 ```

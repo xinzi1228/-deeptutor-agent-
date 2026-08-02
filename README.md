@@ -1,6 +1,6 @@
-# DeepTutor Agent — 数据标注教学智能体
+# 标注星图 — 数据标注教学智能体
 
-基于 [DeepTutor](https://github.com/HKUDS/DeepTutor) 二次开发，定制为**数据标注教学平台**。
+基于 [DeepTutor](https://github.com/HKUDS/DeepTutor) 二次开发，定制为**数据标注教学平台**「标注星图」。
 
 ## 功能
 

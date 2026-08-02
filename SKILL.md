@@ -1,12 +1,12 @@
-# DeepTutor CLI Skill
+# 标注星图 CLI Skill
 
-> Teach your AI agent to configure, manage, and use DeepTutor — an intelligent learning platform — entirely through the command line.
+> Teach your AI agent to configure, manage, and use 标注星图 — a data-annotation teaching platform built on DeepTutor — entirely through the command line.
 
 ## When to Use
 
 Use this skill when the user wants to:
-- Set up or configure DeepTutor
-- Chat with DeepTutor or run a capability (deep solve, quiz generation, deep research, visualize, math animation, mastery path)
+- Set up or configure 标注星图
+- Chat with the annotation-coach (the `chat` capability)
 - Create, manage, or search knowledge bases
 - Create, manage, or run Partners (IM-connected companions)
 - Search, install, or manage skills from a hub (ClawHub)
@@ -27,18 +27,14 @@ Use this skill when the user wants to:
 ```bash
 # Interactive REPL
 deeptutor chat
-deeptutor chat --capability deep_solve --kb my-kb --tool rag --tool web_search
+deeptutor chat --kb my-kb --tool rag --tool web_search
 
-# One-shot capability execution
-deeptutor run chat "Explain Fourier transform"
-deeptutor run deep_solve "Solve x^2 = 4" --tool rag --kb textbook
-deeptutor run deep_question "Linear algebra" --config num_questions=5
-deeptutor run deep_research "Attention mechanisms" --kb papers --config mode=report --config depth=standard
-deeptutor run visualize "Plot the unit circle"
-deeptutor run math_animator "Visualize a Fourier series"
+# One-shot chat capability execution (标注星图 only registers `chat`)
+deeptutor run chat "I want to practice vehicle detection annotation"
+deeptutor run chat "Explain IoU" --tool rag --kb annotation-guide
 
 # Capabilities accepted by `run` / `chat -c`:
-#   chat, deep_solve, deep_question, deep_research, visualize, math_animator, mastery_path
+#   chat
 
 # Options for `run`:
 #   --session <id>         Resume existing session
@@ -192,9 +188,9 @@ deeptutor kb create physics --doc ch1.pdf --doc ch2.pdf
 deeptutor run chat "Explain Newton's third law" --kb physics --tool rag
 ```
 
-**Generate quiz questions:**
+**Start an annotation practice session:**
 ```bash
-deeptutor run deep_question "Thermodynamics" --kb physics --config num_questions=5
+deeptutor run chat "I want to practice vehicle detection annotation"
 ```
 
 **Run the full Web app locally:**

@@ -6,11 +6,46 @@
 
 ---
 
-## 一、前端可见功能
+## 一、标注星图工作台彻底改造（Tasks 1-7）
+
+> 目标: 从通用 DeepTutor 工作台收窄为「标注星图」数据标注教学产品（竞品空白领域原创）。
+> 设计/计划: `docs/specs/workbench-restructure-design.md`、`docs/specs/workbench-restructure-implementation-plan.md`（`877237a3`/`176a32cf`）。
+
+### 1.1 Capability 白名单（只留 chat）
+
+`deeptutor/runtime/bootstrap/builtin_capabilities.py` 只注册 `chat`（`c89537c3`）。已下线 capability: `deep_solve` / `deep_question` / `deep_research` / `visualize` / `math_animator` / `mastery_path`。CLI 文档已同步清理，`deeptutor run` 只宣传 `chat`。
+
+### 1.2 Persona 白名单（只留 annotation-coach，固定默认）
+
+- persona 只保留 annotation-coach（`39d6c3a8`）
+- 生产 turn 解析路径在无 persona 时自动注入 annotation-coach（`bb28b73d`）
+
+### 1.3 前端路由裁剪（删除 9 个通用目录）
+
+`da926980` 删除: `book` / `co-writer` / `partners` / `playground` / `agents` / `knowledge` / `notebook` / `space` / `profile`
+
+workspace 现在只留:
+- `/annotation` — 标注工作台
+- `/home` — Chat（annotation-coach）
+- `/progress` — 学习进度
+
+utility 只留 `memory`（中心/图谱/L1/L2/L3/resolve）与 `settings`。
+
+### 1.4 侧边栏裁 4 项
+
+`SidebarShell.tsx`: PRIMARY_NAV = Home / Annotation / Progress，SECONDARY_NAV = Memory / Settings（`f2e64107`）。`860c835f`/`8fafbdfd` 移除 Home/Memory 内已删功能的残留入口与 `/profile` 死链接。
+
+### 1.5 品牌 → 标注星图
+
+`45e885b6`/`9482cf98`: i18n 值批量替换 + layout / 登录页 / 侧边栏品牌（logo alt / aria-label / 文案）统一为「标注星图」，英文品牌串同步清理。
+
+---
+
+## 二、前端可见功能
 
 > 入口均在侧边栏（`web/components/sidebar/SidebarShell.tsx`）。Annotation / Progress / Memory 三个入口**无条件可见**（不在 `lib/capability-routes.ts` 权限门槛列表内）。
 
-### 1.1 个人中心 Progress 页（`/progress`）
+### 2.1 个人中心 Progress 页（`/progress`）
 
 **入口**: 侧边栏 → **Progress**（TrendingUp 图标）→ `web/app/(workspace)/progress/page.tsx`
 
@@ -31,7 +66,7 @@
 **操作**: 打开 `/progress` 即可看到全部面板。无数据时显示空态占位，不白屏。
 **预跑状态**: ✅ 已填充（records 2 条 / 图谱 43 节点含 struggling / 决策 2 条 / 课程计划）。
 
-### 1.2 Annotation 标注工作台（`/annotation`）
+### 2.2 Annotation 标注工作台（`/annotation`）
 
 **入口**: 侧边栏 → **Annotation**（Tag 图标）→ `web/app/(workspace)/annotation/page.tsx`
 
@@ -41,7 +76,7 @@
 - **Pro 模式**: iframe 直接嵌入 **Label Studio**（`http://localhost:8080`）
   - 预跑状态: ✅ Label Studio 已启动（Docker 容器 `ls`，token `ad69bdb5...`）
 
-### 1.3 Memory 记忆中心（`/memory`）
+### 2.3 Memory 记忆中心（`/memory`）
 
 **入口**: 侧边栏 → **Memory**（Brain 图标）→ `web/app/(utility)/memory/`
 
@@ -52,7 +87,7 @@
 | L1/L2/L3 工作台 | `l1/page.tsx` 等 | 各层文档查看/编辑/审计 |
 | 记忆设置 | `/settings/memory` | L2/L3 预算、去重、合并策略 |
 
-### 1.4 Settings 工具开关页（`/settings/tools`）
+### 2.4 Settings 工具开关页（`/settings/tools`）
 
 **入口**: 侧边栏 → **Settings** → Tools
 
@@ -60,17 +95,11 @@
 - 分类为「内置工具」区 → **Always on 锁定**（不可开关，`USER_TOGGLEABLE_TOOL_NAMES` 未含）
 - 可展开查看每个工具的 when_to_use / input_format / 参数
 
-### 1.5 Mastery Path 精通之路（`/space/learning`）
-
-**入口**: 侧边栏 → **Learning Space** → 精通之路磁贴 → `web/app/(utility)/space/learning/page.tsx`
-
-- 掌握式学习地图：模块/知识点掌握百分比 + 下一步动作
-- **需先在对话用 Mastery Path 模式建路径**才有内容（`kp_count > 0`）
-- 预跑状态: ⚠️ 未预跑（需要 Mastery Path 模式建路径）
+> ~~Mastery Path 精通之路~~ 已随工作台彻底改造移除（`/space/learning` 路由与 `mastery_path` capability 已下线）。
 
 ---
 
-## 二、需对话触发功能
+## 三、需对话触发功能
 
 > 全部通过 annotation-coach persona 对话触发。工具已注册为 always-on（第 12 个 = `graph_query`）。
 
@@ -102,7 +131,7 @@ python -m deeptutor_cli.main chat -l zh -p annotation-coach   # 交互对话
 
 ---
 
-## 三、无法前端可见功能
+## 四、无法前端可见功能
 
 | 功能 | 位置/接口 | 说明 | 预跑状态 |
 |------|----------|------|---------|

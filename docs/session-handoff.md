@@ -7,7 +7,7 @@
 
 ## 一、项目定位与竞赛背景
 
-- **项目**: DeepTutor 开源项目 fork，改造为「数据标注教学平台」（数据标注教学智能体）
+- **项目**: DeepTutor 开源项目 fork，改造为「标注星图」——数据标注教学智能体（数据标注教学平台）
 - **竞赛**: 科大讯飞 XA-202603（星辰 Agent 平台）——**平台开放自由选择，DeepTutor 可作为交付**
 - **竞赛核心**: 6 模块（①学习计划 ②会话管理 ③任务引导 ④困难检测 ⑤学习报告 ⑥练习批改）+ 6 份交付材料
 - **竞赛文件**: `标注星图_团队分工与周报模板_v5.5.docx`（团队 6 人，目标 2026-09-01）
@@ -47,6 +47,14 @@
 - annotation-coach persona + 12 教学工具（competency_map/job_analysis/get_annotation_task/annotation_check/write_learning_record/generate_iou_demo/log_decision/evaluate_teaching_plan/verify_foresight/improve_teaching_flow/finalize_diagnosis/graph_query）+ ability_radar
 - 诊断式教学/决策审计/对抗性评估/记忆进化Reflection/foresight预测/教学自改进/CRAG/docx手册/Coach绩效
 
+### 4. 标注星图工作台彻底改造（Tasks 1-7，全部已提交）
+- **capability 白名单**: 只留 `chat`（`c89537c3`）——`deeptutor run deep_solve/deep_question/deep_research/visualize/math_animator/mastery_path` 均已下线
+- **persona 白名单**: 只留 annotation-coach 并固定默认（`39d6c3a8`，生产 turn 解析路径无 persona 时注入）
+- **前端路由裁剪**: 删除 9 个通用目录（book/co-writer/partners/playground/agents/knowledge/notebook/space/profile，`da926980`），workspace 只留 annotation/home/progress
+- **侧边栏裁 4 项**: Home/Annotation/Progress + Memory/Settings（`f2e64107`，`860c835f`/`8fafbdfd` 移除已删功能入口）
+- **品牌重塑**: 「DeepTutor」→「标注星图」（i18n 批量替换 + layout/登录页/侧边栏，`45e885b6`/`9482cf98`）
+- 设计/计划: `docs/specs/workbench-restructure-design.md`、`docs/specs/workbench-restructure-implementation-plan.md`（`877237a3`/`176a32cf`）
+
 ## 四、当前待办
 
 ### A. 困难检测介入（下一步，立即执行）
@@ -61,13 +69,11 @@
   5. 接入 flow-practice/onboarding + PERSONA 规则 12
   6. 审计闭环 + 回归验证
 
-### B. 专门化改造（剩余两个子项目，brainstorm 讨论过但未写 spec）
+### B. 专门化改造（剩余一个子项目，brainstorm 讨论过但未写 spec）
 **注意: 压缩后这些 brainstorming 细节会丢失，恢复时需重新澄清用户偏好**
-1. **工作台裁剪**: 导航白名单（只留 Annotation/Progress/Home）+ capability/tool/persona 白名单 + 固定 annotation-coach + 默认路由
-   - 技术基础: `SidebarShell.tsx` 硬编码数组可改配置、`capability-routes.ts` 门控、`CapabilityAccessContext`
-2. **任务引导引擎化**: 分步状态机 + 像素级校验（贴边/遮挡/最小外接矩形）+ 题型扩展（判断/规范/错误案例）
+1. **任务引导引擎化**: 分步状态机 + 像素级校验（贴边/遮挡/最小外接矩形）+ 题型扩展（判断/规范/错误案例）
    - 复用 `learning/grading.py`（choice/short/open）、`quiz_judge.py`
-3. （可选后期）语音引导/打卡徽章（基础设施已有 `services/voice/`）
+2. （可选后期）语音引导/打卡徽章（基础设施已有 `services/voice/`）
 
 ## 五、演示环境与数据状态
 
@@ -111,4 +117,4 @@
 2. 询问用户执行方式（Subagent-Driven 已选，确认是否继续）
 3. 开始 Task 1: StruggleDetector 3 信号检测器
 4. 完成后按计划推进 Task 2-6
-5. 困难检测完成后，重新 brainstorm 专门化改造的剩余两个子项目（工作台/任务引导）
+5. 困难检测完成后，重新 brainstorm 专门化改造的剩余子项目（任务引导引擎化）
