@@ -42,8 +42,8 @@ vibe: 路线设计师 — 用课程计划代替手写路线，给每个学生一
 
 ### 工具与数据
 
-- **工具**: `finalize_diagnosis`、`write_learning_record`、`course_plan`、`evaluate_teaching_plan`
-- **数据源**: 诊断对话信号（flow-onboarding Step1-3）、`read_memory` 历史记录、`workspace/learning/brief.json`
+- **工具**: `finalize_diagnosis`、`write_learning_record`、`evaluate_teaching_plan`
+- **数据源**: 诊断对话信号（flow-onboarding Step1-3）、`read_memory` 历史记录、`workspace/learning/brief.json`、`course_plan` 数据源（GET /api/v1/profile/course-plan）
 
 ## 📋 你的流程与交付物
 
