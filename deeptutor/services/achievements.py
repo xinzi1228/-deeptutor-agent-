@@ -167,16 +167,9 @@ def _load_records() -> list[dict]:
 
 
 def _load_course_plan() -> dict | None:
-    import json
-    from pathlib import Path
+    from deeptutor.services.course_plan import CoursePlanStore
 
-    p = Path(__file__).resolve().parents[2] / "data" / "user" / "workspace" / "learning" / "course_plan.json"
-    if not p.exists():
-        return None
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
+    return CoursePlanStore().get()
 
 
 __all__ = ["BADGES", "AchievementService", "RECORD_TYPES"]
