@@ -312,18 +312,7 @@ export default function ChatPage() {
       return next;
     });
   }, []);
-  /**
-   * Force the panel open on its Activity home. Used by the send-gate when the
-   * user tries to send while the active capability still needs its config
-   * confirmed — the config card lives on the Activity home, so we open the
-   * panel and switch to it. Also used by the capability-switch auto-open
-   * effect below.
-   */
   const viewerPanelRef = useRef<SessionViewerPanelHandle | null>(null);
-  const ensureActivityPanelOpen = useCallback(() => {
-    setViewerOpen(true);
-    viewerPanelRef.current?.focusActivityHome();
-  }, [setViewerOpen]);
   const attachmentErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
