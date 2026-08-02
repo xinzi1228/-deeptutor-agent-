@@ -152,9 +152,6 @@ export default memo(function ChatComposer({
   selectedKnowledgeBases,
   isStreaming,
   isVisualizeMode,
-  capabilityNeedsConfig,
-  capabilityConfigConfirmed,
-  onRequestConfigConfirm,
   capabilities,
   onSetCapMenuOpen,
   onToggleKB,
@@ -220,19 +217,6 @@ export default memo(function ChatComposer({
   selectedKnowledgeBases: string[];
   isStreaming: boolean;
   isVisualizeMode: boolean;
-  /**
-   * True when the active capability (e.g. Quiz / Visualize / Research)
-   * requires explicit configuration before sending. When true, `canSend`
-   * is gated on `capabilityConfigConfirmed`.
-   */
-  capabilityNeedsConfig: boolean;
-  capabilityConfigConfirmed: boolean;
-  /**
-   * Called when the user clicks the send button while config is required
-   * but not yet confirmed. The page uses this to surface the config card
-   * (open the Activity panel, scroll to it, etc.).
-   */
-  onRequestConfigConfirm: () => void;
   capabilities: CapabilityDef[];
   onSetCapMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   onToggleKB: (name: string) => void;
@@ -383,13 +367,7 @@ export default memo(function ChatComposer({
     !!selectedPersona ||
     !!selectedMemoryFiles.length;
 
-  // `capabilityNeedsConfig && !capabilityConfigConfirmed` blocks send so the
-  // user has to click *Confirm* in the right-side Activity panel first.
-  // Clicking the send button while in this state surfaces the config card
-  // (via `onRequestConfigConfirm`) instead of silently doing nothing.
-  const isConfigBlocked = capabilityNeedsConfig && !capabilityConfigConfirmed;
-  const canSend =
-    (hasContent || hasReferences) && !isStreaming && !isConfigBlocked;
+  const canSend = (hasContent || hasReferences) && !isStreaming;
 
   // Unified reference tree above the textarea: Space references, persona
   // and memory render as quiet monochrome rows, collapsed behind a count
@@ -469,16 +447,10 @@ export default memo(function ChatComposer({
   ];
 
   const handleManualSend = useCallback(() => {
-    if (isConfigBlocked) {
-      // Don't silently fail — surface the config card so the user knows
-      // they need to confirm settings first.
-      onRequestConfigConfirm();
-      return;
-    }
     if (!canSend) return;
     const content = inputHandleRef.current?.getValue() || "";
     doSend(content);
-  }, [canSend, doSend, isConfigBlocked, onRequestConfigConfirm]);
+  }, [canSend, doSend]);
 
   return (
     <div
@@ -888,28 +860,12 @@ export default memo(function ChatComposer({
                     />
                   </button>
                 ) : (
-                  // When the active capability needs an unconfirmed config,
-                  // we keep the button clickable (so a click can surface
-                  // the Activity-panel config card via
-                  // `onRequestConfigConfirm`) but only once the user has
-                  // *intent* (typed text or queued references). Without
-                  // intent, the button stays disabled so an empty-state
-                  // composer doesn't have a "live" send button.
                   <button
                     type="button"
                     onClick={handleManualSend}
                     disabled={!(hasContent || hasReferences) || isStreaming}
-                    title={
-                      isConfigBlocked
-                        ? t("Confirm settings on the right to send.")
-                        : undefined
-                    }
                     aria-disabled={!canSend}
-                    className={`ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] transition-[background-color,transform,opacity] duration-150 active:scale-95 disabled:opacity-25 ${
-                      isConfigBlocked
-                        ? "bg-[var(--muted-foreground)]/30 text-[var(--primary-foreground)] hover:bg-[var(--muted-foreground)]/45"
-                        : "bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90"
-                    }`}
+                    className="ml-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-[var(--primary)] text-[var(--primary-foreground)] transition-[background-color,transform,opacity] duration-150 active:scale-95 disabled:opacity-25 hover:bg-[var(--primary)]/90"
                     aria-label={t("Send")}
                   >
                     <ArrowUp size={16} strokeWidth={2.5} />

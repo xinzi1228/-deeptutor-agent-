@@ -604,9 +604,6 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
         selectedKnowledgeBases={selectedKnowledgeBases}
         isStreaming={thread.isStreaming}
         isVisualizeMode={false}
-        capabilityNeedsConfig={false}
-        capabilityConfigConfirmed={true}
-        onRequestConfigConfirm={() => {}}
         capabilities={FOLLOWUP_CAPABILITIES}
         onSetCapMenuOpen={setCapMenuOpen}
         onToggleKB={handleToggleKB}

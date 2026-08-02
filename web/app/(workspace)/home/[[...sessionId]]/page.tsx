@@ -1564,9 +1564,6 @@ export default function ChatPage() {
               selectedKnowledgeBases={selectedKbOnly}
               isStreaming={state.isStreaming}
               isVisualizeMode={false}
-              capabilityNeedsConfig={false}
-              capabilityConfigConfirmed={false}
-              onRequestConfigConfirm={ensureActivityPanelOpen}
               capabilities={CAPABILITIES}
               onSetCapMenuOpen={setCapMenuOpen}
               onToggleKB={handleToggleKB}
