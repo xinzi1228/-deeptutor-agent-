@@ -28,6 +28,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { SelectedHistorySession } from "@/components/chat/HistorySessionPicker";
 import type { SelectedQuestionEntry } from "@/components/chat/QuestionBankPicker";
+import { ChatChartCard } from "@/components/chat/home/ChatChartCard";
 import AssistantResponse from "@/components/common/AssistantResponse";
 import {
   InlineFileCardProvider,
@@ -320,6 +321,15 @@ const AssistantMessage = memo(function AssistantMessage({
     [msg.events],
   );
 
+  const chartCard = useMemo(() => {
+    const meta = resultEvent?.metadata as Record<string, unknown> | undefined;
+    if (!meta?.chart) return null;
+    return meta.chart as {
+      type: string;
+      data: Record<string, unknown>;
+    };
+  }, [resultEvent]);
+
   const outlinePreview = useMemo(() => {
     if (msg.capability !== "deep_research" || !resultEvent) return null;
     const meta = resultEvent.metadata as Record<string, unknown> | undefined;
@@ -503,7 +513,10 @@ const AssistantMessage = memo(function AssistantMessage({
           ),
         )
       ) : (
-        <AssistantResponse content={msg.content} isStreaming={isStreaming} />
+        <>
+          <AssistantResponse content={msg.content} isStreaming={isStreaming} />
+          {chartCard ? <ChatChartCard chart={chartCard as any} /> : null}
+        </>
       )}
       {/* Non-default branches (quiz, math animator, visualize) keep
           ask_user below the body. The default branch inlines the card
