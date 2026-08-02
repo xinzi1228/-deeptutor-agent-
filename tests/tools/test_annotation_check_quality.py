@@ -185,3 +185,22 @@ async def test_execute_error_case_routes_to_metadata():
     assert result.success
     assert result.metadata["accuracy"] == 1.0
     assert result.metadata["correct"] == 2
+
+
+def test_auto_readiness_thresholds():
+    from deeptutor.tools.annotation_check import auto_readiness
+
+    assert auto_readiness(0.9) == "advance"
+    assert auto_readiness(0.85) == "advance"
+    assert auto_readiness(0.8) == "advance_with_caution"
+    assert auto_readiness(0.7) == "advance_with_caution"
+    assert auto_readiness(0.68) == "more_practice"
+    assert auto_readiness(0.65) == "more_practice"
+    assert auto_readiness(0.5) == "review_first"
+
+
+def test_auto_readiness_floor():
+    from deeptutor.tools.annotation_check import auto_readiness
+
+    assert auto_readiness(0.0) == "review_first"
+    assert auto_readiness(None) == "review_first"  # missing f1 -> conservative

@@ -109,6 +109,29 @@ def quality_checks(boxes: list[dict], image_size: tuple[int, int]) -> list[dict]
     return checks
 
 
+# -------------------------------------------------------- auto readiness gate
+
+READINESS_ADVANCE = "advance"
+READINESS_ADVANCE_WITH_CAUTION = "advance_with_caution"
+READINESS_MORE_PRACTICE = "more_practice"
+READINESS_REVIEW_FIRST = "review_first"
+
+
+def auto_readiness(f1: float | None) -> str:
+    """Map an F1 score to a readiness_gate decision (deterministic, conservative on missing)."""
+    try:
+        f = float(f1)
+    except (TypeError, ValueError):
+        return READINESS_REVIEW_FIRST
+    if f >= 0.85:
+        return READINESS_ADVANCE
+    if f >= 0.7:
+        return READINESS_ADVANCE_WITH_CAUTION
+    if f >= 0.65:
+        return READINESS_MORE_PRACTICE
+    return READINESS_REVIEW_FIRST
+
+
 def _bbox_metrics(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> dict:
     """Compute bbox evaluation metrics (tp/fp/fn/precision/recall/f1)."""
     all_ious: list[tuple[float, int, int]] = []
@@ -547,14 +570,17 @@ class AnnotationCheckTool(BaseTool):
                     pass  # malformed input -> fall back to default
             content, metrics = _bbox_report(predictions, ground_truth, image_size=image_size)
             f1 = metrics.get("f1", 0.0)
+            readiness = auto_readiness(f1)
+            metadata["readiness"] = readiness
             passed = f1 >= 0.7
             if task_id:
                 try:
                     from deeptutor.services.teaching_flow import TeachingFlowEngine
 
-                    TeachingFlowEngine().on_evaluated(task_id, f1=f1)
+                    TeachingFlowEngine().on_evaluated(task_id, f1=f1, readiness=readiness)
                 except Exception:
                     pass  # auto-advance is best-effort; never block grading
+            content += f"\n\n**自动 readiness 判定**: {readiness}"
             chart = build_scorecard_chart(
                 f1=f1,
                 precision=metrics.get("precision", 0.0),

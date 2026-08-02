@@ -148,13 +148,15 @@ class TeachingFlowEngine:
         state["blocked"] = None
         return self._write(self._with_expert(state), state_path)
 
-    def on_evaluated(self, task_id: str, f1: float, *, state_path: Path | None = None) -> dict:
+    def on_evaluated(self, task_id: str, f1: float, *, readiness: str | None = None, state_path: Path | None = None) -> dict:
         state = self.get_state(state_path)
         if state.get("task_id") != task_id:
             state = self.start_task(task_id, state_path=state_path)
         state["steps"]["evaluate"]["status"] = STATUS_DONE
         state["steps"]["evaluate"]["ts"] = _now()
         state["steps"]["evaluate"]["f1"] = f1
+        if readiness is not None:
+            state["steps"]["evaluate"]["readiness"] = readiness
         state["steps"]["feedback"]["status"] = STATUS_IN_PROGRESS
         state["current_step"] = "feedback"
         state["blocked"] = None

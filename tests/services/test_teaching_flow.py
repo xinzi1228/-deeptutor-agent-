@@ -208,3 +208,17 @@ def test_expert_follows_step_advance(tmp_path):
     assert e.get_state()["expert"] == "report_analyst"
     e.advance("record")  # -> current_step None -> fallback select_task
     assert e.get_state()["expert"] == "task_guide"
+
+
+def test_on_evaluated_optional_readiness_kwarg(tmp_path):
+    e = TeachingFlowEngine(path=None, in_memory=True)
+    e.start_task("task1")
+    r = e.on_evaluated("task1", f1=0.5, readiness="review_first")
+    assert r["steps"]["evaluate"]["readiness"] == "review_first"
+
+
+def test_on_evaluated_no_readiness_keeps_clean(tmp_path):
+    e = TeachingFlowEngine(path=None, in_memory=True)
+    e.start_task("task1")
+    r = e.on_evaluated("task1", f1=0.9)
+    assert "readiness" not in r["steps"]["evaluate"]
