@@ -47,9 +47,17 @@ def test_load_for_context_wraps_body(service: PersonaService) -> None:
     assert "Think out loud with the user." in rendered
 
 
-def test_load_for_context_missing_is_empty(service: PersonaService) -> None:
+def test_load_for_context_unknown_is_empty(service: PersonaService) -> None:
     assert service.load_for_context("ghost") == ""
-    assert service.load_for_context("") == ""
+
+
+def test_load_for_context_empty_falls_back_to_default_persona(service: PersonaService) -> None:
+    # An empty persona name resolves to the fixed default (annotation-coach).
+    service.create("annotation-coach", "Annotation Coach", "Coach body.")
+    rendered = service.load_for_context("")
+    assert "## Active Persona" in rendered
+    assert "### Persona: annotation-coach" in rendered
+    assert "Coach body." in rendered
 
 
 def test_update_description_and_rename(service: PersonaService) -> None:

@@ -1331,19 +1331,26 @@ class TurnRuntimeManager:
             from deeptutor.multi_user.context import get_current_user
             from deeptutor.multi_user.paths import get_admin_path_service
             from deeptutor.multi_user.skill_access import assigned_skill_ids
-            from deeptutor.services.persona import PersonaService, get_persona_service
+            from deeptutor.services.persona import (
+                DEFAULT_PERSONA,
+                PersonaService,
+                get_persona_service,
+            )
             from deeptutor.services.skill.service import SkillService, render_skills_manifest
 
             current_user = get_current_user()
+            # 标注星图: an absent/empty persona means the fixed default voice
+            # (annotation-coach), never "no persona". An explicitly requested
+            # persona always wins; an unknown explicit name still resolves to
+            # no persona (same as before — only the empty case defaults).
             requested_persona = str(payload.get("persona") or "").strip()
-            persona_context = ""
-            if requested_persona:
-                persona_context = get_persona_service().load_for_context(requested_persona)
-                if not persona_context and not current_user.is_admin:
-                    persona_context = PersonaService(
-                        root=get_admin_path_service().get_workspace_dir() / "personas"
-                    ).load_for_context(requested_persona)
-            active_persona = requested_persona if persona_context else ""
+            target_persona = requested_persona or DEFAULT_PERSONA
+            persona_context = get_persona_service().load_for_context(target_persona)
+            if not persona_context and not current_user.is_admin:
+                persona_context = PersonaService(
+                    root=get_admin_path_service().get_workspace_dir() / "personas"
+                ).load_for_context(target_persona)
+            active_persona = target_persona if persona_context else ""
 
             # Skills: never user-selected per turn. The model sees a
             # one-line manifest of every skill visible to this user (own +

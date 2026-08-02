@@ -419,12 +419,84 @@ async def test_turn_runtime_session_persona_persists_falls_back_and_clears(
     assert detail["preferences"]["persona"] == "socratic"
     assert detail["messages"][2]["metadata"]["request_snapshot"]["persona"] == "socratic"
 
-    # Turn 3 — explicit "" (Default): clears the stored preference and the
-    # turn runs without a persona.
+    # Turn 3 — explicit "" (Default): clears the stored preference; the turn
+    # still runs with the fixed default persona (annotation-coach).
     await run_turn(session["id"], {"persona": ""})
     detail = await store.get_session_with_messages(session["id"])
     assert detail["preferences"]["persona"] == ""
-    assert "persona" not in detail["messages"][4]["metadata"]["request_snapshot"]
+    assert detail["messages"][4]["metadata"]["request_snapshot"]["persona"] == "annotation-coach"
+
+
+@pytest.mark.asyncio
+async def test_turn_runtime_no_persona_defaults_to_annotation_coach(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    """A turn with no persona in the payload resolves to the fixed default
+    persona (annotation-coach) so the coach voice is always injected."""
+    store = SQLiteSessionStore(tmp_path / "chat_history.db")
+    runtime = TurnRuntimeManager(store)
+
+    class FakeContextBuilder:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        async def build(self, **_kwargs):
+            return SimpleNamespace(
+                conversation_history=[],
+                conversation_summary="",
+                context_text="",
+                token_count=0,
+                budget=0,
+            )
+
+    class FakeOrchestrator:
+        async def handle(self, context):
+            assert context.persona_context  # coach voice injected
+            assert "annotation-coach" in context.persona_context
+            yield StreamEvent(
+                type=StreamEventType.CONTENT,
+                source="chat",
+                stage="responding",
+                content="ok",
+                metadata={"call_kind": "llm_final_response"},
+            )
+            yield StreamEvent(type=StreamEventType.DONE, source="chat")
+
+    monkeypatch.setattr("deeptutor.services.llm.config.get_llm_config", lambda: SimpleNamespace())
+    monkeypatch.setattr(
+        "deeptutor.services.session.context_builder.ContextBuilder", FakeContextBuilder
+    )
+    monkeypatch.setattr("deeptutor.runtime.orchestrator.ChatOrchestrator", FakeOrchestrator)
+    monkeypatch.setattr(
+        "deeptutor.services.memory.get_memory_store",
+        lambda: SimpleNamespace(read_l3_concat=lambda: "", emit=_noop_async),
+    )
+    monkeypatch.setattr("deeptutor.services.skill.get_skill_service", _fake_skill_service)
+    monkeypatch.setattr("deeptutor.services.persona.get_persona_service", _fake_persona_service)
+
+    session, turn = await runtime.start_turn(
+        {
+            "type": "start_turn",
+            "content": "hi",
+            "session_id": None,
+            "capability": None,
+            "tools": [],
+            "knowledge_bases": [],
+            "attachments": [],
+            "language": "en",
+            "config": {},
+        }
+    )
+    async for _event in runtime.subscribe_turn(turn["id"], after_seq=0):
+        pass
+
+    detail = await store.get_session_with_messages(session["id"])
+    assert detail is not None
+    assert (
+        detail["messages"][0]["metadata"]["request_snapshot"]["persona"]
+        == "annotation-coach"
+    )
 
 
 @pytest.mark.asyncio
