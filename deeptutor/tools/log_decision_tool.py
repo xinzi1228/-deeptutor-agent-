@@ -1,8 +1,9 @@
 """Log coach decision tool — lumen-style decision audit trail.
 
-Records WHY the coach recommended a task / judged readiness / chose a route,
-so the learner (or a teacher auditing the system) can trace any decision back
-to its evidence. Surfaces in the personal-centre "why" panel.
+Records WHY the coach recommended a task / judged readiness / chose a route /
+intervened on a struggle signal, so the learner (or a teacher auditing the
+system) can trace any decision back to its evidence. Surfaces in the
+personal-centre "why" panel.
 """
 
 from __future__ import annotations
@@ -31,7 +32,8 @@ class LogDecisionTool(BaseTool):
             name="log_decision",
             description=(
                 "Record a coaching decision with its rationale for the audit trail. "
-                "Call AFTER you recommend a task, judge readiness, or choose a route — "
+                "Call AFTER you recommend a task, judge readiness, choose a route, or intervene "
+                "on a struggle signal — "
                 "capture WHAT you decided and WHY (evidence). Shown to the learner in the "
                 "progress 'why' panel so every recommendation is traceable."
             ),

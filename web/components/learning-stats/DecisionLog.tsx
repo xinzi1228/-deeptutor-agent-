@@ -7,6 +7,7 @@ const KIND_LABEL: Record<string, string> = {
   task_recommendation: "任务推荐",
   readiness_judgment: "推进判定",
   route_choice: "路线选择",
+  struggle_intervention: "卡住介入",
 };
 
 export function DecisionLog({ decisions }: { decisions: DecisionLog[] }) {
