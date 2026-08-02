@@ -1,0 +1,443 @@
+{
+  "task1": {
+    "title": "街景车辆检测",
+    "type": "bbox",
+    "difficulty": "easy",
+    "object_count": 1,
+    "image_url": "/images/car2.jpeg",
+    "labels": [
+      "car"
+    ],
+    "instruction": "在街景图片中找到汽车并用矩形框标注。框的边缘应紧贴车身轮廓，不包含过多背景。",
+    "ground_truth": [
+      {
+        "x": 207,
+        "y": 140,
+        "w": 353,
+        "h": 273,
+        "label": "car"
+      }
+    ],
+    "next_task": "task2",
+    "knowledge_points": [
+      "边界框绘制规范",
+      "最小外接矩形原则"
+    ]
+  },
+  "task2": {
+    "title": "停车场多车辆检测",
+    "type": "bbox",
+    "difficulty": "medium",
+    "object_count": 4,
+    "image_url": "/images/car4.jpeg",
+    "labels": [
+      "car"
+    ],
+    "instruction": "停车场中有多辆车，请全部标注出来。注意：远处的车也要标注，不要因为小而漏掉。",
+    "ground_truth": [
+      {
+        "x": 187,
+        "y": 351,
+        "w": 144,
+        "h": 140,
+        "label": "car"
+      },
+      {
+        "x": 431,
+        "y": 308,
+        "w": 89,
+        "h": 109,
+        "label": "car"
+      },
+      {
+        "x": 664,
+        "y": 409,
+        "w": 138,
+        "h": 137,
+        "label": "car"
+      },
+      {
+        "x": 564,
+        "y": 141,
+        "w": 71,
+        "h": 35,
+        "label": "car"
+      }
+    ],
+    "next_task": "task3",
+    "knowledge_points": [
+      "多目标检测",
+      "小目标标注策略",
+      "漏标预防"
+    ]
+  },
+  "task3": {
+    "title": "车辆特写标注",
+    "type": "bbox",
+    "difficulty": "easy",
+    "object_count": 1,
+    "image_url": "/images/car1.jpeg",
+    "labels": [
+      "car"
+    ],
+    "instruction": "标注整车的完整轮廓。注意：框要包含完整的车身，包括后视镜和轮胎，但不要包含过多地面。",
+    "ground_truth": [
+      {
+        "x": 527,
+        "y": 52,
+        "w": 871,
+        "h": 813,
+        "label": "car"
+      }
+    ],
+    "next_task": "task4",
+    "knowledge_points": [
+      "边界框绘制规范",
+      "完整性原则"
+    ]
+  },
+  "task4": {
+    "title": "马群检测",
+    "type": "bbox",
+    "difficulty": "medium",
+    "object_count": 4,
+    "image_url": "/images/2.jpeg",
+    "labels": [
+      "horse"
+    ],
+    "instruction": "找出图中所有的马并标注。注意区分马和其他动物（如果有的话），框要覆盖完整的马身。",
+    "ground_truth": [
+      {
+        "x": 0,
+        "y": 157,
+        "w": 88,
+        "h": 116,
+        "label": "horse"
+      },
+      {
+        "x": 433,
+        "y": 74,
+        "w": 181,
+        "h": 358,
+        "label": "horse"
+      },
+      {
+        "x": 26,
+        "y": 121,
+        "w": 292,
+        "h": 295,
+        "label": "horse"
+      },
+      {
+        "x": 313,
+        "y": 130,
+        "w": 116,
+        "h": 291,
+        "label": "horse"
+      }
+    ],
+    "next_task": "task5",
+    "knowledge_points": [
+      "多目标检测",
+      "相似目标区分"
+    ]
+  },
+  "task5": {
+    "title": "动物分类标注",
+    "type": "classification",
+    "difficulty": "easy",
+    "object_count": 1,
+    "image_url": "/images/car2.jpeg",
+    "labels": [
+      "car",
+      "not_car"
+    ],
+    "instruction": "判断图片中是否存在汽车。如果存在汽车，选择 'car'；如果不存在或不是汽车，选择 'not_car'。",
+    "ground_truth": {
+      "label": "car"
+    },
+    "next_task": "task6",
+    "knowledge_points": [
+      "图像分类基础",
+      "单标签分类"
+    ],
+    "items": [
+      {
+        "id": 1,
+        "text": "图片中有汽车吗？"
+      },
+      {
+        "id": 2,
+        "text": "附加判断：这辆车是什么颜色？"
+      }
+    ]
+  },
+  "task6": {
+    "title": "遮挡场景车辆检测",
+    "type": "bbox",
+    "difficulty": "hard",
+    "object_count": 4,
+    "image_url": "/images/car4.jpeg",
+    "labels": [
+      "car"
+    ],
+    "instruction": "停车场中有车被部分遮挡。对于遮挡 < 50% 的车：标注可见部分，框按可见轮廓推断完整范围。对于遮挡 > 50% 的车：可不标注。",
+    "ground_truth": [
+      {
+        "x": 187,
+        "y": 351,
+        "w": 144,
+        "h": 140,
+        "label": "car",
+        "occluded": false
+      },
+      {
+        "x": 431,
+        "y": 308,
+        "w": 89,
+        "h": 109,
+        "label": "car",
+        "occluded": false
+      },
+      {
+        "x": 664,
+        "y": 409,
+        "w": 138,
+        "h": 137,
+        "label": "car",
+        "occluded": true
+      },
+      {
+        "x": 564,
+        "y": 141,
+        "w": 71,
+        "h": 35,
+        "label": "car",
+        "occluded": false
+      }
+    ],
+    "next_task": "task7",
+    "knowledge_points": [
+      "遮挡目标处理原则",
+      "遮挡比例判定"
+    ]
+  },
+  "task7": {
+    "title": "密集小目标检测",
+    "type": "bbox",
+    "difficulty": "hard",
+    "object_count": 20,
+    "image_url": "/images/car4.jpeg",
+    "labels": [
+      "car"
+    ],
+    "instruction": "停车场中有大量车辆。标注技巧：由大到小标注，先标大目标再标小目标。在 200% 缩放比例下检查小目标。这是对标注耐心和细致度的考验。",
+    "ground_truth": [
+      {
+        "x": 187,
+        "y": 351,
+        "w": 144,
+        "h": 140,
+        "label": "car"
+      },
+      {
+        "x": 431,
+        "y": 308,
+        "w": 89,
+        "h": 109,
+        "label": "car"
+      },
+      {
+        "x": 664,
+        "y": 409,
+        "w": 138,
+        "h": 137,
+        "label": "car"
+      },
+      {
+        "x": 564,
+        "y": 141,
+        "w": 71,
+        "h": 35,
+        "label": "car"
+      }
+    ],
+    "next_task": "task8",
+    "knowledge_points": [
+      "小目标标注策略",
+      "由大到小标注技巧",
+      "缩放辅助标注"
+    ]
+  },
+  "task8": {
+    "title": "精度挑战：精准框练习",
+    "type": "bbox",
+    "difficulty": "hard",
+    "object_count": 1,
+    "image_url": "/images/car1.jpeg",
+    "labels": [
+      "car"
+    ],
+    "instruction": "这是精度挑战任务！框的边缘必须与目标边缘的距离 ≤ 3 像素。IOU ≥ 0.95 才算通过。请用方向键微调框位置，确保最高精度。",
+    "ground_truth": [
+      {
+        "x": 527,
+        "y": 52,
+        "w": 871,
+        "h": 813,
+        "label": "car"
+      }
+    ],
+    "next_task": "task9",
+    "knowledge_points": [
+      "精确定位",
+      "像素级微调",
+      "最小外接矩形"
+    ]
+  },
+  "task9": {
+    "title": "动物分类（多选）",
+    "type": "classification",
+    "difficulty": "medium",
+    "object_count": 1,
+    "image_url": "/images/2.jpeg",
+    "labels": [
+      "horse",
+      "dog",
+      "cat",
+      "bird"
+    ],
+    "instruction": "判断图片中出现了哪些动物（可多选）。注意：仔细查看图片每个角落，可能有隐藏在背景中的动物。",
+    "ground_truth": {
+      "label": "horse"
+    },
+    "next_task": "task10",
+    "knowledge_points": [
+      "多标签分类",
+      "细粒度观察"
+    ]
+  },
+  "task10": {
+    "title": "标注判断练习",
+    "type": "judgment",
+    "difficulty": "easy",
+    "object_count": 1,
+    "image_url": "/images/car2.jpeg",
+    "labels": [
+      "correct",
+      "wrong"
+    ],
+    "instruction": "下面每条描述某次对街景图片的标注结果。请逐条判断该标注是否正确：正确的标注选 correct，错误的选 wrong。判断依据是标注规范——框要完整紧贴目标轮廓、标签正确、不遗漏目标、不重复标注。",
+    "ground_truth": [
+      {
+        "id": 1,
+        "answer": "correct"
+      },
+      {
+        "id": 2,
+        "answer": "wrong"
+      },
+      {
+        "id": 3,
+        "answer": "correct"
+      }
+    ],
+    "next_task": "task11",
+    "knowledge_points": [
+      "标注质量判断",
+      "边界框绘制规范",
+      "错误识别"
+    ],
+    "items": [
+      {
+        "id": 1,
+        "text": "标注框完整覆盖汽车车身，边缘紧贴轮廓，标签为 car。"
+      },
+      {
+        "id": 2,
+        "text": "标注框只框住车头，车尾和轮胎都在框外，标签为 car。"
+      },
+      {
+        "id": 3,
+        "text": "图中只有一辆车，只标了一个紧贴车身的 car 框，无多余框。"
+      }
+    ]
+  },
+  "task11": {
+    "title": "标注规范练习",
+    "type": "standard",
+    "difficulty": "medium",
+    "object_count": 1,
+    "image_url": "/images/car2.jpeg",
+    "labels": [
+      "car"
+    ],
+    "instruction": "请按标准格式输出这张图中汽车的边界框标注。要求 JSON 数组，每个对象必须包含 x（左上角横坐标）、y（左上角纵坐标）、w（宽度）、h（高度）、label（标签）五个字段，缺一不可，标签必须是 car。框的边缘要贴合车身，不要包含过多背景。",
+    "ground_truth": [
+      {
+        "required_fields": [
+          "x",
+          "y",
+          "w",
+          "h",
+          "label"
+        ],
+        "labels": [
+          "car"
+        ]
+      }
+    ],
+    "next_task": "task12",
+    "knowledge_points": [
+      "标准标注格式",
+      "字段完整性",
+      "标签规范"
+    ]
+  },
+  "task12": {
+    "title": "错误案例找错",
+    "type": "error_case",
+    "difficulty": "hard",
+    "object_count": 1,
+    "image_url": "/images/car2.jpeg",
+    "labels": [
+      "error",
+      "normal"
+    ],
+    "instruction": "下面是针对同一张街景图的几条标注案例。请找出其中存在错误的标注：认为有错误的案例就列入结果。常见错误包括：框没贴合目标、标签错误、漏标目标、同一目标重复标注。请逐条认真核对。",
+    "ground_truth": [
+      {
+        "id": 1,
+        "is_error": true
+      },
+      {
+        "id": 2,
+        "is_error": false
+      },
+      {
+        "id": 3,
+        "is_error": true
+      }
+    ],
+    "next_task": "task1",
+    "knowledge_points": [
+      "错误案例识别",
+      "质检思维",
+      "常见标注错误"
+    ],
+    "items": [
+      {
+        "id": 1,
+        "text": "标注框比汽车大很多，框进大量地面和背景，标签为 car。"
+      },
+      {
+        "id": 2,
+        "text": "标注框完整覆盖汽车，紧贴轮廓，标签为 car，无多余框。"
+      },
+      {
+        "id": 3,
+        "text": "图中只有一辆车，却标注了两个高度重叠的 car 框。"
+      }
+    ]
+  }
+}

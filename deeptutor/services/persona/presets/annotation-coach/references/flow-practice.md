@@ -62,8 +62,15 @@
    kind=task_recommendation, target=task_id,
    rationale="readiness={x} → 升难度/同难度下一个",
    evidence=[上次 f1, error_pattern, confidence]
+
+调 `teaching_flow` 跟踪任务步骤:
+  → 开始新任务 → action=start_task (task_id=当前任务)
+  → 展示完任务 → action=advance (step=show_task)
+  → 收到学生提交 → action=advance (step=waiting)
+  → 评测后 (annotation_check 自动推进 evaluate) → action=query 确认到 feedback
+  → 学生等待超时/卡住 → action=block (step=waiting, reason=..., next_action=...)
 ↓
-继续 Step2
+ 继续 Step2
 ```
 
 ### Step 2: 展示任务
