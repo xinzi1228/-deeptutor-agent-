@@ -1,0 +1,18 @@
+{
+  "_note": "教学专家角色索引（Source of truth）。coordinator + 6 experts。每个条目 file 指向角色文件。pytest 校验目录与索引双向一致 + frontmatter 完整。",
+  "coordinator": {
+    "id": "annotation_coach",
+    "label": "标注教练",
+    "icon": "🎯",
+    "color": "#3B82F6",
+    "file": "../../../services/persona/presets/annotation-coach/PERSONA.md"
+  },
+  "experts": [
+    {"id": "learning_planner", "label": "学习计划师", "icon": "🗺️", "color": "#10B981", "file": "references/experts/learning_planner.md"},
+    {"id": "session_steward", "label": "会话管家", "icon": "💬", "color": "#6366F1", "file": "references/experts/session_steward.md"},
+    {"id": "task_guide", "label": "任务引导师", "icon": "🧭", "color": "#F59E0B", "file": "references/experts/task_guide.md"},
+    {"id": "struggle_detective", "label": "困难检测师", "icon": "🕵️", "color": "#EF4444", "file": "references/experts/struggle_detective.md"},
+    {"id": "report_analyst", "label": "学习报告师", "icon": "📊", "color": "#8B5CF6", "file": "references/experts/report_analyst.md"},
+    {"id": "grading_expert", "label": "练习批改师", "icon": "✅", "color": "#06B6D4", "file": "references/experts/grading_expert.md"}
+  ]
+}
