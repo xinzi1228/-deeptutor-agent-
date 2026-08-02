@@ -67,15 +67,7 @@ async def _collect_events(run_coro) -> list[StreamEvent]:
 
 
 def test_builtin_capability_registry_covers_documented_capabilities() -> None:
-    assert set(BUILTIN_CAPABILITY_CLASSES) == {
-        "chat",
-        "deep_solve",
-        "deep_question",
-        "deep_research",
-        "math_animator",
-        "visualize",
-        "mastery_path",
-    }
+    assert set(BUILTIN_CAPABILITY_CLASSES) == {"chat"}
 
 
 @pytest.mark.asyncio

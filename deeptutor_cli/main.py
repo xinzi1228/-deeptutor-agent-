@@ -77,8 +77,7 @@ def run_capability(
     capability: str = typer.Argument(
         ...,
         help=(
-            "Capability name (e.g. chat, deep_solve, deep_question, "
-            "deep_research, visualize, math_animator, mastery_path)."
+            "Capability name (e.g. chat)."
         ),
     ),
     message: str = typer.Argument(..., help="Message to send."),
