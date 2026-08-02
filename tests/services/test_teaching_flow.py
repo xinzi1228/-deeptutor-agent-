@@ -180,3 +180,31 @@ def test_get_state_includes_expert():
     state = e.get_state()
     assert "expert" in state
     assert state["expert"] == "task_guide"  # current_step is show_task after start_task
+
+
+def test_expert_route_values_match_manifest():
+    from deeptutor.services.teaching_flow import EXPERT_ROUTE
+
+    base = Path(__file__).resolve().parents[2] / "deeptutor" / "skills" / "builtin" / "annotation-coach-flows"
+    manifest = json.loads((base / "experts_manifest.json").read_text(encoding="utf-8"))
+    manifest_ids = {e["id"] for e in manifest["experts"]}
+    assert set(EXPERT_ROUTE.values()) <= manifest_ids
+
+
+def test_expert_follows_step_advance(tmp_path):
+    from deeptutor.services.teaching_flow import TeachingFlowEngine
+
+    e = TeachingFlowEngine(path=None, in_memory=True)
+    assert e.get_state()["expert"] == "task_guide"  # fresh -> select_task
+    e.start_task("task1")  # -> show_task
+    assert e.get_state()["expert"] == "task_guide"
+    e.advance("show_task")  # -> waiting
+    assert e.get_state()["expert"] == "task_guide"
+    e.advance("waiting")  # -> evaluate
+    assert e.get_state()["expert"] == "grading_expert"
+    e.advance("evaluate")  # -> feedback
+    assert e.get_state()["expert"] == "grading_expert"
+    e.advance("feedback")  # -> record
+    assert e.get_state()["expert"] == "report_analyst"
+    e.advance("record")  # -> current_step None -> fallback select_task
+    assert e.get_state()["expert"] == "task_guide"
