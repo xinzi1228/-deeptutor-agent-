@@ -37,8 +37,8 @@ export function CheckinCalendar() {
   const cols: string[][] = [];
   for (let w = 0; w < WEEKS; w++) {
     const col: string[] = [];
-    for (let d = 6 - w * 7; d > -w * 7 - 1; d--) {
-      col.push(isoDate(-d));
+    for (let d = 0; d < 7; d++) {
+      col.push(isoDate(-(w * 7 + d)));
     }
     cols.push(col);
   }
