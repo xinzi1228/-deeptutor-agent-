@@ -69,8 +69,9 @@ def check_overlap(boxes: list[dict], iou_threshold: float = 0.5) -> list[dict]:
     for i in range(len(boxes)):
         for j in range(i + 1, len(boxes)):
             iou = _calculate_iou(boxes[i], boxes[j])
-            # skip nested boxes (one fully inside the other) — treat as acceptable
-            nested = _contains(boxes[i], boxes[j]) or _contains(boxes[j], boxes[i])
+            # skip nested boxes (one fully inside the other) — treat as acceptable;
+            # pixel-identical boxes are duplicate annotations and must still be flagged
+            nested = (_contains(boxes[i], boxes[j]) or _contains(boxes[j], boxes[i])) and boxes[i] != boxes[j]
             if iou > iou_threshold and not nested:
                 checks.append({
                     "rule": "overlap",

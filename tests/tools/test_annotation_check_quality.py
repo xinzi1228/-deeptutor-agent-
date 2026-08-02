@@ -40,6 +40,16 @@ def test_overlap_nested_not_flagged():
     assert check_overlap(boxes, iou_threshold=0.5) == []
 
 
+def test_overlap_identical_boxes_flagged():
+    boxes = [
+        {"x": 10, "y": 10, "w": 100, "h": 100, "label": "car"},
+        {"x": 10, "y": 10, "w": 100, "h": 100, "label": "car"},
+    ]
+    checks = check_overlap(boxes, iou_threshold=0.5)
+    assert len(checks) == 1
+    assert checks[0]["rule"] == "overlap"
+
+
 def test_overlap_partial_high_iou_flagged():
     boxes = [
         {"x": 10, "y": 10, "w": 100, "h": 100, "label": "car"},
