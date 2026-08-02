@@ -196,6 +196,7 @@ def compose_enabled_tools(
         "competency_map",
         "ability_radar",
         "struggle_detect",
+        "teaching_flow",
         "job_analysis",
         "get_annotation_task",
         "annotation_check",
