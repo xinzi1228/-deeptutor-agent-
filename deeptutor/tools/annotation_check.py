@@ -11,7 +11,7 @@ from deeptutor.tools.prompting import load_prompt_hints
 
 
 def collect_public_artifacts(workdir: str) -> list[Any]:
-    """Discover public artifacts under *workdir* (lazy import avoids an import cycle)."""
+    """Discover public artifacts under *workdir* (module-level alias for monkeypatching in tests)."""
     from deeptutor.services.sandbox.artifacts import collect_public_artifacts as _real
 
     return _real(workdir)
@@ -67,18 +67,19 @@ def _bbox_metrics(predictions: list[dict], ground_truth: list[dict], iou_thresho
     }
 
 
-def _bbox_report(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> str:
-    """Evaluate bounding boxes with detailed educational feedback (returns string)."""
+def _bbox_report(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> tuple[str, dict]:
+    """Evaluate bounding boxes with educational feedback, returns (content, metrics)."""
+    metrics = _bbox_metrics(predictions, ground_truth, iou_threshold)
+
     if not predictions and not ground_truth:
-        return "No predictions and no ground truth provided."
+        return "No predictions and no ground truth provided.", metrics
 
     if not predictions:
         return (
             f"You didn't submit any bounding boxes, but there are {len(ground_truth)} objects to find.\n"
             f"Example format: {{\"x\": 80, \"y\": 120, \"w\": 140, \"h\": 160, \"label\": \"cat\"}}"
-        )
+        ), metrics
 
-    metrics = _bbox_metrics(predictions, ground_truth, iou_threshold)
     tp = metrics["tp"]
     fp = metrics["fp"]
     fn = metrics["fn"]
@@ -145,7 +146,7 @@ def _bbox_report(predictions: list[dict], ground_truth: list[dict], iou_threshol
     else:
         lines.append("**Tip**: Slow down. Make each box tightly wrap its object.")
 
-    return "\n".join(lines)
+    return "\n".join(lines), metrics
 
 
 def _classify_report(predictions: list[dict], ground_truth: list[dict]) -> str:
@@ -265,8 +266,7 @@ class AnnotationCheckTool(BaseTool):
             content = _classify_report(predictions, ground_truth)
             chart = None
         else:
-            content = _bbox_report(predictions, ground_truth)
-            metrics = _bbox_metrics(predictions, ground_truth)
+            content, metrics = _bbox_report(predictions, ground_truth)
             f1 = metrics.get("f1", 0.0)
             passed = f1 >= 0.7
             chart = build_scorecard_chart(
