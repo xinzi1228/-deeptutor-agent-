@@ -41,9 +41,19 @@ def build_scorecard_chart(*, f1: float, precision: float, recall: float, passed:
     }
 
 
-def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
-    h = hex_color.lstrip("#")
-    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+def _configure_cjk_font() -> None:
+    """Point matplotlib at a cross-platform CJK font so Chinese titles don't render as tofu boxes."""
+    import matplotlib.pyplot as plt
+
+    plt.rcParams["font.sans-serif"] = [
+        "Microsoft YaHei",
+        "SimHei",
+        "Noto Sans CJK SC",
+        "PingFang SC",
+        "WenQuanYi Zen Hei",
+        "DejaVu Sans",
+    ]
+    plt.rcParams["axes.unicode_minus"] = False
 
 
 async def render_scorecard_png(
@@ -54,7 +64,7 @@ async def render_scorecard_png(
     passed: bool,
     feedback: list[str],
     out_dir: Path,
-) -> Path:
+) -> Path | None:
     """Render a scorecard as a PNG via matplotlib. Never raises on chart errors."""
     import asyncio
 
@@ -64,9 +74,10 @@ async def render_scorecard_png(
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
+        _configure_cjk_font()
+
         fig, ax = plt.subplots(figsize=(7, 3), dpi=120)
         color = "#22c55e" if passed else "#ef4444"
-        rgb = _hex_to_rgb(color)
 
         ax.barh([0], [f1], color=color, alpha=0.85, height=0.55)
         ax.barh([0], [1], color="#e5e7eb", height=0.55)
@@ -107,12 +118,17 @@ async def render_scorecard_png(
 
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / "scorecard.png"
-        fig.tight_layout()
-        fig.savefig(path, bbox_inches="tight")
-        plt.close(fig)
-        return path
+        try:
+            fig.tight_layout()
+            fig.savefig(path, bbox_inches="tight")
+            return path
+        finally:
+            plt.close(fig)
 
-    return await asyncio.to_thread(_draw)
+    try:
+        return await asyncio.to_thread(_draw)
+    except Exception:
+        return None
 
 
 __all__ = ["build_scorecard_chart", "progress_chart", "radar_chart", "render_scorecard_png"]

@@ -118,6 +118,8 @@ server = [
     "loguru>=0.7.3,<1.0.0",
     "json-repair>=0.57.0,<1.0.0",
     "croniter>=6.0.0,<7.0.0",
+    # Chat scorecard PNG rendering (deeptutor/tools/chart_cards.py)
+    "matplotlib>=3.8.0",
 ]
 
 # Partner channel SDKs + MCP client. Mirrors requirements/partners.txt.

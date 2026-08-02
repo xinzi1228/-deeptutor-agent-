@@ -47,4 +47,36 @@ async def test_render_scorecard_png(tmp_path):
     )
     assert path.exists()
     assert path.suffix == ".png"
+    assert path.read_bytes()[:4] == b"\x89PNG"
     assert path.stat().st_size > 500
+
+
+@pytest.mark.asyncio
+async def test_render_scorecard_png_returns_none_on_failure(monkeypatch, tmp_path):
+    from matplotlib.figure import Figure
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("save failed")
+
+    monkeypatch.setattr(Figure, "savefig", _boom)
+    path = await render_scorecard_png(
+        f1=0.85,
+        precision=0.9,
+        recall=0.8,
+        passed=True,
+        feedback=["框A 匹配 (IOU=0.82)"],
+        out_dir=tmp_path,
+    )
+    assert path is None
+
+
+def test_configure_cjk_font():
+    import matplotlib.pyplot as plt
+
+    from deeptutor.tools.chart_cards import _configure_cjk_font
+
+    _configure_cjk_font()
+    sans_serif = list(plt.rcParams["font.sans-serif"])
+    cjk_fonts = {"Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "PingFang SC", "WenQuanYi Zen Hei"}
+    assert cjk_fonts.intersection(sans_serif), f"no CJK font in font.sans-serif: {sans_serif}"
+    assert plt.rcParams["axes.unicode_minus"] is False
