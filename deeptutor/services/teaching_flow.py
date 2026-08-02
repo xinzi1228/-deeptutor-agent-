@@ -51,9 +51,9 @@ def flow_state_path(base_dir: Path | None = None) -> Path:
 class TeachingFlowEngine:
     """Deterministic task-level flow state machine over flow_state.json."""
 
-    def __init__(self, path: Path | None = None, base_dir: Path | None = None) -> None:
+    def __init__(self, path: Path | None = None, *, base_dir: Path | None = None, in_memory: bool = False) -> None:
         self._path = path or _default_path(base_dir)
-        self._in_memory: dict | None = None if path is not None else self._fresh_state()
+        self._in_memory: dict | None = self._fresh_state() if in_memory else None
 
     # ------------------------------------------------------------------ state
 
@@ -65,7 +65,10 @@ class TeachingFlowEngine:
             return self._in_memory
         p = self._resolve(state_path)
         if p.exists():
-            return json.loads(p.read_text(encoding="utf-8"))
+            try:
+                return json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                return self._fresh_state()
         return self._fresh_state()
 
     def _fresh_state(self) -> dict:
@@ -89,7 +92,7 @@ class TeachingFlowEngine:
 
     # -------------------------------------------------------------- actions
 
-    def start_task(self, task_id: str, *, state_path: Path | None = None, base_dir: Path | None = None) -> dict:
+    def start_task(self, task_id: str, *, state_path: Path | None = None) -> dict:
         state = self._fresh_state()
         state["task_id"] = task_id
         state["current_step"] = "show_task"
@@ -97,10 +100,10 @@ class TeachingFlowEngine:
         state["steps"]["show_task"] = {"status": STATUS_IN_PROGRESS, "ts": _now()}
         return self._write(state, state_path)
 
-    def advance(self, step: str, *, state_path: Path | None = None, base_dir: Path | None = None) -> dict:
-        state = self.get_state(state_path)
+    def advance(self, step: str, *, state_path: Path | None = None) -> dict:
         if step not in FLOW_STEPS:
-            return self._write(state, state_path)
+            raise ValueError(f"未知步骤: {step} (可选: {', '.join(FLOW_STEPS)})")
+        state = self.get_state(state_path)
         for pre in PREREQUISITES[step]:
             if state["steps"].get(pre, {}).get("status") != STATUS_DONE:
                 state["blocked"] = {
@@ -120,7 +123,7 @@ class TeachingFlowEngine:
         state["blocked"] = None
         return self._write(state, state_path)
 
-    def on_evaluated(self, task_id: str, f1: float, *, state_path: Path | None = None, base_dir: Path | None = None) -> dict:
+    def on_evaluated(self, task_id: str, f1: float, *, state_path: Path | None = None) -> dict:
         state = self.get_state(state_path)
         if state.get("task_id") != task_id:
             state = self.start_task(task_id, state_path=state_path)
@@ -132,14 +135,15 @@ class TeachingFlowEngine:
         state["blocked"] = None
         return self._write(state, state_path)
 
-    def block(self, step: str, reason: str, next_action: str, *, state_path: Path | None = None, base_dir: Path | None = None) -> dict:
+    def block(self, step: str, reason: str, next_action: str, *, state_path: Path | None = None) -> dict:
+        if step not in FLOW_STEPS:
+            raise ValueError(f"未知步骤: {step} (可选: {', '.join(FLOW_STEPS)})")
         state = self.get_state(state_path)
-        if step in state["steps"]:
-            state["steps"][step]["status"] = STATUS_BLOCKED
+        state["steps"][step]["status"] = STATUS_BLOCKED
         state["blocked"] = {"step": step, "reason": reason, "next_action": next_action}
         return self._write(state, state_path)
 
-    def reset(self, *, state_path: Path | None = None, base_dir: Path | None = None) -> dict:
+    def reset(self, *, state_path: Path | None = None) -> dict:
         state = self._fresh_state()
         return self._write(state, state_path)
 
