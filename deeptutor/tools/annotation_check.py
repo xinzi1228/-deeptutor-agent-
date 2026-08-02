@@ -6,7 +6,15 @@ import json
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
+from deeptutor.tools.chart_cards import build_scorecard_chart, render_scorecard_png
 from deeptutor.tools.prompting import load_prompt_hints
+
+
+def collect_public_artifacts(workdir: str) -> list[Any]:
+    """Discover public artifacts under *workdir* (lazy import avoids an import cycle)."""
+    from deeptutor.services.sandbox.artifacts import collect_public_artifacts as _real
+
+    return _real(workdir)
 
 
 def _calculate_iou(box1: dict, box2: dict) -> float:
@@ -27,6 +35,38 @@ def _calculate_iou(box1: dict, box2: dict) -> float:
     return intersection / union if union > 0 else 0.0
 
 
+def _bbox_metrics(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> dict:
+    """Compute bbox evaluation metrics (tp/fp/fn/precision/recall/f1)."""
+    all_ious: list[tuple[float, int, int]] = []
+    for pi, pred in enumerate(predictions):
+        for gj, gt in enumerate(ground_truth):
+            if pred.get("label", "") != gt.get("label", ""):
+                continue
+            iou = _calculate_iou(pred, gt)
+            if iou >= iou_threshold:
+                all_ious.append((iou, pi, gj))
+    all_ious.sort(key=lambda x: x[0], reverse=True)
+    matched_pred: set[int] = set()
+    matched_gt: set[int] = set()
+    matches: list[dict] = []
+    for iou, pi, gj in all_ious:
+        if pi not in matched_pred and gj not in matched_gt:
+            matches.append({"pred_idx": pi, "gt_idx": gj, "iou": iou})
+            matched_pred.add(pi)
+            matched_gt.add(gj)
+    tp = len(matches)
+    fp = len(predictions) - tp
+    fn = len(ground_truth) - tp
+    precision = tp / len(predictions) if predictions else 0
+    recall = tp / len(ground_truth) if ground_truth else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    return {
+        "tp": tp, "fp": fp, "fn": fn,
+        "precision": precision, "recall": recall, "f1": f1,
+        "matches": matches, "matched_pred": matched_pred, "matched_gt": matched_gt,
+    }
+
+
 def _bbox_report(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> str:
     """Evaluate bounding boxes with detailed educational feedback (returns string)."""
     if not predictions and not ground_truth:
@@ -38,32 +78,16 @@ def _bbox_report(predictions: list[dict], ground_truth: list[dict], iou_threshol
             f"Example format: {{\"x\": 80, \"y\": 120, \"w\": 140, \"h\": 160, \"label\": \"cat\"}}"
         )
 
-    all_ious: list[tuple[float, int, int]] = []
-    for pi, pred in enumerate(predictions):
-        for gj, gt in enumerate(ground_truth):
-            if pred.get("label", "") != gt.get("label", ""):
-                continue
-            iou = _calculate_iou(pred, gt)
-            if iou >= iou_threshold:
-                all_ious.append((iou, pi, gj))
-
-    all_ious.sort(key=lambda x: x[0], reverse=True)
-    matched_pred: set[int] = set()
-    matched_gt: set[int] = set()
-    matches: list[dict] = []
-
-    for iou, pi, gj in all_ious:
-        if pi not in matched_pred and gj not in matched_gt:
-            matches.append({"pred_idx": pi, "gt_idx": gj, "iou": iou})
-            matched_pred.add(pi)
-            matched_gt.add(gj)
-
-    tp = len(matches)
-    fp = len(predictions) - tp
-    fn = len(ground_truth) - tp
-    precision = tp / len(predictions) if predictions else 0
-    recall = tp / len(ground_truth) if ground_truth else 0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    metrics = _bbox_metrics(predictions, ground_truth, iou_threshold)
+    tp = metrics["tp"]
+    fp = metrics["fp"]
+    fn = metrics["fn"]
+    precision = metrics["precision"]
+    recall = metrics["recall"]
+    f1 = metrics["f1"]
+    matches = metrics["matches"]
+    matched_pred = metrics["matched_pred"]
+    matched_gt = metrics["matched_gt"]
 
     lines = ["## Bounding Box Results\n"]
     lines.append(f"**Precision**: {precision:.0%}  — when you draw a box, how often is it correct?")
@@ -168,30 +192,12 @@ def _classify_report(predictions: list[dict], ground_truth: list[dict]) -> str:
 
 # Dict-returning versions for programmatic use (e.g. Label Studio integration)
 def _bbox_dict(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> dict:
-    all_ious: list[tuple[float, int, int]] = []
-    for pi, pred in enumerate(predictions):
-        for gj, gt in enumerate(ground_truth):
-            if pred.get("label", "") != gt.get("label", ""):
-                continue
-            iou = _calculate_iou(pred, gt)
-            if iou >= iou_threshold:
-                all_ious.append((iou, pi, gj))
-
-    all_ious.sort(key=lambda x: x[0], reverse=True)
-    matched_pred: set[int] = set()
-    matched_gt: set[int] = set()
-    for iou, pi, gj in all_ious:
-        if pi not in matched_pred and gj not in matched_gt:
-            matched_pred.add(pi)
-            matched_gt.add(gj)
-    tp = len(matched_pred)
-    precision = tp / len(predictions) if predictions else 0
-    recall = tp / len(ground_truth) if ground_truth else 0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    metrics = _bbox_metrics(predictions, ground_truth, iou_threshold)
+    tp = metrics["tp"]
     return {
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "f1": round(f1, 4),
+        "precision": round(metrics["precision"], 4),
+        "recall": round(metrics["recall"], 4),
+        "f1": round(metrics["f1"], 4),
         "matched_count": tp,
         "extra_count": len(predictions) - tp,
         "missed_count": len(ground_truth) - tp,
@@ -257,8 +263,37 @@ class AnnotationCheckTool(BaseTool):
 
         if task_type == "classification":
             content = _classify_report(predictions, ground_truth)
+            chart = None
         else:
             content = _bbox_report(predictions, ground_truth)
+            metrics = _bbox_metrics(predictions, ground_truth)
+            f1 = metrics.get("f1", 0.0)
+            passed = f1 >= 0.7
+            chart = build_scorecard_chart(
+                f1=f1,
+                precision=metrics.get("precision", 0.0),
+                recall=metrics.get("recall", 0.0),
+                passed=passed,
+            )
+            try:
+                from deeptutor.services.path_service import get_path_service
+
+                out_dir = get_path_service().get_task_workspace("chat", "scorecard") / "media"
+                feedback = [f"IOU {m['iou']:.2f}" for m in metrics.get("matches", [])][:3]
+                png = await render_scorecard_png(
+                    f1=f1,
+                    precision=metrics.get("precision", 0.0),
+                    recall=metrics.get("recall", 0.0),
+                    passed=passed,
+                    feedback=feedback,
+                    out_dir=out_dir,
+                )
+                if png is not None:
+                    artifacts = collect_public_artifacts(str(out_dir))
+                    if artifacts:
+                        content = f"![成绩单]({artifacts[0].url})\n\n" + content
+            except Exception:
+                pass  # scorecard is best-effort; text feedback remains
 
         # 落盘保障 (回归发现: Coach 多轮对话中会漏记录): 评测后必须写学习记录
         content += (
@@ -269,7 +304,10 @@ class AnnotationCheckTool(BaseTool):
             "foresight 预测学生下一步。"
         )
 
-        return ToolResult(content=content)
+        metadata: dict = {}
+        if chart:
+            metadata["chart"] = chart
+        return ToolResult(content=content, metadata=metadata or None)
 
     def get_prompt_hints(self, language: str = "en") -> Any:
         hints = load_prompt_hints(self.name, language=language)
