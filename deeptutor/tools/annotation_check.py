@@ -118,7 +118,15 @@ READINESS_REVIEW_FIRST = "review_first"
 
 
 def auto_readiness(f1: float | None) -> str:
-    """Map an F1 score to a readiness_gate decision (deterministic, conservative on missing)."""
+    """Map an F1 score to a readiness_gate decision (deterministic, conservative on missing).
+
+    Emits 4 of the 6 readiness_gate 判定 (decision-matrix §3): advance /
+    advance_with_caution / more_practice / review_first. The other two —
+    step_down and diagnose_again — are NOT produced here: they are coach /
+    struggle-detection decisions made from deeper signals (prerequisite gaps,
+    repeated failed interventions), not from a single F1 score. Coach may
+    override this default via the teaching_flow advance readiness parameter.
+    """
     try:
         f = float(f1)
     except (TypeError, ValueError):
@@ -382,27 +390,35 @@ def _standard_report(predictions: list[dict], ground_truth: list[dict]) -> str:
 
 
 def _error_case_report(predictions: list[dict], ground_truth: list[dict]) -> str:
-    """Evaluate whether the student flagged the correct erroneous annotations."""
+    """Evaluate whether the student flagged the correct erroneous annotations.
+
+    Unlisted ground-truth cases are implicitly treated as not flagged — a student
+    who lists only the error ids (the natural answer) gets full credit for the
+    non-error cases they correctly left unflagged.
+    """
     gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
+    flagged_by_id = {_resolve_id(p, i): bool(p.get("flagged")) for i, p in enumerate(predictions)}
     correct = 0
     total = len(ground_truth)
     lines = ["## 错误案例检出结果\n"]
-    for i, pred in enumerate(predictions):
-        item_id = _resolve_id(pred, i)
-        gt = gt_by_id.get(item_id)
-        if not gt:
-            lines.append(f"- 案例 {item_id}: 额外作答（无标准案例）")
-            continue
-        flagged = bool(pred.get("flagged"))
+    for item_id, gt in gt_by_id.items():
+        flagged = flagged_by_id.get(item_id, False)
         should_flag = bool(gt.get("is_error"))
         if flagged == should_flag:
             correct += 1
-            lines.append(f"- 案例 {item_id}: ✅ 判断正确{'（标出错误）' if flagged else '（无误标）'}")
+            if item_id in flagged_by_id:
+                lines.append(f"- 案例 {item_id}: ✅ 判断正确{'（标出错误）' if flagged else '（无误标）'}")
+            else:
+                lines.append(f"- 案例 {item_id}: ✅ 判断正确（未标出，视为无误）")
         else:
-            lines.append(f"- 案例 {item_id}: ❌ 判断错误（{'应标出错误' if should_flag else '不应标出'}）")
-    for item_id, gt in gt_by_id.items():
-        if not any(_resolve_id(p, i) == item_id for i, p in enumerate(predictions)):
-            lines.append(f"- 案例 {item_id}: 未作答")
+            if item_id in flagged_by_id:
+                lines.append(f"- 案例 {item_id}: ❌ 判断错误（{'应标出错误' if should_flag else '不应标出'}）")
+            else:
+                lines.append(f"- 案例 {item_id}: ❌ 漏标（应为错误）")
+    for i, pred in enumerate(predictions):
+        item_id = _resolve_id(pred, i)
+        if item_id not in gt_by_id:
+            lines.append(f"- 案例 {item_id}: 额外作答（无标准案例）")
     rate = correct / total if total > 0 else 0
     lines.append(f"\n**检出准确率**: {rate:.0%} ({correct}/{total})")
     return "\n".join(lines)
@@ -457,11 +473,13 @@ def _standard_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
 
 
 def _error_case_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
+    """Score error-case answers: unlisted GT cases are implicitly "not flagged" (correct when not an error)."""
     gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
+    flagged_by_id = {_resolve_id(p, i): bool(p.get("flagged")) for i, p in enumerate(predictions)}
     correct = sum(
         1
-        for i, p in enumerate(predictions)
-        if gt_by_id.get(_resolve_id(p, i)) and bool(p.get("flagged")) == bool(gt_by_id[_resolve_id(p, i)].get("is_error"))
+        for item_id, gt in gt_by_id.items()
+        if flagged_by_id.get(item_id, False) == bool(gt.get("is_error"))
     )
     total = len(ground_truth)
     return {"accuracy": round(correct / total, 4) if total else 0, "correct": correct, "total": total}

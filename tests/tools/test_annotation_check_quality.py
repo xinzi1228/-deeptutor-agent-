@@ -144,6 +144,25 @@ def test_error_case_dict_idless_matches_report():
     assert "100%" in _error_case_report(predictions, ground_truth)
 
 
+def test_error_case_unlisted_implicit_not_flagged_full_credit():
+    from deeptutor.tools.annotation_check import _error_case_dict, _error_case_report
+
+    # student lists ONLY the error ids; unlisted GT case (id=2, non-error) is implicitly not flagged
+    predictions = [{"id": 1, "flagged": True}, {"id": 3, "flagged": True}]
+    ground_truth = [{"id": 1, "is_error": True}, {"id": 2, "is_error": False}, {"id": 3, "is_error": True}]
+    assert _error_case_dict(predictions, ground_truth) == {"accuracy": 1.0, "correct": 3, "total": 3}
+    assert "100%" in _error_case_report(predictions, ground_truth)
+
+
+def test_error_case_unlisted_missing_error_penalized():
+    from deeptutor.tools.annotation_check import _error_case_dict
+
+    # student lists only id=1 (correct), omits id=3 which IS an error -> 2/3
+    predictions = [{"id": 1, "flagged": True}]
+    ground_truth = [{"id": 1, "is_error": True}, {"id": 2, "is_error": False}, {"id": 3, "is_error": True}]
+    assert _error_case_dict(predictions, ground_truth) == {"accuracy": round(2 / 3, 4), "correct": 2, "total": 3}
+
+
 @pytest.mark.asyncio
 async def test_execute_judgment_routes_to_metadata():
     from deeptutor.tools.annotation_check import AnnotationCheckTool
