@@ -142,7 +142,12 @@ function useResolvedTitles(
 
 interface SpaceCategoryDef {
   key: string;
-  href: string;
+  /**
+   * Route of the retained page this category resolves in. Omitted when the
+   * feature's own page was removed — the header then renders non-navigable
+   * (the rows still describe what the session referenced).
+   */
+  href?: string;
   label: string;
   icon: LucideIcon;
 }
@@ -150,31 +155,26 @@ interface SpaceCategoryDef {
 const SPACE_CATEGORIES: Record<string, SpaceCategoryDef> = {
   chat_history: {
     key: "chat_history",
-    href: "/space/chat-history",
     label: "Chat history",
     icon: History,
   },
   books: {
     key: "books",
-    href: "/space/books",
     label: "Books",
     icon: BookOpen,
   },
   notebooks: {
     key: "notebooks",
-    href: "/space/notebooks",
     label: "Notebooks",
     icon: NotebookPen,
   },
   question_bank: {
     key: "question_bank",
-    href: "/space/questions",
     label: "Question bank",
     icon: ClipboardList,
   },
   persona: {
     key: "persona",
-    href: "/space/personas",
     label: "Persona",
     icon: UserRound,
   },
@@ -439,29 +439,42 @@ function SpaceSubsection({
   children: ReactNode;
 }) {
   const Icon = category.icon;
-  return (
-    <div>
-      <Link
-        href={category.href}
-        className="group flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-[var(--muted)]/40"
-      >
-        <Icon
-          size={12}
-          strokeWidth={1.8}
-          className="shrink-0 text-[var(--muted-foreground)]"
-        />
-        <span className="flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--muted-foreground)] transition-colors group-hover:text-[var(--primary)]">
-          {category.label}
-        </span>
-        <span className="rounded-full bg-[var(--muted)]/55 px-1.5 py-[1px] text-[10px] font-semibold text-[var(--muted-foreground)]">
-          {count}
-        </span>
+  const inner = (
+    <>
+      <Icon
+        size={12}
+        strokeWidth={1.8}
+        className="shrink-0 text-[var(--muted-foreground)]"
+      />
+      <span className="flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
+        {category.label}
+      </span>
+      <span className="rounded-full bg-[var(--muted)]/55 px-1.5 py-[1px] text-[10px] font-semibold text-[var(--muted-foreground)]">
+        {count}
+      </span>
+      {category.href && (
         <ExternalLink
           size={10}
           strokeWidth={2}
           className="shrink-0 text-[var(--muted-foreground)] opacity-0 transition-opacity group-hover:opacity-100"
         />
-      </Link>
+      )}
+    </>
+  );
+  return (
+    <div>
+      {category.href ? (
+        <Link
+          href={category.href}
+          className="group flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-[var(--muted)]/40"
+        >
+          {inner}
+        </Link>
+      ) : (
+        <div className="flex items-center gap-2 rounded-md px-2 py-1">
+          {inner}
+        </div>
+      )}
       <ul className="mt-0.5 space-y-px pl-5">{children}</ul>
     </div>
   );

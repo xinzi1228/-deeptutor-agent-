@@ -219,34 +219,17 @@ function asString(v: unknown): string {
 function entityDeepLinkUrl(surface: Surface, ent: Entity): string | null {
   const m = ent.metadata || {};
   switch (surface) {
+    // Chat entities are session ids — deep-link to the retained Home page.
     case "chat":
       return `/home/${encodeURIComponent(ent.id)}`;
-    case "cowriter":
-      return `/co-writer/${encodeURIComponent(ent.id)}`;
-    case "notebook": {
-      const nbId = asString(m.notebook_id);
-      return nbId
-        ? `/space/notebooks?notebook=${encodeURIComponent(nbId)}`
-        : "/space/notebooks";
-    }
-    case "book":
-      return `/book?book=${encodeURIComponent(ent.id)}`;
-    case "partner": {
-      // Partner entity.id is `partnerId:sessionKey`. Deep-link to the partner.
-      const partnerId = asString(m.partner_id) || ent.id.split(":")[0];
-      return partnerId
-        ? `/partners/${encodeURIComponent(partnerId)}`
-        : "/partners";
-    }
+    // Quiz entities are `session:question` refs — deep-link to the session
+    // on the retained Home page. Without a session, render without a link.
     case "quiz": {
-      // Quiz entity.id is `session:question`. Deep-link to the session.
       const sessionId = asString(m.session_id) || ent.id.split(":")[0];
-      return sessionId
-        ? `/?session=${encodeURIComponent(sessionId)}`
-        : "/space/questions";
+      return sessionId ? `/home/${encodeURIComponent(sessionId)}` : null;
     }
-    case "kb":
-      return `/knowledge?kb=${encodeURIComponent(ent.id)}`;
+    // cowriter / notebook / book / partner / kb surfaces belong to removed
+    // routes — those entities render without a navigation link (null).
   }
   return null;
 }

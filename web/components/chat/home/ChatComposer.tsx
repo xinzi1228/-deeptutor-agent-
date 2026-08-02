@@ -9,7 +9,6 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUp,
   BookOpen,
@@ -23,7 +22,6 @@ import {
   MessageSquare,
   Mic,
   Paperclip,
-  Plus,
   Sparkles,
   Square,
   UserRound,
@@ -42,10 +40,8 @@ import type { SelectedQuestionEntry } from "@/components/chat/QuestionBankPicker
 import type { SelectedRecord } from "@/lib/notebook-selection-types";
 import type { LLMSelection } from "@/lib/unified-ws";
 import type { LLMOption } from "@/lib/llm-options";
-import ChatSpaceMenu from "@/components/chat/space/ChatSpaceMenu";
 import type { SpaceMemoryFile } from "@/lib/space-items";
 import type { SelectedBookReference } from "@/lib/book-references";
-import AgentSelector from "./AgentSelector";
 import KnowledgeSelector from "./KnowledgeSelector";
 import ModelSelector from "./ModelSelector";
 import PersonaSelector from "./PersonaSelector";
@@ -140,12 +136,9 @@ export default memo(function ChatComposer({
   composerRef,
   capMenuRef,
   capBtnRef,
-  spaceMenuRef,
-  spaceBtnRef,
   dragCounter,
   dragging,
   capMenuOpen,
-  spaceMenuOpen,
   hasMessages,
   attachments,
   attachmentError,
@@ -154,8 +147,6 @@ export default memo(function ChatComposer({
   connectedAgents = [],
   selectedAgent = null,
   onSelectAgent,
-  subagentBudget = null,
-  onSubagentBudgetChange,
   llmOptions,
   activeLLMDefault,
   llmSelection,
@@ -177,7 +168,6 @@ export default memo(function ChatComposer({
   onRequestConfigConfirm,
   capabilities,
   onSetCapMenuOpen,
-  onSetSpaceMenuOpen,
   onToggleKB,
   onSelectLLM,
   onSelectNotebookPicker,
@@ -450,14 +440,6 @@ export default memo(function ChatComposer({
     persona: selectedPersona ? 1 : 0,
     memory: selectedMemoryFiles.length,
   };
-  // Badge on the "+" button = how many things are selected through the
-  // "+" menu. Knowledge is excluded: it no longer lives in this menu —
-  // it has its own toolbar chip (KnowledgeSelector) with its own active
-  // state, so counting it here would double-signal.
-  const contextSelectionCount = Object.entries(spaceSelectionCounts).reduce(
-    (total, [key, count]) => (key === "knowledge" ? total : total + count),
-    0,
-  );
 
   // Unified reference tree above the textarea: Space references, persona
   // and memory render as quiet monochrome rows, collapsed behind a count
@@ -878,73 +860,7 @@ export default memo(function ChatComposer({
                 )}
               </div>
 
-              <div className="relative flex min-w-0 flex-1 items-center">
-                <button
-                  ref={spaceBtnRef}
-                  type="button"
-                  onClick={() => onSetSpaceMenuOpen((v) => !v)}
-                  title={t("Add files & context")}
-                  aria-label={t("Add files & context")}
-                  className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-[background-color,color,transform] duration-150 active:scale-90 ${
-                    spaceMenuOpen
-                      ? "bg-[var(--muted)] text-[var(--foreground)]"
-                      : "text-[var(--muted-foreground)] hover:bg-[var(--muted)]/55 hover:text-[var(--foreground)]"
-                  }`}
-                >
-                  <Plus size={20} strokeWidth={1.8} />
-                  {contextSelectionCount > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-[13px] min-w-[13px] items-center justify-center rounded-full bg-[var(--primary)] px-[3px] text-[8px] font-semibold leading-none text-[var(--primary-foreground)] ring-[1.5px] ring-[var(--card)]">
-                      {contextSelectionCount}
-                    </span>
-                  )}
-                </button>
-                <AnimatePresence>
-                  {spaceMenuOpen && (
-                    <motion.div
-                      ref={spaceMenuRef}
-                      className="absolute bottom-full left-0 z-50 mb-1.5"
-                      style={{ transformOrigin: "bottom left" }}
-                      initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                      transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-                    >
-                      <ChatSpaceMenu
-                        variant="toolbar"
-                        selectedCounts={spaceSelectionCounts}
-                        knowledgeAvailable={false}
-                        personaAvailable={!onPersonaSelectionChange}
-                        agentsAvailable={agentsAvailable}
-                        onSelectItem={(key) => {
-                          onSetSpaceMenuOpen(false);
-                          if (key === "attach") handlePickFiles();
-                          else if (key === "chat_history")
-                            onSelectHistoryPicker();
-                          else if (key === "my_agents") onSelectAgentsPicker();
-                          else if (key === "books") onSelectBookPicker();
-                          else if (key === "notebooks")
-                            onSelectNotebookPicker();
-                          else if (key === "question_bank")
-                            onSelectQuestionBankPicker();
-                          else if (key === "persona") onSelectPersonaPicker();
-                          else if (key === "memory") onSelectMemoryPicker();
-                        }}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
               <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                {connectedAgents.length > 0 && onSelectAgent ? (
-                  <AgentSelector
-                    agents={connectedAgents}
-                    selected={selectedAgent}
-                    onSelect={onSelectAgent}
-                    budget={subagentBudget}
-                    onBudgetChange={onSubagentBudgetChange}
-                  />
-                ) : null}
                 {knowledgeBases.length > 0 ? (
                   <KnowledgeSelector
                     knowledgeBases={knowledgeBases}
