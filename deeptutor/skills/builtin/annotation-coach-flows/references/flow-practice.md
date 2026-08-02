@@ -100,7 +100,7 @@
 
 在内部形成判断。不输出。
 
-评测后调 `struggle_detect` 检查是否卡住:
+评测后调 struggle_detect 检查是否卡住:
   → 有信号: 按建议介入 (降难度/换模式/主动询问), 并用 log_decision(kind=struggle_intervention) 记录
   → 无信号: 正常推进
 
