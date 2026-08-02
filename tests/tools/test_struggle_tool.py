@@ -23,6 +23,16 @@ class _FakeDetector:
         }
 
 
+class _RaisingDetector:
+    """Fake whose detect raises — mirrors a malformed-record detector crash."""
+
+    def detect(self, *, records, now=None) -> dict:
+        raise TypeError("'<' not supported between instances of 'str' and 'NoneType'")
+
+    def intervention_suggestion(self, signal) -> dict:
+        return {}
+
+
 def _no_signal() -> dict:
     return {"signals": [], "has_struggle": False, "max_severity": None}
 
@@ -63,6 +73,21 @@ async def test_struggle_detect_severe_with_llm(monkeypatch) -> None:
     result = await tool.execute()
     assert result.success
     assert "反复漏标" in result.content
+
+
+@pytest.mark.asyncio
+async def test_struggle_detect_detector_raises_degrades(monkeypatch) -> None:
+    """Design doc §6: detector internal exception degrades to no-signal, not crash."""
+    from deeptutor.tools.struggle_tool import StruggleDetectTool
+
+    monkeypatch.setattr("deeptutor.tools.struggle_tool._load_records", lambda: [])
+    monkeypatch.setattr("deeptutor.tools.struggle_tool._build_detector", lambda: _RaisingDetector())
+
+    tool = StruggleDetectTool()
+    result = await tool.execute()
+    assert result.success
+    assert "未检测到" in result.content
+    assert result.metadata.get("has_struggle") is False
 
 
 @pytest.mark.asyncio

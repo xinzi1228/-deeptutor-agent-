@@ -26,7 +26,11 @@ class StruggleDetectTool(BaseTool):
     async def execute(self, **kwargs: Any) -> ToolResult:
         records = _load_records()
         detector = _build_detector()
-        result = detector.detect(records=records)
+        try:
+            result = detector.detect(records=records)
+        except Exception:
+            # Design doc §6: detector internal exception degrades to no-signal.
+            result = {"signals": [], "has_struggle": False, "max_severity": None}
 
         if not result.get("has_struggle"):
             return ToolResult(
