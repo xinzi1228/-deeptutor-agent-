@@ -294,6 +294,10 @@ def _judgment_is_correct(label: Any, answer: Any) -> bool:
     return _normalize_judgment(label) == _normalize_judgment(answer)
 
 
+def _resolve_id(pred: dict, idx: int) -> int:
+    return pred.get("id", idx)
+
+
 def _judgment_report(predictions: list[dict], ground_truth: list[dict]) -> str:
     """Evaluate judgment (true/false) answers per item."""
     gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
@@ -301,7 +305,7 @@ def _judgment_report(predictions: list[dict], ground_truth: list[dict]) -> str:
     total = len(ground_truth)
     lines = ["## 判断题结果\n"]
     for i, pred in enumerate(predictions):
-        item_id = pred.get("id", i)
+        item_id = _resolve_id(pred, i)
         gt = gt_by_id.get(item_id)
         if not gt:
             lines.append(f"- Item {item_id}: 额外作答（无标准答案）")
@@ -313,7 +317,7 @@ def _judgment_report(predictions: list[dict], ground_truth: list[dict]) -> str:
         else:
             lines.append(f"- Item {item_id}: ❌ 判断错误（正确答案: {gt.get('answer')}）")
     for item_id, gt in gt_by_id.items():
-        if not any(p.get("id", i) == item_id for i, p in enumerate(predictions)):
+        if not any(_resolve_id(p, i) == item_id for i, p in enumerate(predictions)):
             lines.append(f"- Item {item_id}: 未作答")
     accuracy = correct / total if total > 0 else 0
     lines.append(f"\n**准确率 (Accuracy)**: {accuracy:.0%} ({correct}/{total})")
@@ -325,6 +329,11 @@ def _standard_report(predictions: list[dict], ground_truth: list[dict]) -> str:
     gt = ground_truth[0] if ground_truth else {}
     required = gt.get("required_fields", ["x", "y", "w", "h", "label"])
     labels = gt.get("labels", [])
+    if not predictions:
+        return (
+            "## 规范校验结果\n"
+            f"无提交。需要 {len(ground_truth)} 条标注，请按 `{required}` 字段提交。"
+        )
     valid = 0
     total = len(predictions)
     lines = ["## 规范校验结果\n"]
@@ -356,9 +365,10 @@ def _error_case_report(predictions: list[dict], ground_truth: list[dict]) -> str
     total = len(ground_truth)
     lines = ["## 错误案例检出结果\n"]
     for i, pred in enumerate(predictions):
-        item_id = pred.get("id", i)
+        item_id = _resolve_id(pred, i)
         gt = gt_by_id.get(item_id)
         if not gt:
+            lines.append(f"- 案例 {item_id}: 额外作答（无标准案例）")
             continue
         flagged = bool(pred.get("flagged"))
         should_flag = bool(gt.get("is_error"))
@@ -367,6 +377,9 @@ def _error_case_report(predictions: list[dict], ground_truth: list[dict]) -> str
             lines.append(f"- 案例 {item_id}: ✅ 判断正确{'（标出错误）' if flagged else '（无误标）'}")
         else:
             lines.append(f"- 案例 {item_id}: ❌ 判断错误（{'应标出错误' if should_flag else '不应标出'}）")
+    for item_id, gt in gt_by_id.items():
+        if not any(_resolve_id(p, i) == item_id for i, p in enumerate(predictions)):
+            lines.append(f"- 案例 {item_id}: 未作答")
     rate = correct / total if total > 0 else 0
     lines.append(f"\n**检出准确率**: {rate:.0%} ({correct}/{total})")
     return "\n".join(lines)
@@ -397,9 +410,9 @@ def _judgment_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
     gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
     correct = sum(
         1
-        for p in predictions
-        if gt_by_id.get(p.get("id"))
-        and _judgment_is_correct(p.get("label", ""), gt_by_id[p.get("id")].get("answer", ""))
+        for i, p in enumerate(predictions)
+        if gt_by_id.get(_resolve_id(p, i))
+        and _judgment_is_correct(p.get("label", ""), gt_by_id[_resolve_id(p, i)].get("answer", ""))
     )
     total = len(ground_truth)
     return {"accuracy": round(correct / total, 4) if total else 0, "correct": correct, "total": total}
@@ -424,8 +437,8 @@ def _error_case_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
     gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
     correct = sum(
         1
-        for p in predictions
-        if gt_by_id.get(p.get("id")) and bool(p.get("flagged")) == bool(gt_by_id[p.get("id")].get("is_error"))
+        for i, p in enumerate(predictions)
+        if gt_by_id.get(_resolve_id(p, i)) and bool(p.get("flagged")) == bool(gt_by_id[_resolve_id(p, i)].get("is_error"))
     )
     total = len(ground_truth)
     return {"accuracy": round(correct / total, 4) if total else 0, "correct": correct, "total": total}

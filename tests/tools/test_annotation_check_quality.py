@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from deeptutor.tools.annotation_check import (
     check_edge_proximity,
     check_overlap,
@@ -112,3 +114,74 @@ def test_error_case_report():
     content = _error_case_report(predictions, ground_truth)
     assert "检出" in content or "accuracy" in content.lower() or "准确" in content
     assert "100%" in content
+
+
+def test_judgment_dict_idless_matches_report():
+    from deeptutor.tools.annotation_check import _judgment_dict, _judgment_report
+
+    predictions = [{"label": "correct"}, {"label": "wrong"}]
+    ground_truth = [{"answer": True}, {"answer": False}]
+    assert _judgment_dict(predictions, ground_truth) == {"accuracy": 1.0, "correct": 2, "total": 2}
+    assert "100%" in _judgment_report(predictions, ground_truth)
+
+
+def test_standard_dict_missing_label_zero():
+    from deeptutor.tools.annotation_check import _standard_dict
+
+    predictions = [{"x": 0, "y": 0, "w": 100, "h": 100}]
+    ground_truth = [{"required_fields": ["x", "y", "w", "h", "label"]}]
+    assert _standard_dict(predictions, ground_truth) == {"compliance_rate": 0.0, "valid": 0, "total": 1}
+
+
+def test_error_case_dict_idless_matches_report():
+    from deeptutor.tools.annotation_check import _error_case_dict, _error_case_report
+
+    predictions = [{"flagged": True}, {"flagged": False}]
+    ground_truth = [{"is_error": True}, {"is_error": False}]
+    assert _error_case_dict(predictions, ground_truth) == {"accuracy": 1.0, "correct": 2, "total": 2}
+    assert "100%" in _error_case_report(predictions, ground_truth)
+
+
+@pytest.mark.asyncio
+async def test_execute_judgment_routes_to_metadata():
+    from deeptutor.tools.annotation_check import AnnotationCheckTool
+
+    tool = AnnotationCheckTool()
+    result = await tool.execute(
+        task_type="judgment",
+        predictions='[{"label":"correct"},{"label":"wrong"}]',
+        ground_truth='[{"answer":true},{"answer":false}]',
+    )
+    assert result.success
+    assert result.metadata["accuracy"] == 1.0
+    assert result.metadata["correct"] == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_standard_routes_to_metadata():
+    from deeptutor.tools.annotation_check import AnnotationCheckTool
+
+    tool = AnnotationCheckTool()
+    result = await tool.execute(
+        task_type="standard",
+        predictions='[{"x":0,"y":0,"w":100,"h":100}]',
+        ground_truth='[{"required_fields":["x","y","w","h","label"]}]',
+    )
+    assert result.success
+    assert result.metadata["compliance_rate"] == 0.0
+    assert result.metadata["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_execute_error_case_routes_to_metadata():
+    from deeptutor.tools.annotation_check import AnnotationCheckTool
+
+    tool = AnnotationCheckTool()
+    result = await tool.execute(
+        task_type="error_case",
+        predictions='[{"flagged":true},{"flagged":false}]',
+        ground_truth='[{"is_error":true},{"is_error":false}]',
+    )
+    assert result.success
+    assert result.metadata["accuracy"] == 1.0
+    assert result.metadata["correct"] == 2
