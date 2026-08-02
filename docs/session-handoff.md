@@ -1,7 +1,7 @@
-# 会话交接文档（Compression Handoff v2）
+# 会话交接文档（Compression Handoff v3）
 
 > 用途: 压缩上下文前的状态快照。恢复后据此无缝继续。
-> 创建: 2026-08-02（v2 更新——多专家角色体系规划完成，待实施）
+> 创建: 2026-08-02（v3 更新——多专家角色体系已实施完成）
 
 ---
 
@@ -26,18 +26,17 @@
 | 优化 1: 工作台裁剪 | ✅（标注星图彻底改造） |
 | 优化 2: 任务引导引擎化 | ✅ |
 | 优化 3: 语音/打卡徽章 | ✅（语音基础已有不动，打卡+6 徽章完成） |
-| **多专家角色体系**（借鉴 agency-agents） | 🔴 **spec+计划已提交，未实施** |
+| **多专家角色体系**（借鉴 agency-agents） | ✅ **已实施完成**（6 专家卡 + manifest 索引 + expert_route + 自动 readiness，全量回归无新失败） |
 
 ## 三、近期完成的功能（全部已提交）
 
-### 1. 多专家角色体系（最新，规划完成待实施）
-- **spec**: `docs/specs/expert-roles-design.md`（`3592b2e3`）
-- **计划**: `docs/specs/expert-roles-implementation-plan.md`（`ab147392`，5 任务 TDD）
-- **内容**: 借鉴 `msitarzewski/agency-agents`（agent 角色封装 frontmatter+Identity/Mission/Rules/Capabilities/Processes/Deliverables + divisions.json 索引）+ `jnMetaCode/agency-orchestrator`（编排+验收核验）
-- **3 借鉴点落地**:
-  - A: 6 专家角色集（learning_planner/session_steward/task_guide/struggle_detective/report_analyst/grading_expert 对应竞赛 6 模块），annotation-coach 总协调按阶段路由
-  - B: 轻量编排——TeachingFlowEngine 加 `expert_route`（阶段→专家）+ annotation_check 自动 readiness 验收（F1≥0.85→advance / 0.7-0.85→advance_with_caution / 0.65-0.7→more_practice / <0.65→review_first）
-  - C: `experts_manifest.json`（divisions.json 风格）+ pytest 双向一致校验 + frontmatter 完整校验
+### 1. 多专家角色体系（已完成，8 提交 `e77b044d`→`e469d8fe`）
+- **spec**: `docs/specs/expert-roles-design.md`（`3592b2e3`）；**计划**: `docs/specs/expert-roles-implementation-plan.md`（`ab147392`）
+- **落地**（借鉴 `msitarzewski/agency-agents` + `jnMetaCode/agency-orchestrator`）:
+  - A: 6 专家角色卡（learning_planner/session_steward/task_guide/struggle_detective/report_analyst/grading_expert 对应竞赛 6 模块，agency-agents 结构 frontmatter+身份/使命/规则/能力/流程），`references/experts/*.md` + PERSONA 专家协作路由节（preset+workspace 双副本同步）
+  - B: 轻量编排——`TeachingFlowEngine.EXPERT_ROUTE` 阶段→专家路由（query 返回附带 `expert`）+ `annotation_check` 自动 readiness 验收（F1≥0.85→advance / 0.7-0.85→advance_with_caution / 0.65-0.7→more_practice / <0.65→review_first），写入 flow_state + metadata + content
+  - C: `experts_manifest.json`（divisions.json 风格，coordinator `annotation-coach` + 6 experts）+ pytest 双向一致校验（目录↔索引 + frontmatter + coordinator id 对齐）
+- 测试: 67 个 feature 测试过；全量 2979 passed / 33 预存在失败（无新增）；冒烟 SMOKE OK
 
 ### 2. 打卡徽章引擎（`072c2669`→`745f7da8`，6 提交）
 - `deeptutor/services/achievements.py`: 从 learning records 派生打卡（日期/streak 从今天往前）+ 6 徽章（first_step/streak_3/streak_7/first_pass/practice_10/module_clear）+ 阶段通关双路径（course_plan 优先/≥5 任务降级，fallback 仅 plan 不可用时）
@@ -66,24 +65,14 @@
 - 诊断式教学/决策审计/对抗评估/foresight/教学自改进/CRAG/docx 手册/Coach 绩效
 - 3 份 fork 文档（docs/fork-features*.md）
 
-## 四、当前待办（唯一挂起项）
+## 四、当前待办（多专家体系已完成，剩余可选后续）
 
-### A. 多专家角色体系实施（下一步，立即执行）
-- **spec**: `docs/specs/expert-roles-design.md`（`3592b2e3`）
-- **计划**: `docs/specs/expert-roles-implementation-plan.md`（`ab147392`，5 任务 TDD）
-- **执行方式**: 未选（Subagent-Driven 推荐 vs Inline）——压缩前未确认
-- **任务清单**:
-  1. 6 专家角色文件（`annotation-coach-flows/references/experts/*.md`）+ PERSONA 专家协作节
-  2. `experts_manifest.json` + 一致性校验测试
-  3. `TeachingFlowEngine.expert_route` + teaching_flow query 附带 expert
-  4. `annotation_check` 自动 readiness 验收
-  5. 全量回归 + 冒烟
-
-### B. 已记录的可选后续（非阻塞）
+### A. 已记录的可选后续（非阻塞）
 - 死代码清理（orphaned 组件: space/* agents/* knowledge/* partners/* CapabilityConfigCard；ChatComposer config-gating props；reference-picker dialogs）
 - 热力图列顺序（新→旧 vs GitHub 旧→新）+ 两组件重复 fetch 提共享 helper
 - `course_plan` task10-12 模块映射 + `KP_TO_SKILL_ALIASES` 新知识点
 - `error_case` 评分语义（学生只列错误 id 得 2/3）
+- 多专家体系已知小缺口（final review 记录）: `auto_readiness` docstring 注明只发 4/6 判定（step_down/diagnose_again 留给 Coach/struggle 决策）；学习记录 readiness 落盘依赖 Coach 信任（工具 schema 已支持）；会话级 EXPERT_ROUTE 键（onboarding/theory/report/session/struggle）目前无 current_step 驱动（前向设计）
 - 全量验证: build 需清 proxy（`127.0.0.1:7890` 坏，fonts.gstatic.com 拉取失败）
 
 ## 五、演示环境与数据状态
@@ -121,22 +110,20 @@
 ## 七、git 状态
 
 - 分支: main（用户批准直接 main 提交，不用功能分支）
-- HEAD: `ab147392`（多专家角色体系实施计划）
+- HEAD: `e469d8fe`（多专家角色体系实施完成，8 提交 `e77b044d`→`e469d8fe`）
 - docs/ 被 gitignore，提交需 `git add -f docs/...`
 - data/ 被 gitignore，task_bank.json/flow_state.json 提交需 `git add -f`
-- 未跟踪（无关）: `coze_teach.txt`、`scripts/analyze_coze.py`、`工具开发/`、`研究与学习/`、`标注星图_*.docx`
+- 未跟踪（无关）: `coze_teach.txt`、`scripts/analyze_coze.py`、`工具开发/`、`研究与学习/`、`标注星图_*.docx`、`.playwright-mcp/`
 - 已知: `web/next-env.d.ts` 是 Next.js 工具产物（next build 后可能变 M，无关）
-- 全量测试预存在失败 ~33（Windows 路径/GBK/可选依赖/sandbox），均与功能无关
+- 全量测试预存在失败 ~33（Windows 路径/GBK/可选依赖 telegram/slack/sandbox），均与功能无关；多专家实施无新增失败（2979 passed）
 
 ## 八、恢复后第一步 + 交接提示词
 
 **交接提示词**（压缩后直接说这句即可无缝继续）:
 
-> 读 docs/session-handoff.md + docs/specs/expert-roles-implementation-plan.md，继续多专家角色体系实施（Subagent-Driven），从 Task 1 开始。加载 subagent-driven-development 技能。
+> 读 docs/session-handoff.md，继续标注星图开发。多专家角色体系已完成，可从 B 项可选后续（死代码清理 / error_case 评分语义 / auto_readiness docstring 等）或竞赛交付材料准备开始。
 
 **恢复步骤**:
-1. 读 `docs/session-handoff.md`（本文件）+ `docs/specs/expert-roles-implementation-plan.md`
-2. 确认执行方式（Subagent-Driven 推荐）
-3. 开始 Task 1: 6 专家角色文件 + PERSONA 协作节
-4. 按计划推进 Task 2-5
-5. 完成后（可选）做死代码清理等 B 项后续
+1. 读 `docs/session-handoff.md`（本文件）
+2. 竞赛 6 模块 + 3 优化方向 + 多专家体系已全部完成
+3. 可选后续: B 项死代码清理等 + final review 记录的多专家小缺口 + 竞赛交付材料准备
