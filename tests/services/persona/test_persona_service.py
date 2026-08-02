@@ -78,10 +78,10 @@ def test_list_personas(service: PersonaService) -> None:
 
 def test_migrate_legacy_skills(tmp_path: Path) -> None:
     skills_root = tmp_path / "skills"
-    peer_dir = skills_root / "peer"
-    peer_dir.mkdir(parents=True)
-    (peer_dir / "SKILL.md").write_text(
-        "---\nname: peer\ndescription: Study partner\ntriggers: [discuss]\n---\n\nBe a peer.\n"
+    coach_dir = skills_root / "annotation-coach"
+    coach_dir.mkdir(parents=True)
+    (coach_dir / "SKILL.md").write_text(
+        "---\nname: annotation-coach\ndescription: Annotation coach\ntriggers: [annotate]\n---\n\nBe an annotation coach.\n"
     )
     # A non-persona skill must be left untouched.
     other = skills_root / "data-tool"
@@ -91,43 +91,46 @@ def test_migrate_legacy_skills(tmp_path: Path) -> None:
     service = PersonaService(root=tmp_path / "personas")
     migrated = service.migrate_legacy_skills(skills_root)
 
-    assert migrated == ["peer"]
-    detail = service.get_detail("peer")
-    assert detail.description == "Study partner"
-    assert "Be a peer." in detail.content
+    assert migrated == ["annotation-coach"]
+    detail = service.get_detail("annotation-coach")
+    assert detail.description == "Annotation coach"
+    assert "Be an annotation coach." in detail.content
     # legacy frontmatter keys (triggers) are dropped
     assert "triggers" not in detail.content
     # source skill dir removed, unrelated skill preserved
-    assert not peer_dir.exists()
+    assert not coach_dir.exists()
     assert (other / "SKILL.md").exists()
 
 
 def test_migrate_is_idempotent(tmp_path: Path) -> None:
     skills_root = tmp_path / "skills"
-    (skills_root / "teacher").mkdir(parents=True)
-    (skills_root / "teacher" / "SKILL.md").write_text(
-        "---\nname: teacher\ndescription: T\n---\n\nbody\n"
+    (skills_root / "annotation-coach").mkdir(parents=True)
+    (skills_root / "annotation-coach" / "SKILL.md").write_text(
+        "---\nname: annotation-coach\ndescription: A\n---\n\nbody\n"
     )
     service = PersonaService(root=tmp_path / "personas")
-    assert service.migrate_legacy_skills(skills_root) == ["teacher"]
+    assert service.migrate_legacy_skills(skills_root) == ["annotation-coach"]
     # second run finds nothing new
     assert service.migrate_legacy_skills(skills_root) == []
 
 
 def test_seed_presets_creates_defaults(service: PersonaService) -> None:
-    # Issue #659: fresh installs must expose peer / teacher / research-assistant.
+    # Issue #659: fresh installs must expose the bundled annotation-coach preset.
     seeded = service.seed_presets()
-    assert set(seeded) == {"peer", "teacher", "research-assistant"}
+    assert set(seeded) == {"annotation-coach"}
     names = {p.name for p in service.list_personas()}
-    assert {"peer", "teacher", "research-assistant"} <= names
-    teacher = service.get_detail("teacher")
-    assert teacher.description  # frontmatter description survived
-    assert "Teacher Mode" in teacher.content
+    assert {"annotation-coach"} <= names
+    coach = service.get_detail("annotation-coach")
+    assert coach.description  # frontmatter description survived
+    assert "标注教练" in coach.content
 
 
 def test_seed_presets_is_idempotent_and_non_destructive(service: PersonaService) -> None:
     service.seed_presets()
     # A user edit to a seeded persona must not be clobbered by a later seed.
-    service.update("peer", content="---\nname: peer\ndescription: mine\n---\n\nCustom body.")
+    service.update(
+        "annotation-coach",
+        content="---\nname: annotation-coach\ndescription: mine\n---\n\nCustom body.",
+    )
     assert service.seed_presets() == []  # nothing re-seeded
-    assert "Custom body." in service.get_detail("peer").content
+    assert "Custom body." in service.get_detail("annotation-coach").content

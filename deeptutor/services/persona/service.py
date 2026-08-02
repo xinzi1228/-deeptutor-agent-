@@ -4,7 +4,7 @@ PersonaService
 
 Loads user-authored PERSONA.md files from ``data/user/workspace/personas/``.
 
-A persona is a behaviour/voice preset ("teacher", "peer", …) the user picks
+A persona is a behaviour/voice preset ("annotation-coach", …) the user picks
 for a conversation. Unlike capability skills (see
 :mod:`deeptutor.services.skill`), a persona must shape the model's voice from
 the very first token, so the selected persona's body is injected verbatim
@@ -19,9 +19,9 @@ The file starts with a YAML frontmatter block holding ``name`` and
 ``description``, followed by the Markdown body that becomes the system-prompt
 block when the persona is active.
 
-Legacy migration: persona-type entries that historically lived in the skills
-workspace (``peer`` / ``teacher`` / ``research-assistant``) are moved into the
-personas root on first service access for a workspace.
+Legacy migration: a persona-type entry that historically lived in the skills
+workspace (``annotation-coach``) is moved into the personas root on first
+service access for a workspace.
 """
 
 from __future__ import annotations
@@ -48,8 +48,12 @@ PRESETS_DIR = Path(__file__).resolve().parent / "presets"
 
 # Product-seeded persona skills that predate the persona/skill split. Only
 # these well-known names are migrated automatically — arbitrary user skills
-# cannot be classified safely and stay where they are.
-LEGACY_PERSONA_SKILLS: tuple[str, ...] = ("peer", "teacher", "research-assistant")
+# cannot be classified safely and stay where they are. The 标注星图 teaching
+# product ships a single persona, so only ``annotation-coach`` is eligible.
+LEGACY_PERSONA_SKILLS: tuple[str, ...] = ("annotation-coach",)
+
+# Default persona applied when no persona is explicitly requested (标注星图).
+DEFAULT_PERSONA = "annotation-coach"
 
 
 @dataclass(slots=True)
@@ -192,11 +196,13 @@ class PersonaService:
     def load_for_context(self, name: str) -> str:
         """Render the selected persona into the system-prompt block.
 
+        ``name`` falling back to :data:`DEFAULT_PERSONA` when empty — the
+        标注星图 product always wants the annotation-coach voice active.
+
         Returns ``""`` when the persona doesn't exist or has an empty body —
         a missing persona must never break the turn.
         """
-        if not name:
-            return ""
+        name = (name or "").strip() or DEFAULT_PERSONA
         try:
             detail = self.get_detail(name)
         except (PersonaNotFoundError, InvalidPersonaNameError):
@@ -267,8 +273,8 @@ class PersonaService:
 
         Idempotent and non-destructive: a persona that already exists (a user
         edit or a prior seed) is never overwritten. Seeding the admin workspace
-        makes ``peer`` / ``teacher`` / ``research-assistant`` appear as
-        read-only presets on fresh installs (issue #659). Returns seeded names.
+        makes ``annotation-coach`` appear as a read-only preset on fresh
+        installs (issue #659). Returns seeded names.
         """
         if not PRESETS_DIR.is_dir():
             return []
@@ -353,6 +359,7 @@ def get_persona_service() -> PersonaService:
 
 
 __all__ = [
+    "DEFAULT_PERSONA",
     "InvalidPersonaNameError",
     "LEGACY_PERSONA_SKILLS",
     "PERSONA_FILE",
