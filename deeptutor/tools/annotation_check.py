@@ -35,6 +35,73 @@ def _calculate_iou(box1: dict, box2: dict) -> float:
     return intersection / union if union > 0 else 0.0
 
 
+# ------------------------------------------------------- quality heuristics
+
+def check_edge_proximity(boxes: list[dict], image_size: tuple[int, int], threshold: int = 5) -> list[dict]:
+    """Flag boxes touching the image edge (within threshold px) — may be drawn over the edge or miss edge objects."""
+    img_w, img_h = image_size
+    checks = []
+    for i, box in enumerate(boxes):
+        x, y = box["x"], box["y"]
+        w, h = box["w"], box["h"]
+        if x < threshold or y < threshold or (x + w) > (img_w - threshold) or (y + h) > (img_h - threshold):
+            checks.append({
+                "rule": "edge",
+                "box_idx": i,
+                "message": f"框 {i + 1} 贴到图像边缘 (距边界 < {threshold}px)，可能画过头或漏了边缘目标",
+            })
+    return checks
+
+
+def check_overlap(boxes: list[dict], iou_threshold: float = 0.5) -> list[dict]:
+    """Flag heavily overlapping boxes (not nested) — likely duplicate annotations of the same object."""
+    checks = []
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            iou = _calculate_iou(boxes[i], boxes[j])
+            # skip near-identical nested boxes (one inside the other) — treat as acceptable
+            a_area = boxes[i]["w"] * boxes[i]["h"]
+            b_area = boxes[j]["w"] * boxes[j]["h"]
+            smaller = min(a_area, b_area)
+            larger = max(a_area, b_area)
+            nested = smaller > 0 and (larger - smaller) / larger > 0.5 and iou >= 0.9
+            if iou > iou_threshold and not nested:
+                checks.append({
+                    "rule": "overlap",
+                    "box_idx": i,
+                    "other_idx": j,
+                    "message": f"框 {i + 1} 与框 {j + 1} 高度重叠 (IOU={iou:.2f})，可能重复标注同一目标",
+                })
+                break  # only flag once per box
+    return checks
+
+
+def check_tightness(boxes: list[dict], ratio_threshold: float = 5.0) -> list[dict]:
+    """Flag boxes with extreme aspect ratio (too wide/thin) — likely too much padding or clipped object."""
+    checks = []
+    for i, box in enumerate(boxes):
+        w, h = box["w"], box["h"]
+        if w <= 0 or h <= 0:
+            continue
+        ratio = max(w, h) / min(w, h)
+        if ratio > ratio_threshold:
+            checks.append({
+                "rule": "tightness",
+                "box_idx": i,
+                "message": f"框 {i + 1} 宽高比异常 ({ratio:.1f}:1)，可能留白过多或切到目标",
+            })
+    return checks
+
+
+def quality_checks(boxes: list[dict], image_size: tuple[int, int]) -> list[dict]:
+    """Aggregate all heuristic quality checks (no ground truth needed)."""
+    checks = []
+    checks.extend(check_edge_proximity(boxes, image_size))
+    checks.extend(check_overlap(boxes))
+    checks.extend(check_tightness(boxes))
+    return checks
+
+
 def _bbox_metrics(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> dict:
     """Compute bbox evaluation metrics (tp/fp/fn/precision/recall/f1)."""
     all_ious: list[tuple[float, int, int]] = []
@@ -67,7 +134,12 @@ def _bbox_metrics(predictions: list[dict], ground_truth: list[dict], iou_thresho
     }
 
 
-def _bbox_report(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> tuple[str, dict]:
+def _bbox_report(
+    predictions: list[dict],
+    ground_truth: list[dict],
+    iou_threshold: float = 0.5,
+    image_size: tuple[int, int] = (1000, 1000),
+) -> tuple[str, dict]:
     """Evaluate bounding boxes with educational feedback, returns (content, metrics)."""
     metrics = _bbox_metrics(predictions, ground_truth, iou_threshold)
 
@@ -135,6 +207,12 @@ def _bbox_report(predictions: list[dict], ground_truth: list[dict], iou_threshol
         for gj in missed:
             gt = ground_truth[gj]
             lines.append(f"- '{gt.get('label','?')}' at ({gt['x']},{gt['y']}) {gt['w']}x{gt['h']}: not found!")
+
+    qchecks = quality_checks(predictions, image_size)
+    if qchecks:
+        lines.append("\n### 质量检查 (无需标准答案)")
+        for qc in qchecks:
+            lines.append(f"- {qc['message']}")
 
     lines.append("\n---")
     if f1 >= 0.8:
@@ -245,6 +323,12 @@ class AnnotationCheckTool(BaseTool):
                     enum=["bbox", "classification"],
                     default="bbox",
                 ),
+                ToolParameter(
+                    name="image_size",
+                    type="string",
+                    description="Image dimensions as 'WxH' (e.g. '1000x1000'), used for edge proximity checks. Optional.",
+                    required=False,
+                ),
             ],
         )
 
@@ -266,7 +350,15 @@ class AnnotationCheckTool(BaseTool):
             content = _classify_report(predictions, ground_truth)
             chart = None
         else:
-            content, metrics = _bbox_report(predictions, ground_truth)
+            image_size = (1000, 1000)
+            image_size_raw = kwargs.get("image_size")
+            if image_size_raw:
+                try:
+                    img_w, img_h = str(image_size_raw).split("x")
+                    image_size = (int(img_w.strip()), int(img_h.strip()))
+                except (ValueError, AttributeError):
+                    pass  # malformed input -> fall back to default
+            content, metrics = _bbox_report(predictions, ground_truth, image_size=image_size)
             f1 = metrics.get("f1", 0.0)
             passed = f1 >= 0.7
             chart = build_scorecard_chart(
