@@ -37,6 +37,8 @@ import { EvaluationPanel } from "@/components/learning-stats/EvaluationPanel";
 import { Timeline } from "@/components/learning-stats/Timeline";
 import { CoachMetricsPanel } from "@/components/learning-stats/CoachMetrics";
 import { KnowledgeGraphPanel } from "@/components/learning-stats/KnowledgeGraphPanel";
+import { CheckinCalendar } from "@/components/learning-stats/CheckinCalendar";
+import { BadgeWall } from "@/components/learning-stats/BadgeWall";
 
 export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
@@ -160,6 +162,13 @@ export default function ProgressPage() {
           <KnowledgeGraphPanel data={knowledgeGraph} />
         </div>
       )}
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <CheckinCalendar />
+        </div>
+        <BadgeWall />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DecisionLogPanel decisions={decisions} />
