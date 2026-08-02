@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from deeptutor.tools.annotation_check import (
@@ -204,3 +206,42 @@ def test_auto_readiness_floor():
 
     assert auto_readiness(0.0) == "review_first"
     assert auto_readiness(None) == "review_first"  # missing f1 -> conservative
+
+
+@pytest.mark.asyncio
+async def test_bbox_execute_wires_readiness(monkeypatch):
+    from deeptutor.tools.annotation_check import AnnotationCheckTool
+
+    captured = {}
+    class _FakeEngine:
+        def on_evaluated(self, task_id, f1, *, readiness=None, state_path=None):
+            captured["task_id"] = task_id
+            captured["f1"] = f1
+            captured["readiness"] = readiness
+            return {}
+    # the bbox branch does `from deeptutor.services.teaching_flow import TeachingFlowEngine`
+    # inside execute(), so the module attribute on the target module is what gets called
+    monkeypatch.setattr("deeptutor.services.teaching_flow.TeachingFlowEngine", lambda: _FakeEngine())
+
+    predictions = [
+        {"x": 10, "y": 10, "w": 100, "h": 100, "label": "cat"},
+        {"x": 150, "y": 150, "w": 100, "h": 100, "label": "cat"},
+        {"x": 300, "y": 300, "w": 100, "h": 100, "label": "cat"},
+    ]
+    ground_truth = [
+        {"x": 10, "y": 10, "w": 100, "h": 100, "label": "cat"},
+        {"x": 150, "y": 150, "w": 100, "h": 100, "label": "cat"},
+        {"x": 300, "y": 300, "w": 100, "h": 100, "label": "cat"},
+    ]
+    result = await AnnotationCheckTool().execute(
+        predictions=json.dumps(predictions),
+        ground_truth=json.dumps(ground_truth),
+        task_type="bbox",
+        task_id="task1",
+    )
+    assert result.success
+    assert result.metadata["readiness"] == "advance"  # F1=1.0 -> advance
+    assert "readiness" in result.content  # content mentions the judgment
+    assert captured["readiness"] == "advance"
+    assert captured["task_id"] == "task1"
+    assert captured["f1"] == 1.0
