@@ -305,6 +305,7 @@ app.mount(
 # Import routers only after runtime settings are initialized.
 # Some router modules load YAML settings at import time.
 from deeptutor.api.routers import (
+    achievements,
     agent_config,
     attachments,
     auth,
@@ -426,6 +427,9 @@ app.include_router(
 )
 app.include_router(
     agent_config.router, prefix="/api/v1/agent-config", tags=["agent-config"], dependencies=_auth
+)
+app.include_router(
+    achievements.router, prefix="/api/v1", tags=["achievements"], dependencies=_auth
 )
 app.include_router(
     partners.router, prefix="/api/v1/partners", tags=["partners"], dependencies=_admin
