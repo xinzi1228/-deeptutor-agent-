@@ -39,8 +39,11 @@ class LogDecisionTool(BaseTool):
                 ToolParameter(
                     name="kind",
                     type="string",
-                    description="Decision kind: 'task_recommendation' | 'readiness_judgment' | 'route_choice'.",
-                    enum=["task_recommendation", "readiness_judgment", "route_choice"],
+                    description=(
+                        "Decision kind: 'task_recommendation' | 'readiness_judgment' | 'route_choice' "
+                        "| 'struggle_intervention'."
+                    ),
+                    enum=["task_recommendation", "readiness_judgment", "route_choice", "struggle_intervention"],
                 ),
                 ToolParameter(
                     name="target",
@@ -69,9 +72,9 @@ class LogDecisionTool(BaseTool):
         rationale = str(kwargs.get("rationale") or "").strip()
         evidence_raw = kwargs.get("evidence")
 
-        if kind not in ("task_recommendation", "readiness_judgment", "route_choice"):
+        if kind not in ("task_recommendation", "readiness_judgment", "route_choice", "struggle_intervention"):
             return ToolResult(
-                content="Error: kind must be task_recommendation | readiness_judgment | route_choice.",
+                content="Error: kind must be task_recommendation | readiness_judgment | route_choice | struggle_intervention.",
                 success=False,
             )
         if not target or not rationale:
