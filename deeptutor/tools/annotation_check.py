@@ -276,6 +276,102 @@ def _classify_report(predictions: list[dict], ground_truth: list[dict]) -> str:
     return "\n".join(lines)
 
 
+_TRUE_ANSWER_SYNONYMS = {"true", "correct", "right", "yes", "1", "对", "正确", "是"}
+_FALSE_ANSWER_SYNONYMS = {"false", "incorrect", "no", "0", "错", "错误", "否"}
+
+
+def _normalize_judgment(value: Any) -> str:
+    """Normalize a judgment label/answer to a canonical truth string ("true"/"false")."""
+    s = str(value).strip().lower()
+    if s in _TRUE_ANSWER_SYNONYMS:
+        return "true"
+    if s in _FALSE_ANSWER_SYNONYMS:
+        return "false"
+    return s
+
+
+def _judgment_is_correct(label: Any, answer: Any) -> bool:
+    return _normalize_judgment(label) == _normalize_judgment(answer)
+
+
+def _judgment_report(predictions: list[dict], ground_truth: list[dict]) -> str:
+    """Evaluate judgment (true/false) answers per item."""
+    gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
+    correct = 0
+    total = len(ground_truth)
+    lines = ["## 判断题结果\n"]
+    for i, pred in enumerate(predictions):
+        item_id = pred.get("id", i)
+        gt = gt_by_id.get(item_id)
+        if not gt:
+            lines.append(f"- Item {item_id}: 额外作答（无标准答案）")
+            continue
+        is_correct = _judgment_is_correct(pred.get("label", ""), gt.get("answer", ""))
+        if is_correct:
+            correct += 1
+            lines.append(f"- Item {item_id}: ✅ 判断正确")
+        else:
+            lines.append(f"- Item {item_id}: ❌ 判断错误（正确答案: {gt.get('answer')}）")
+    for item_id, gt in gt_by_id.items():
+        if not any(p.get("id", i) == item_id for i, p in enumerate(predictions)):
+            lines.append(f"- Item {item_id}: 未作答")
+    accuracy = correct / total if total > 0 else 0
+    lines.append(f"\n**准确率 (Accuracy)**: {accuracy:.0%} ({correct}/{total})")
+    return "\n".join(lines)
+
+
+def _standard_report(predictions: list[dict], ground_truth: list[dict]) -> str:
+    """Evaluate annotation-standard compliance (required fields / label / coord ranges)."""
+    gt = ground_truth[0] if ground_truth else {}
+    required = gt.get("required_fields", ["x", "y", "w", "h", "label"])
+    labels = gt.get("labels", [])
+    valid = 0
+    total = len(predictions)
+    lines = ["## 规范校验结果\n"]
+    for i, pred in enumerate(predictions):
+        missing = [f for f in required if f not in pred]
+        bad_label = bool(labels) and pred.get("label") not in labels
+        bad_coord = any(pred.get(f) is None for f in ["x", "y", "w", "h"] if f in required)
+        if missing or bad_label or bad_coord:
+            reasons = []
+            if missing:
+                reasons.append(f"缺字段 {missing}")
+            if bad_label:
+                reasons.append(f"标签 '{pred.get('label')}' 不在 {labels}")
+            if bad_coord:
+                reasons.append("坐标字段为空")
+            lines.append(f"- 标注 {i + 1}: ❌ {', '.join(reasons)}")
+        else:
+            valid += 1
+            lines.append(f"- 标注 {i + 1}: ✅ 符合规范")
+    rate = valid / total if total > 0 else 0
+    lines.append(f"\n**合规率**: {rate:.0%} ({valid}/{total})")
+    return "\n".join(lines)
+
+
+def _error_case_report(predictions: list[dict], ground_truth: list[dict]) -> str:
+    """Evaluate whether the student flagged the correct erroneous annotations."""
+    gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
+    correct = 0
+    total = len(ground_truth)
+    lines = ["## 错误案例检出结果\n"]
+    for i, pred in enumerate(predictions):
+        item_id = pred.get("id", i)
+        gt = gt_by_id.get(item_id)
+        if not gt:
+            continue
+        flagged = bool(pred.get("flagged"))
+        should_flag = bool(gt.get("is_error"))
+        if flagged == should_flag:
+            correct += 1
+            lines.append(f"- 案例 {item_id}: ✅ 判断正确{'（标出错误）' if flagged else '（无误标）'}")
+        else:
+            lines.append(f"- 案例 {item_id}: ❌ 判断错误（{'应标出错误' if should_flag else '不应标出'}）")
+    rate = correct / total if total > 0 else 0
+    lines.append(f"\n**检出准确率**: {rate:.0%} ({correct}/{total})")
+    return "\n".join(lines)
+
+
 # Dict-returning versions for programmatic use (e.g. Label Studio integration)
 def _bbox_dict(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> dict:
     metrics = _bbox_metrics(predictions, ground_truth, iou_threshold)
@@ -297,6 +393,44 @@ def _classify_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
     return {"accuracy": round(correct / total, 4) if total else 0, "correct": correct, "total": total}
 
 
+def _judgment_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
+    gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
+    correct = sum(
+        1
+        for p in predictions
+        if gt_by_id.get(p.get("id"))
+        and _judgment_is_correct(p.get("label", ""), gt_by_id[p.get("id")].get("answer", ""))
+    )
+    total = len(ground_truth)
+    return {"accuracy": round(correct / total, 4) if total else 0, "correct": correct, "total": total}
+
+
+def _standard_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
+    gt = ground_truth[0] if ground_truth else {}
+    required = gt.get("required_fields", ["x", "y", "w", "h", "label"])
+    labels = gt.get("labels", [])
+    valid = 0
+    for pred in predictions:
+        missing = [f for f in required if f not in pred]
+        bad_label = bool(labels) and pred.get("label") not in labels
+        bad_coord = any(pred.get(f) is None for f in ["x", "y", "w", "h"] if f in required)
+        if not (missing or bad_label or bad_coord):
+            valid += 1
+    total = len(predictions)
+    return {"compliance_rate": round(valid / total, 4) if total else 0, "valid": valid, "total": total}
+
+
+def _error_case_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
+    gt_by_id = {g.get("id", i): g for i, g in enumerate(ground_truth)}
+    correct = sum(
+        1
+        for p in predictions
+        if gt_by_id.get(p.get("id")) and bool(p.get("flagged")) == bool(gt_by_id[p.get("id")].get("is_error"))
+    )
+    total = len(ground_truth)
+    return {"accuracy": round(correct / total, 4) if total else 0, "correct": correct, "total": total}
+
+
 class AnnotationCheckTool(BaseTool):
     def get_definition(self) -> ToolDefinition:
         return ToolDefinition(
@@ -305,6 +439,9 @@ class AnnotationCheckTool(BaseTool):
                 "Evaluate annotation quality by comparing predictions against ground truth. "
                 "For bounding boxes: computes IOU, precision, recall, F1. "
                 "For classification: computes per-item accuracy. "
+                "For judgment: true/false answers per item. "
+                "For standard: annotation-standard compliance (required fields / label / coord ranges). "
+                "For error_case: whether erroneous annotations were flagged correctly. "
                 "Returns a detailed educational report with per-item feedback."
             ),
             parameters=[
@@ -314,20 +451,28 @@ class AnnotationCheckTool(BaseTool):
                     description=(
                         "JSON string of user's predictions. "
                         "Bbox: [{\"x\":80,\"y\":120,\"w\":140,\"h\":160,\"label\":\"cat\"},...]. "
-                        "Classification: [{\"id\":1,\"label\":\"positive\"},...]."
+                        "Classification: [{\"id\":1,\"label\":\"positive\"},...]. "
+                        "Judgment: [{\"id\":1,\"label\":\"correct\"},...]. "
+                        "Standard: [{\"x\":80,\"y\":120,\"w\":140,\"h\":160,\"label\":\"cat\"},...]. "
+                        "Error_case: [{\"id\":1,\"flagged\":true},...]."
                     ),
                 ),
                 ToolParameter(
                     name="ground_truth",
                     type="string",
-                    description="JSON string of correct answers, same format. You prepare this from your task description.",
+                    description=(
+                        "JSON string of correct answers, same format. You prepare this from your task description. "
+                        "Judgment: [{\"id\":1,\"answer\":true},...]. "
+                        "Standard: [{\"required_fields\":[\"x\",\"y\",\"w\",\"h\",\"label\"],\"labels\":[\"cat\",\"dog\"]}]. "
+                        "Error_case: [{\"id\":1,\"is_error\":true},...]."
+                    ),
                 ),
                 ToolParameter(
                     name="task_type",
                     type="string",
-                    description="'bbox' or 'classification'.",
+                    description="'bbox', 'classification', 'judgment', 'standard', or 'error_case'.",
                     required=False,
-                    enum=["bbox", "classification"],
+                    enum=["bbox", "classification", "judgment", "standard", "error_case"],
                     default="bbox",
                 ),
                 ToolParameter(
@@ -356,8 +501,22 @@ class AnnotationCheckTool(BaseTool):
         if task_type == "classification":
             content = _classify_report(predictions, ground_truth)
             chart = None
+            metadata = {}
+        elif task_type == "judgment":
+            content = _judgment_report(predictions, ground_truth)
+            chart = None
+            metadata = _judgment_dict(predictions, ground_truth)
+        elif task_type == "standard":
+            content = _standard_report(predictions, ground_truth)
+            chart = None
+            metadata = _standard_dict(predictions, ground_truth)
+        elif task_type == "error_case":
+            content = _error_case_report(predictions, ground_truth)
+            chart = None
+            metadata = _error_case_dict(predictions, ground_truth)
         else:
             image_size = (1000, 1000)
+            metadata = {}
             image_size_raw = kwargs.get("image_size")
             if image_size_raw:
                 try:
@@ -403,7 +562,6 @@ class AnnotationCheckTool(BaseTool):
             "foresight 预测学生下一步。"
         )
 
-        metadata: dict = {}
         if chart:
             metadata["chart"] = chart
         return ToolResult(content=content, metadata=metadata or None)

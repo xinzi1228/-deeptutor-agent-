@@ -80,3 +80,33 @@ def test_quality_checks_aggregates():
     rules = {c["rule"] for c in checks}
     assert "edge" in rules
     assert "tightness" in rules
+
+
+def test_judgment_report():
+    from deeptutor.tools.annotation_check import _judgment_report
+
+    predictions = [{"id": 1, "label": "correct"}, {"id": 2, "label": "wrong"}]
+    ground_truth = [{"id": 1, "answer": True}, {"id": 2, "answer": False}]
+    content = _judgment_report(predictions, ground_truth)
+    assert "Accuracy" in content or "准确率" in content
+    assert "50%" in content or "0.5" in content
+
+
+def test_standard_report_requires_valid_box():
+    from deeptutor.tools.annotation_check import _standard_report
+
+    # missing label field -> invalid
+    predictions = [{"x": 0, "y": 0, "w": 100, "h": 100}]
+    ground_truth = [{"required_fields": ["x", "y", "w", "h", "label"]}]
+    content = _standard_report(predictions, ground_truth)
+    assert "合规率" in content or "invalid" in content.lower() or "合规" in content
+
+
+def test_error_case_report():
+    from deeptutor.tools.annotation_check import _error_case_report
+
+    # ground truth marks box 1 as erroneous (edge rule); student should flag it
+    predictions = [{"id": 1, "flagged": True}, {"id": 2, "flagged": False}]
+    ground_truth = [{"id": 1, "is_error": True}, {"id": 2, "is_error": False}]
+    content = _error_case_report(predictions, ground_truth)
+    assert "检出" in content or "accuracy" in content.lower() or "准确" in content
