@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
+import json
 import re
 from typing import TYPE_CHECKING
 
@@ -57,12 +58,12 @@ def grade_answer(user_answer: str, expected_answer: str, question_type: str = "s
         return False
 
     if question_type == "standard":
-        import json
-
         try:
             spec = json.loads(expected_answer)
             answer_obj = json.loads(user_answer)
         except json.JSONDecodeError:
+            return False
+        if not isinstance(spec, dict) or not isinstance(answer_obj, dict):
             return False
         required = spec.get("required_fields", [])
         labels = spec.get("labels", [])
@@ -75,14 +76,17 @@ def grade_answer(user_answer: str, expected_answer: str, question_type: str = "s
         return False
 
     if question_type == "error_case":
-        import json
-
         try:
             spec = json.loads(expected_answer)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(spec, dict):
+            return False
+        try:
             expected_errors = sorted(spec.get("errors", []))
             user_norm = user_answer.replace("[", "").replace("]", "")
             answer_errors = sorted(int(x) for x in user_norm.split(",") if x.strip())
-        except (json.JSONDecodeError, ValueError):
+        except (TypeError, ValueError):
             return False
         return answer_errors == expected_errors
 

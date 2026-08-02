@@ -36,3 +36,16 @@ def test_grade_error_case_partial():
     expected = '{"errors":[1,3]}'
     answer = "[1]"
     assert not grade_answer(answer, expected, question_type="error_case")
+
+
+def test_grade_standard_non_dict_expected_fails_closed():
+    answer = '{"x":10,"y":10,"w":100,"h":100,"label":"car"}'
+    assert not grade_answer(answer, "[1,2,3]", question_type="standard")
+
+
+def test_grade_error_case_non_dict_expected_fails_closed():
+    assert not grade_answer("[1,3]", "null", question_type="error_case")
+
+
+def test_grade_tf_unrecognized_input_fails_closed():
+    assert not grade_answer("maybe", "maybe", question_type="tf")
