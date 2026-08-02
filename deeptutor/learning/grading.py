@@ -16,7 +16,8 @@ def grade_answer(user_answer: str, expected_answer: str, question_type: str = "s
     Args:
         user_answer: The user's submitted answer.
         expected_answer: The stored expected answer.
-        question_type: One of "choice", "short", "open".
+        question_type: One of "choice", "short", "open", "tf", "standard",
+            "error_case".
 
     Returns:
         True if answer is correct.
@@ -45,6 +46,45 @@ def grade_answer(user_answer: str, expected_answer: str, question_type: str = "s
             return False
         matched = sum(1 for kw in keywords if kw in user)
         return matched / len(keywords) >= 0.6
+
+    if question_type == "tf":
+        truthy = {"对", "正确", "true", "t", "yes", "是", "1"}
+        falsy = {"错", "错误", "false", "f", "no", "否", "0"}
+        if user in truthy:
+            return expected in truthy
+        if user in falsy:
+            return expected in falsy
+        return False
+
+    if question_type == "standard":
+        import json
+
+        try:
+            spec = json.loads(expected_answer)
+            answer_obj = json.loads(user_answer)
+        except json.JSONDecodeError:
+            return False
+        required = spec.get("required_fields", [])
+        labels = spec.get("labels", [])
+        if isinstance(answer_obj, dict):
+            if any(f not in answer_obj for f in required):
+                return False
+            if labels and answer_obj.get("label") not in labels:
+                return False
+            return True
+        return False
+
+    if question_type == "error_case":
+        import json
+
+        try:
+            spec = json.loads(expected_answer)
+            expected_errors = sorted(spec.get("errors", []))
+            user_norm = user_answer.replace("[", "").replace("]", "")
+            answer_errors = sorted(int(x) for x in user_norm.split(",") if x.strip())
+        except (json.JSONDecodeError, ValueError):
+            return False
+        return answer_errors == expected_errors
 
     return False
 
