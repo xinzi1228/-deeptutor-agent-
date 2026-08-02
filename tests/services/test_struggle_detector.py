@@ -73,6 +73,24 @@ def test_stall_timeout_not_triggered_recent():
     assert StruggleDetector().stall_timeout(records, now=now, threshold_minutes=30) == []
 
 
+def test_stall_timeout_triggers_naive_timestamp():
+    now = datetime(2026, 8, 2, 12, 0, tzinfo=timezone.utc)
+    records = [
+        _rec(task_id="task1", f1=0.6, timestamp="2026-08-01T10:00:00"),
+    ]
+    signals = StruggleDetector().stall_timeout(records, now=now, threshold_minutes=30)
+    assert len(signals) == 1
+    assert signals[0]["type"] == "stall_timeout"
+
+
+def test_stall_timeout_not_triggered_naive_recent():
+    now = datetime(2026, 8, 2, 12, 0, tzinfo=timezone.utc)
+    records = [
+        _rec(task_id="task1", f1=0.6, timestamp="2026-08-02T11:50:00"),
+    ]
+    assert StruggleDetector().stall_timeout(records, now=now, threshold_minutes=30) == []
+
+
 def test_detect_aggregates_signals():
     now = datetime(2026, 8, 2, 12, 0, tzinfo=timezone.utc)
     records = [

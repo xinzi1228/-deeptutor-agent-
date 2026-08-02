@@ -91,6 +91,8 @@ class StruggleDetector:
             ts_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
         except (ValueError, AttributeError):
             return []
+        if ts_dt.tzinfo is None:
+            ts_dt = ts_dt.replace(tzinfo=timezone.utc)
         elapsed = now - ts_dt
         if elapsed.total_seconds() > threshold_minutes * 60:
             return [
@@ -115,7 +117,7 @@ class StruggleDetector:
         signals.extend(self.repeated_error(records))
         signals.extend(self.stall_timeout(records, now=now))
         signals.sort(key=lambda s: SEVERITY_RANK.get(s["severity"], 0), reverse=True)
-        max_severity = max((s["severity"] for s in signals), default=None)
+        max_severity = signals[0]["severity"] if signals else None
         return {
             "signals": signals,
             "has_struggle": bool(signals),
