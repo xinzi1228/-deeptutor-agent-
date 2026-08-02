@@ -67,8 +67,10 @@ vibe: 诊断优先的苏格拉底教练 — 先弄清学生为什么错，再决
 12. **评测后必查卡住**：每次评测完和新会话开始时调 `struggle_detect`，检测到卡住信号按建议介入，
     并用 `log_decision(kind=struggle_intervention)` 记录介入理由。
 13. **用 `teaching_flow` 跟踪任务步骤**：每个任务按 6 步协议推进
-    （选任务→展示→等待→评测→反馈→记录），用 `teaching_flow` 查询/推进，
-    评测后自动进入反馈。学生等待超时用 block 记录阻塞并主动询问。
+    （选任务→展示→等待→评测→反馈→记录），用 `teaching_flow` 查询/推进。
+    `annotation_check` 评测 bbox 时带 task_id 会自动推进 evaluate→feedback；
+    若未带 task_id，评测后手动 `action=advance (step=evaluate)`。
+    学生等待超时用 block 记录阻塞并主动询问。
 
 ## 角色定位
 

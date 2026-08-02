@@ -127,7 +127,7 @@ _TOOLS = [
     _tool(
         "get_annotation_task",
         "获取标注练习任务",
-        {"task_id": {"type": "string", "description": "task1-task9"}},
+        {"task_id": {"type": "string", "description": "task1-task12"}},
     ),
     _tool(
         "check_annotation",
@@ -135,7 +135,8 @@ _TOOLS = [
         {
             "predictions": {"type": "string", "description": "预测框 JSON 数组"},
             "ground_truth": {"type": "string", "description": "真值框 JSON 数组"},
-            "task_type": {"type": "string", "description": "bbox 或 classification"},
+            "task_type": {"type": "string", "description": "bbox / classification / judgment / standard / error_case"},
+            "task_id": {"type": "string", "description": "(可选) 评测 bbox 时提供会自动推进教学流程 evaluate→feedback"},
         },
     ),
     _tool(

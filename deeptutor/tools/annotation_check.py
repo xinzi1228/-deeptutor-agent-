@@ -455,7 +455,8 @@ class AnnotationCheckTool(BaseTool):
                 "For judgment: true/false answers per item. "
                 "For standard: annotation-standard compliance (required fields / label / coord ranges). "
                 "For error_case: whether erroneous annotations were flagged correctly. "
-                "Returns a detailed educational report with per-item feedback."
+                "Returns a detailed educational report with per-item feedback. "
+                "评测 bbox 后若提供 task_id 会自动推进教学流程 evaluate→feedback。"
             ),
             parameters=[
                 ToolParameter(
@@ -494,11 +495,18 @@ class AnnotationCheckTool(BaseTool):
                     description="Image dimensions as 'WxH' (e.g. '1000x1000'), used for edge proximity checks. Optional.",
                     required=False,
                 ),
+                ToolParameter(
+                    name="task_id",
+                    type="string",
+                    description="(可选) 当前评测的标注任务 id。评测 bbox 后若提供会自动推进教学流程 evaluate→feedback。",
+                    required=False,
+                ),
             ],
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         task_type = kwargs.get("task_type", "bbox")
+        task_id = kwargs.get("task_id")
         predictions_raw = kwargs.get("predictions", "[]")
         ground_truth_raw = kwargs.get("ground_truth", "[]")
 
@@ -540,6 +548,13 @@ class AnnotationCheckTool(BaseTool):
             content, metrics = _bbox_report(predictions, ground_truth, image_size=image_size)
             f1 = metrics.get("f1", 0.0)
             passed = f1 >= 0.7
+            if task_id:
+                try:
+                    from deeptutor.services.teaching_flow import TeachingFlowEngine
+
+                    TeachingFlowEngine().on_evaluated(task_id, f1=f1)
+                except Exception:
+                    pass  # auto-advance is best-effort; never block grading
             chart = build_scorecard_chart(
                 f1=f1,
                 precision=metrics.get("precision", 0.0),
