@@ -13,7 +13,21 @@ from deeptutor.capabilities.solve import SOLVE_TOOL_TYPES
 from deeptutor.capabilities.subagent import SUBAGENT_TOOL_TYPES
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
 from deeptutor.knowledge.manifest import KB_FILES_DEFAULT_LIMIT, KB_FILES_MAX_LIMIT
+from deeptutor.tools.ability_radar_tool import AbilityRadarTool
+from deeptutor.tools.annotation_check import AnnotationCheckTool
+from deeptutor.tools.competency_tool import CompetencyMapTool
+from deeptutor.tools.evaluate_teaching_plan_tool import EvaluateTeachingPlanTool
 from deeptutor.tools.exec_tool import ExecTool
+from deeptutor.tools.finalize_diagnosis_tool import FinalizeDiagnosisTool
+from deeptutor.tools.graph_tool import GraphQueryTool
+from deeptutor.tools.improve_teaching_flow_tool import ImproveTeachingFlowTool
+from deeptutor.tools.iou_demo_tool import GenerateIouDemoTool
+from deeptutor.tools.job_analysis_tool import JobAnalysisTool
+from deeptutor.tools.label_studio_tool import (
+    LabelStudioCheckTool,
+    LabelStudioCreateProjectTool,
+)
+from deeptutor.tools.log_decision_tool import LogDecisionTool
 from deeptutor.tools.media_gen_tool import ImagegenTool, VideogenTool
 from deeptutor.tools.partner_memory import (
     PARTNER_BUILTIN_TOOL_NAMES,
@@ -21,23 +35,10 @@ from deeptutor.tools.partner_memory import (
     PartnerReadTool,
     PartnerSearchTool,
 )
-from deeptutor.tools.annotation_check import AnnotationCheckTool
-from deeptutor.tools.write_learning_record import WriteLearningRecordTool
-from deeptutor.tools.iou_demo_tool import GenerateIouDemoTool
-from deeptutor.tools.log_decision_tool import LogDecisionTool
-from deeptutor.tools.evaluate_teaching_plan_tool import EvaluateTeachingPlanTool
-from deeptutor.tools.verify_foresight_tool import VerifyForesightTool
-from deeptutor.tools.improve_teaching_flow_tool import ImproveTeachingFlowTool
-from deeptutor.tools.finalize_diagnosis_tool import FinalizeDiagnosisTool
-from deeptutor.tools.graph_tool import GraphQueryTool
-from deeptutor.tools.label_studio_tool import (
-    LabelStudioCheckTool,
-    LabelStudioCreateProjectTool,
-)
-from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
-from deeptutor.tools.competency_tool import CompetencyMapTool
-from deeptutor.tools.job_analysis_tool import JobAnalysisTool
 from deeptutor.tools.prompting import load_prompt_hints
+from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
+from deeptutor.tools.verify_foresight_tool import VerifyForesightTool
+from deeptutor.tools.write_learning_record import WriteLearningRecordTool
 
 logger = logging.getLogger(__name__)
 
@@ -1613,6 +1614,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     LabelStudioCreateProjectTool,
     LabelStudioCheckTool,
     CompetencyMapTool,
+    AbilityRadarTool,
     JobAnalysisTool,
     WriteLearningRecordTool,
     GenerateIouDemoTool,
@@ -1716,6 +1718,7 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "ls_create_project",
     "ls_check_annotations",
     "competency_map",
+    "ability_radar",
     "job_analysis",
     "ask_user",
 )
@@ -1743,6 +1746,7 @@ __all__ = [
     "LabelStudioCreateProjectTool",
     "LabelStudioCheckTool",
     "CompetencyMapTool",
+    "AbilityRadarTool",
     "JobAnalysisTool",
     "WriteLearningRecordTool",
     "GenerateIouDemoTool",

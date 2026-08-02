@@ -194,6 +194,7 @@ def compose_enabled_tools(
         "ask_user",
         "cron",
         "competency_map",
+        "ability_radar",
         "job_analysis",
         "get_annotation_task",
         "annotation_check",
