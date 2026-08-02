@@ -28,6 +28,11 @@ def progress_chart(*, completed: int, total: int, modules: list[dict] | None = N
     }
 
 
+def graph_chart(*, nodes: list[dict], edges: list[dict]) -> dict:
+    """Skill dependency / risk-chain graph contract (cytoscape-style)."""
+    return {"type": "graph", "data": {"nodes": nodes, "edges": edges}}
+
+
 def build_scorecard_chart(*, f1: float, precision: float, recall: float, passed: bool) -> dict:
     """Exercise scorecard contract (rendered as matplotlib PNG, not Chart.js)."""
     return {
@@ -131,4 +136,4 @@ async def render_scorecard_png(
         return None
 
 
-__all__ = ["build_scorecard_chart", "progress_chart", "radar_chart", "render_scorecard_png"]
+__all__ = ["build_scorecard_chart", "graph_chart", "progress_chart", "radar_chart", "render_scorecard_png"]

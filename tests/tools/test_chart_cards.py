@@ -6,6 +6,7 @@ import pytest
 
 from deeptutor.tools.chart_cards import (
     build_scorecard_chart,
+    graph_chart,
     progress_chart,
     radar_chart,
     render_scorecard_png,
@@ -33,6 +34,16 @@ def test_scorecard_chart_contract():
     assert c["type"] == "scorecard"
     assert c["data"]["f1"] == 0.85
     assert c["data"]["passed"] is True
+
+
+def test_graph_chart_contract():
+    c = graph_chart(
+        nodes=[{"id": "t", "label": "目标", "status": "target"}],
+        edges=[{"source": "t", "target": "p"}],
+    )
+    assert c["type"] == "graph"
+    assert c["data"]["nodes"][0]["status"] == "target"
+    assert c["data"]["edges"][0]["source"] == "t"
 
 
 @pytest.mark.asyncio

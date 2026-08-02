@@ -68,6 +68,22 @@ class GraphQueryTool(BaseTool):
         else:
             data = svc.risk_path(target)
             content = _format_risk_path(data)
+
+            # chart: skill/task dependency graph with risk markers
+            from deeptutor.tools.chart_cards import graph_chart
+
+            nodes: list[dict] = [{"id": data["target"], "label": data["target_name"], "status": "target"}]
+            edges: list[dict] = []
+            for p in data.get("missing_prereqs", []):
+                nodes.append({"id": p["id"], "label": p["name"], "status": "missing"})
+                edges.append({"source": data["target"], "target": p["id"]})
+            for s in data.get("struggling", []):
+                nodes.append({"id": s["id"], "label": s["name"], "status": "struggling"})
+            for d in data.get("affected_downstream", []):
+                nodes.append({"id": d["id"], "label": d["name"], "status": "affected"})
+                edges.append({"source": data["target"], "target": d["id"]})
+            data["chart"] = graph_chart(nodes=nodes, edges=edges)
+
             if data.get("confidence") == "high":
                 try:
                     explanation = await _explain_risk(query=data, target=target)
