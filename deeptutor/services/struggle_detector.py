@@ -124,5 +124,34 @@ class StruggleDetector:
             "max_severity": max_severity,
         }
 
+    # ---------------------------------------------------- intervention mapping
+
+    def intervention_suggestion(self, signal: dict) -> dict:
+        """Map a signal to an intervention suggestion (readiness_gate mapping)."""
+        s_type = signal.get("type")
+        skill = signal.get("skill") or signal.get("task_id") or ""
+        if s_type == "low_score_streak":
+            return {
+                "readiness": "review_first",
+                "action": f"建议降到更基础任务重练，复习前置技能 '{skill}'",
+                "signal_type": s_type,
+                "target": skill,
+            }
+        if s_type == "repeated_error":
+            return {
+                "readiness": "diagnose_again",
+                "action": f"错误模式 '{signal.get('pattern', '')}' 已确认，建议换教学模式或回退 Phase1 重诊",
+                "signal_type": s_type,
+                "target": skill,
+            }
+        if s_type == "stall_timeout":
+            return {
+                "readiness": "more_practice",
+                "action": f"在任务 '{signal.get('task_id', '')}' 停留超时，建议主动询问学生是否需要帮助并给提示",
+                "signal_type": s_type,
+                "target": signal.get("task_id", ""),
+            }
+        return {"readiness": "more_practice", "action": "继续观察", "signal_type": s_type, "target": skill}
+
 
 __all__ = ["StruggleDetector", "LOW_F1_THRESHOLD", "STALL_THRESHOLD_MINUTES"]

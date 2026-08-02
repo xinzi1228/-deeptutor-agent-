@@ -119,3 +119,27 @@ def test_detect_deterministic():
     r1 = StruggleDetector().detect(records=records, now=now)
     r2 = StruggleDetector().detect(records=records, now=now)
     assert r1 == r2
+
+
+def test_intervention_suggestion_low_score():
+    s = StruggleDetector().intervention_suggestion(
+        {"type": "low_score_streak", "severity": "moderate", "skill": "边界框绘制规范"}
+    )
+    assert s["readiness"] == "review_first"
+    assert "降" in s["action"] or "复习" in s["action"]
+
+
+def test_intervention_suggestion_repeated_error():
+    s = StruggleDetector().intervention_suggestion(
+        {"type": "repeated_error", "severity": "severe", "pattern": "漏标"}
+    )
+    assert s["readiness"] == "diagnose_again"
+    assert "换" in s["action"] or "回退" in s["action"]
+
+
+def test_intervention_suggestion_stall():
+    s = StruggleDetector().intervention_suggestion(
+        {"type": "stall_timeout", "severity": "mild", "task_id": "task2"}
+    )
+    assert s["readiness"] == "more_practice"
+    assert "帮助" in s["action"] or "提示" in s["action"]
