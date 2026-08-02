@@ -175,3 +175,13 @@ async def test_block_skips_next_step_hint(fake_engine):
     assert "阻塞" in result.content
     assert "建议" in result.content
     assert "下一步" not in result.content
+
+
+@pytest.mark.asyncio
+async def test_query_includes_expert(fake_engine):
+    from deeptutor.tools.teaching_flow_tool import TeachingFlowTool
+
+    fake_engine.state = {"task_id": "task1", "current_step": "evaluate", "steps": {}, "blocked": None, "expert": "grading_expert"}
+    result = await TeachingFlowTool().execute(action="query")
+    assert result.success
+    assert "grading_expert" in result.content

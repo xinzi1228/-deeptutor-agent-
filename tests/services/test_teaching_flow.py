@@ -158,3 +158,25 @@ def test_deterministic(tmp_path):
     s2 = e.get_state(tmp_path / "flow_state.json")
     assert s1["current_step"] == s2["current_step"]
     assert _without_ts(s1["steps"]) == _without_ts(s2["steps"])
+
+
+def test_expert_route_mapping():
+    from deeptutor.services.teaching_flow import EXPERT_ROUTE, TeachingFlowEngine
+
+    assert EXPERT_ROUTE["select_task"] == "task_guide"
+    assert EXPERT_ROUTE["evaluate"] == "grading_expert"
+    assert EXPERT_ROUTE["onboarding"] == "learning_planner"
+
+    e = TeachingFlowEngine(path=None, in_memory=True)
+    assert e.expert_route("feedback") == "grading_expert"
+    assert e.expert_route("unknown_stage") == "task_guide"  # default fallback
+
+
+def test_get_state_includes_expert():
+    from deeptutor.services.teaching_flow import TeachingFlowEngine
+
+    e = TeachingFlowEngine(path=None, in_memory=True)
+    e.start_task("task1")
+    state = e.get_state()
+    assert "expert" in state
+    assert state["expert"] == "task_guide"  # current_step is show_task after start_task

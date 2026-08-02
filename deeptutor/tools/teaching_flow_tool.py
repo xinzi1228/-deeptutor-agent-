@@ -127,8 +127,9 @@ def _render_state(engine: Any, state: dict) -> str:
 def _format_state(state: dict, *, hint: str | None = None) -> str:
     task = state.get("task_id") or "（未开始）"
     step = state.get("current_step") or "（完成）"
+    expert = state.get("expert") or "—"
     blocked = state.get("blocked")
-    lines = ["## 教学流程状态", f"当前任务: {task}", f"当前步骤: {step}"]
+    lines = ["## 教学流程状态", f"当前任务: {task}", f"当前步骤: {step}", f"路由专家: {expert}"]
     if blocked:
         lines.append(f"阻塞: {blocked.get('reason', '')}")
         lines.append(f"建议: {blocked.get('next_action', '')}")

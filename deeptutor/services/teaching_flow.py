@@ -34,6 +34,21 @@ PREREQUISITES: dict[str, list[str]] = {
     "record": ["feedback"],
 }
 
+# stage -> expert role id (multi-expert routing, see references/experts/)
+EXPERT_ROUTE: dict[str, str] = {
+    "onboarding": "learning_planner",
+    "theory": "learning_planner",
+    "select_task": "task_guide",
+    "show_task": "task_guide",
+    "waiting": "task_guide",
+    "evaluate": "grading_expert",
+    "feedback": "grading_expert",
+    "record": "report_analyst",
+    "struggle": "struggle_detective",
+    "report": "report_analyst",
+    "session": "session_steward",
+}
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -77,8 +92,14 @@ class TeachingFlowEngine:
             "current_step": "select_task",
             "steps": {s: {"status": STATUS_PENDING, "ts": None} for s in FLOW_STEPS},
             "blocked": None,
+            "expert": self.expert_route("select_task"),
             "updated_at": None,
         }
+
+    def _with_expert(self, state: dict) -> dict:
+        step = state.get("current_step") or "select_task"
+        state["expert"] = self.expert_route(step)
+        return state
 
     def _write(self, state: dict, state_path: Path | None = None) -> dict:
         state["updated_at"] = _now()
@@ -90,6 +111,10 @@ class TeachingFlowEngine:
         p.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
         return state
 
+    def expert_route(self, stage: str) -> str:
+        """Map a teaching stage to its expert role id (default: task_guide)."""
+        return EXPERT_ROUTE.get(stage, "task_guide")
+
     # -------------------------------------------------------------- actions
 
     def start_task(self, task_id: str, *, state_path: Path | None = None) -> dict:
@@ -98,7 +123,7 @@ class TeachingFlowEngine:
         state["current_step"] = "show_task"
         state["steps"]["select_task"] = {"status": STATUS_DONE, "ts": _now()}
         state["steps"]["show_task"] = {"status": STATUS_IN_PROGRESS, "ts": _now()}
-        return self._write(state, state_path)
+        return self._write(self._with_expert(state), state_path)
 
     def advance(self, step: str, *, state_path: Path | None = None) -> dict:
         if step not in FLOW_STEPS:
@@ -111,7 +136,7 @@ class TeachingFlowEngine:
                     "reason": f"前置步骤 '{pre}' 未完成，不能推进到 '{step}'",
                     "next_action": f"先完成 {pre}（调对应工具或等待学生操作）",
                 }
-                return self._write(state, state_path)
+                return self._write(self._with_expert(state), state_path)
         state["steps"][step]["status"] = STATUS_DONE
         state["steps"][step]["ts"] = state["steps"][step].get("ts") or _now()
         idx = FLOW_STEPS.index(step)
@@ -121,7 +146,7 @@ class TeachingFlowEngine:
         else:
             state["current_step"] = None
         state["blocked"] = None
-        return self._write(state, state_path)
+        return self._write(self._with_expert(state), state_path)
 
     def on_evaluated(self, task_id: str, f1: float, *, state_path: Path | None = None) -> dict:
         state = self.get_state(state_path)
@@ -133,7 +158,7 @@ class TeachingFlowEngine:
         state["steps"]["feedback"]["status"] = STATUS_IN_PROGRESS
         state["current_step"] = "feedback"
         state["blocked"] = None
-        return self._write(state, state_path)
+        return self._write(self._with_expert(state), state_path)
 
     def block(self, step: str, reason: str, next_action: str, *, state_path: Path | None = None) -> dict:
         if step not in FLOW_STEPS:
@@ -141,11 +166,11 @@ class TeachingFlowEngine:
         state = self.get_state(state_path)
         state["steps"][step]["status"] = STATUS_BLOCKED
         state["blocked"] = {"step": step, "reason": reason, "next_action": next_action}
-        return self._write(state, state_path)
+        return self._write(self._with_expert(state), state_path)
 
     def reset(self, *, state_path: Path | None = None) -> dict:
         state = self._fresh_state()
-        return self._write(state, state_path)
+        return self._write(self._with_expert(state), state_path)
 
     # ------------------------------------------------------------- guidance
 
@@ -168,6 +193,7 @@ class TeachingFlowEngine:
 
 __all__ = [
     "FLOW_STEPS",
+    "EXPERT_ROUTE",
     "STATUS_PENDING",
     "STATUS_IN_PROGRESS",
     "STATUS_BLOCKED",
