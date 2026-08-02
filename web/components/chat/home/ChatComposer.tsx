@@ -46,17 +46,6 @@ import KnowledgeSelector from "./KnowledgeSelector";
 import ModelSelector from "./ModelSelector";
 import PersonaSelector from "./PersonaSelector";
 
-type SpaceSelectionCounts = {
-  attachments: number;
-  knowledge: number;
-  chatHistory: number;
-  myAgents: number;
-  books: number;
-  notebooks: number;
-  questionBank: number;
-  persona: number;
-  memory: number;
-};
 import ContextReferenceTree, {
   type ContextTreeItem,
 } from "./ContextReferenceTree";
@@ -170,19 +159,11 @@ export default memo(function ChatComposer({
   onSetCapMenuOpen,
   onToggleKB,
   onSelectLLM,
-  onSelectNotebookPicker,
-  onSelectBookPicker,
-  onSelectHistoryPicker,
-  onSelectAgentsPicker,
-  onSelectQuestionBankPicker,
-  onSelectPersonaPicker,
-  onSelectMemoryPicker,
   onClearPersona,
   personaSelection,
   onPersonaSelectionChange,
   personaSelectorOpen,
   onPersonaSelectorOpenChange,
-  agentsAvailable = true,
   onToggleMemoryFile,
   onSend,
   onRemoveAttachment,
@@ -206,12 +187,9 @@ export default memo(function ChatComposer({
   composerRef: RefObject<HTMLDivElement | null>;
   capMenuRef: RefObject<HTMLDivElement | null>;
   capBtnRef: RefObject<HTMLButtonElement | null>;
-  spaceMenuRef: RefObject<HTMLDivElement | null>;
-  spaceBtnRef: RefObject<HTMLButtonElement | null>;
   dragCounter: RefObject<number>;
   dragging: boolean;
   capMenuOpen: boolean;
-  spaceMenuOpen: boolean;
   hasMessages: boolean;
   attachments: PendingAttachment[];
   attachmentError: string | null;
@@ -222,9 +200,6 @@ export default memo(function ChatComposer({
   /** The connected agent selected for this turn, if any (single-select). */
   selectedAgent?: string | null;
   onSelectAgent?: (name: string | null) => void;
-  /** Max times DeepTutor may consult the selected agent this turn. */
-  subagentBudget?: number | null;
-  onSubagentBudgetChange?: (budget: number) => void;
   llmOptions: LLMOption[];
   activeLLMDefault: LLMSelection | null;
   llmSelection: LLMSelection | null;
@@ -260,16 +235,8 @@ export default memo(function ChatComposer({
   onRequestConfigConfirm: () => void;
   capabilities: CapabilityDef[];
   onSetCapMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
-  onSetSpaceMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   onToggleKB: (name: string) => void;
   onSelectLLM: (selection: LLMSelection | null) => void;
-  onSelectNotebookPicker: () => void;
-  onSelectBookPicker: () => void;
-  onSelectHistoryPicker: () => void;
-  onSelectAgentsPicker: () => void;
-  onSelectQuestionBankPicker: () => void;
-  onSelectPersonaPicker: () => void;
-  onSelectMemoryPicker: () => void;
   onClearPersona: () => void;
   /**
    * Session-persona wiring (main chat only). When `onPersonaSelectionChange`
@@ -281,8 +248,6 @@ export default memo(function ChatComposer({
   onPersonaSelectionChange?: (persona: string) => void;
   personaSelectorOpen?: boolean;
   onPersonaSelectorOpenChange?: (open: boolean) => void;
-  /** Hide the My Agents reference entry (e.g. the quiz follow-up surface). */
-  agentsAvailable?: boolean;
   onToggleMemoryFile: (file: SpaceMemoryFile) => void;
   onSend: (content: string) => void;
   onRemoveAttachment: (index: number) => void;
@@ -425,21 +390,6 @@ export default memo(function ChatComposer({
   const isConfigBlocked = capabilityNeedsConfig && !capabilityConfigConfirmed;
   const canSend =
     (hasContent || hasReferences) && !isStreaming && !isConfigBlocked;
-
-  const spaceSelectionCounts: SpaceSelectionCounts = {
-    attachments: attachments.length,
-    knowledge: selectedKnowledgeBases.length,
-    chatHistory: selectedHistorySessions.length,
-    myAgents: selectedAgentSessions.length,
-    books: selectedBookReferences.reduce(
-      (total, ref) => total + ref.pages.length,
-      0,
-    ),
-    notebooks: selectedNotebookRecords.length,
-    questionBank: selectedQuestionEntries.length,
-    persona: selectedPersona ? 1 : 0,
-    memory: selectedMemoryFiles.length,
-  };
 
   // Unified reference tree above the textarea: Space references, persona
   // and memory render as quiet monochrome rows, collapsed behind a count
@@ -609,18 +559,6 @@ export default memo(function ChatComposer({
             connectedAgents={connectedAgents}
             selectedAgent={selectedAgent}
             onSelectAgent={onSelectAgent}
-            selectedCounts={spaceSelectionCounts}
-            knowledgeAvailable={false}
-            personaAvailable={!onPersonaSelectionChange}
-            onSelectAttach={handlePickFiles}
-            agentsAvailable={agentsAvailable}
-            onSelectNotebookPicker={onSelectNotebookPicker}
-            onSelectBookPicker={onSelectBookPicker}
-            onSelectHistoryPicker={onSelectHistoryPicker}
-            onSelectAgentsPicker={onSelectAgentsPicker}
-            onSelectQuestionBankPicker={onSelectQuestionBankPicker}
-            onSelectPersonaPicker={onSelectPersonaPicker}
-            onSelectMemoryPicker={onSelectMemoryPicker}
             onOpenPersonaSelector={
               onPersonaSelectionChange && onPersonaSelectorOpenChange
                 ? () => onPersonaSelectorOpenChange(true)
@@ -884,6 +822,16 @@ export default memo(function ChatComposer({
                   error={llmOptionsError}
                   onChange={onSelectLLM}
                 />
+
+                <button
+                  type="button"
+                  onClick={handlePickFiles}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[var(--muted-foreground)] transition-[background-color,color,transform] duration-150 hover:bg-[var(--muted)]/55 hover:text-[var(--foreground)] active:scale-90"
+                  aria-label={t("Attach files")}
+                  title={t("Attach files")}
+                >
+                  <Paperclip size={16} strokeWidth={1.9} />
+                </button>
 
                 <button
                   type="button"

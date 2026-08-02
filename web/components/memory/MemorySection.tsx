@@ -1072,7 +1072,7 @@ function EntityRow({ surface, ent, focused, pendingKind, t }: EntityRowProps) {
     <li
       id={entityAnchorId(ref)}
       data-entity-ref={ref}
-      title={t("Open in {{label}}", { label: meta.label })}
+      title={url ? t("Open in {{label}}", { label: meta.label }) : undefined}
     >
       {url ? (
         <Link href={url} className={rowClass}>

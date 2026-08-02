@@ -101,8 +101,6 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
   const composerRef = useRef<HTMLDivElement>(null);
   const capMenuRef = useRef<HTMLDivElement>(null);
   const capBtnRef = useRef<HTMLButtonElement>(null);
-  const spaceMenuRef = useRef<HTMLDivElement>(null);
-  const spaceBtnRef = useRef<HTMLButtonElement>(null);
   const dragCounter = useRef(0);
 
   // ── Composer local state ──────────────────────────────────────
@@ -114,7 +112,6 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
   );
   const [dragging, setDragging] = useState(false);
   const [capMenuOpen, setCapMenuOpen] = useState(false);
-  const [spaceMenuOpen, setSpaceMenuOpen] = useState(false);
 
   const [selectedKnowledgeBases, setSelectedKnowledgeBases] = useState<
     string[]
@@ -201,9 +198,9 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
     setLLMSelection(activeLLMDefault);
   }, [activeLLMDefault, llmSelection]);
 
-  // Click-outside handlers for menu chrome (cap / space).
+  // Click-outside handlers for menu chrome (cap).
   useEffect(() => {
-    if (!capMenuOpen && !spaceMenuOpen) return;
+    if (!capMenuOpen) return;
     const handler = (event: MouseEvent) => {
       const target = event.target as Node | null;
       if (!target) return;
@@ -216,19 +213,10 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
       ) {
         setCapMenuOpen(false);
       }
-      if (
-        spaceMenuOpen &&
-        spaceMenuRef.current &&
-        !spaceMenuRef.current.contains(target) &&
-        spaceBtnRef.current &&
-        !spaceBtnRef.current.contains(target)
-      ) {
-        setSpaceMenuOpen(false);
-      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [capMenuOpen, spaceMenuOpen]);
+  }, [capMenuOpen]);
 
   // ── Attachment helpers ────────────────────────────────────────
   const showAttachmentError = useCallback((message: string) => {
@@ -373,25 +361,6 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
     setSelectedKnowledgeBases((prev) =>
       prev.includes(name) ? prev.filter((kb) => kb !== name) : [...prev, name],
     );
-  }, []);
-
-  const handleSelectNotebookPicker = useCallback(() => {
-    setShowNotebookPicker(true);
-  }, []);
-  const handleSelectBookPicker = useCallback(() => {
-    setShowBookPicker(true);
-  }, []);
-  const handleSelectHistoryPicker = useCallback(() => {
-    setShowHistoryPicker(true);
-  }, []);
-  const handleSelectQuestionBankPicker = useCallback(() => {
-    setShowQuestionBankPicker(true);
-  }, []);
-  const handleSelectPersonaPicker = useCallback(() => {
-    setShowPersonaPicker(true);
-  }, []);
-  const handleSelectMemoryPicker = useCallback(() => {
-    setShowMemoryPicker(true);
   }, []);
 
   const handleClearPersona = useCallback(() => {
@@ -609,12 +578,9 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
         composerRef={composerRef}
         capMenuRef={capMenuRef}
         capBtnRef={capBtnRef}
-        spaceMenuRef={spaceMenuRef}
-        spaceBtnRef={spaceBtnRef}
         dragCounter={dragCounter}
         dragging={dragging}
         capMenuOpen={capMenuOpen}
-        spaceMenuOpen={spaceMenuOpen}
         hasMessages={
           thread.messages.filter((m) => m.role !== "system").length > 0
         }
@@ -643,17 +609,8 @@ function FollowupChatComposerImpl({ context }: FollowupChatComposerProps) {
         onRequestConfigConfirm={() => {}}
         capabilities={FOLLOWUP_CAPABILITIES}
         onSetCapMenuOpen={setCapMenuOpen}
-        onSetSpaceMenuOpen={setSpaceMenuOpen}
         onToggleKB={handleToggleKB}
         onSelectLLM={setLLMSelection}
-        onSelectNotebookPicker={handleSelectNotebookPicker}
-        onSelectBookPicker={handleSelectBookPicker}
-        onSelectHistoryPicker={handleSelectHistoryPicker}
-        agentsAvailable={false}
-        onSelectAgentsPicker={() => {}}
-        onSelectQuestionBankPicker={handleSelectQuestionBankPicker}
-        onSelectPersonaPicker={handleSelectPersonaPicker}
-        onSelectMemoryPicker={handleSelectMemoryPicker}
         onClearPersona={handleClearPersona}
         onToggleMemoryFile={handleToggleMemoryFile}
         onSend={handleSend}

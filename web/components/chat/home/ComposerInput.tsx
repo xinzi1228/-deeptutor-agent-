@@ -13,7 +13,6 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { Bot, Check, UserRound } from "lucide-react";
-import type { ChatSpaceSelectionCounts } from "@/components/chat/space/ChatSpaceMenu";
 import { agentGlyph } from "@/components/agents/agent-icons";
 import { shouldSubmitOnEnter } from "@/lib/composer-keyboard";
 import { useAutoSizedTextarea } from "@/lib/use-auto-sized-textarea";
@@ -30,34 +29,14 @@ interface ComposerInputProps {
   onSend: (content: string) => void;
   onInputChange: (content: string) => void;
   onPaste: (e: React.ClipboardEvent) => void;
-  selectedCounts: ChatSpaceSelectionCounts;
-  /**
-   * Hide the Knowledge entry in the @ menu. Knowledge now lives in the
-   * toolbar KnowledgeSelector chip, so this is currently always false —
-   * kept as a prop in case a surface wants the @ entry back.
-   */
-  knowledgeAvailable: boolean;
-  /** Hide the Persona entry (main chat: persona has its own selector). */
-  personaAvailable: boolean;
   /**
    * Connected subagents selectable via the ``@`` mention. When provided, ``@``
-   * opens an agent picker (the main-chat behavior) instead of the Space menu;
-   * surfaces that omit this (e.g. the quiz follow-up) keep the Space menu on @.
+   * opens the agent picker (the main-chat behavior); surfaces that omit it
+   * leave ``@`` as literal text.
    */
   connectedAgents?: { name: string; kind?: string }[];
   selectedAgent?: string | null;
   onSelectAgent?: (name: string | null) => void;
-  onSelectAttach: () => void;
-  onSelectKnowledge?: () => void;
-  onSelectNotebookPicker: () => void;
-  onSelectBookPicker: () => void;
-  onSelectHistoryPicker: () => void;
-  onSelectAgentsPicker?: () => void;
-  /** Hide the My Agents entry (e.g. the quiz follow-up surface). */
-  agentsAvailable?: boolean;
-  onSelectQuestionBankPicker: () => void;
-  onSelectPersonaPicker: () => void;
-  onSelectMemoryPicker: () => void;
   /**
    * Wires the `/persona` slash command. Typing "/" (then any prefix of
    * "persona") at the start of an empty composer pops a command hint;
@@ -147,8 +126,8 @@ export const ComposerInput = memo(
     const [showSlashPopup, setShowSlashPopup] = useState(false);
     const [atQuery, setAtQuery] = useState("");
     const slashEnabled = Boolean(onOpenPersonaSelector);
-    // Main chat passes ``onSelectAgent`` → ``@`` picks a connected agent. Other
-    // surfaces (quiz follow-up) omit it and keep the @ Space menu.
+    // Main chat passes ``onSelectAgent`` → ``@`` picks a connected agent.
+    // Surfaces that omit it leave ``@`` as literal text.
     const agentMentionMode = Boolean(onSelectAgent);
     const filteredAgents = useMemo(
       () =>
@@ -161,10 +140,8 @@ export const ComposerInput = memo(
     );
 
     // Latest text mirrored into a ref by the change handlers (never updated
-    // during render). The @space handlers and the imperative handle read
-    // from this ref so their identities stay stable across keystrokes,
-    // letting `memo` on ChatSpaceMenu actually skip re-renders when
-    // `showAtPopup` doesn't change.
+    // during render). The @ handlers and the imperative handle read from this
+    // ref so their identities stay stable across keystrokes.
     const inputRef = useRef("");
     const { isComposingRef, onCompositionStart, onCompositionEnd } =
       useImeComposing();

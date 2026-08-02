@@ -504,7 +504,6 @@ export default function ChatPage() {
   // context (state.personaSelection) so it follows the session.
   const [personaSelectorOpen, setPersonaSelectorOpen] = useState(false);
   const [showMemoryPicker, setShowMemoryPicker] = useState(false);
-  const [spaceMenuOpen, setSpaceMenuOpen] = useState(false);
   const [selectedNotebookRecords, setSelectedNotebookRecords] = useState<
     SelectedRecord[]
   >([]);
@@ -530,8 +529,6 @@ export default function ChatPage() {
   const dragCounter = useRef(0);
   const capMenuRef = useRef<HTMLDivElement>(null);
   const capBtnRef = useRef<HTMLButtonElement>(null);
-  const spaceMenuRef = useRef<HTMLDivElement>(null);
-  const spaceBtnRef = useRef<HTMLButtonElement>(null);
   const initialLoadRef = useRef(false);
   // Session-loading overlay: shown while navigating from chat-history →
   // session detail. Holds an AbortController so the user can cancel.
@@ -1083,13 +1080,6 @@ export default function ChatPage() {
         !capBtnRef.current.contains(t)
       )
         setCapMenuOpen(false);
-      if (
-        spaceMenuRef.current &&
-        !spaceMenuRef.current.contains(t) &&
-        spaceBtnRef.current &&
-        !spaceBtnRef.current.contains(t)
-      )
-        setSpaceMenuOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -1660,28 +1650,6 @@ export default function ChatPage() {
     agentPreselectDoneRef.current = true;
     handleSelectAgent(name);
   }, [agentNameSet, handleSelectAgent]);
-  const handleSelectNotebookPicker = useCallback(() => {
-    setShowNotebookPicker(true);
-  }, []);
-  const handleSelectBookPicker = useCallback(() => {
-    setShowBookPicker(true);
-  }, []);
-  const handleSelectHistoryPicker = useCallback(() => {
-    setShowHistoryPicker(true);
-  }, []);
-  const handleSelectAgentsPicker = useCallback(() => {
-    setShowAgentsPicker(true);
-  }, []);
-  const handleSelectQuestionBankPicker = useCallback(() => {
-    setShowQuestionBankPicker(true);
-  }, []);
-  const handleSelectPersonaPicker = useCallback(() => {
-    // The @space "Persona" entry now opens the session persona selector.
-    setPersonaSelectorOpen(true);
-  }, []);
-  const handleSelectMemoryPicker = useCallback(() => {
-    setShowMemoryPicker(true);
-  }, []);
   const handleRemoveHistory = useCallback((sessionId: string) => {
     setSelectedHistorySessions((prev) =>
       prev.filter((item) => item.sessionId !== sessionId),
@@ -1952,12 +1920,9 @@ export default function ChatPage() {
               composerRef={composerRef}
               capMenuRef={capMenuRef}
               capBtnRef={capBtnRef}
-              spaceMenuRef={spaceMenuRef}
-              spaceBtnRef={spaceBtnRef}
               dragCounter={dragCounter}
               dragging={dragging}
               capMenuOpen={capMenuOpen}
-              spaceMenuOpen={spaceMenuOpen}
               hasMessages={hasMessages}
               attachments={attachments}
               attachmentError={attachmentError}
@@ -1966,8 +1931,6 @@ export default function ChatPage() {
               connectedAgents={agentOptions}
               selectedAgent={selectedAgent}
               onSelectAgent={handleSelectAgent}
-              subagentBudget={subagentBudget}
-              onSubagentBudgetChange={setSubagentBudget}
               llmOptions={llmOptions}
               activeLLMDefault={activeLLMDefault}
               llmSelection={state.llmSelection}
@@ -1989,16 +1952,8 @@ export default function ChatPage() {
               onRequestConfigConfirm={ensureActivityPanelOpen}
               capabilities={CAPABILITIES}
               onSetCapMenuOpen={setCapMenuOpen}
-              onSetSpaceMenuOpen={setSpaceMenuOpen}
               onToggleKB={handleToggleKB}
               onSelectLLM={setLLMSelection}
-              onSelectNotebookPicker={handleSelectNotebookPicker}
-              onSelectBookPicker={handleSelectBookPicker}
-              onSelectHistoryPicker={handleSelectHistoryPicker}
-              onSelectAgentsPicker={handleSelectAgentsPicker}
-              onSelectQuestionBankPicker={handleSelectQuestionBankPicker}
-              onSelectPersonaPicker={handleSelectPersonaPicker}
-              onSelectMemoryPicker={handleSelectMemoryPicker}
               onClearPersona={handleClearPersona}
               personaSelection={state.personaSelection}
               onPersonaSelectionChange={setPersonaSelection}
