@@ -12,19 +12,15 @@ import {
 import { useParams, useRouter } from "next/navigation";
 
 import {
-  BarChart3,
-  BrainCircuit,
   Clapperboard,
   Code2,
   Compass,
   Database,
   FileSearch,
   Globe,
-  GraduationCap,
   Image as ImageIcon,
   Lightbulb,
   MessageSquare,
-  Microscope,
   PenLine,
   Sparkles,
   type LucideIcon,
@@ -57,7 +53,6 @@ import { BookmarkPlus, Download, PanelRight } from "lucide-react";
 import {
   useUnifiedChat,
   type MessageAttachment,
-  type MessageRequestSnapshot,
 } from "@/context/UnifiedChatContext";
 import { useAppShell } from "@/context/AppShellContext";
 import type { FilePreviewSource } from "@/components/chat/preview/previewerFor";
@@ -75,23 +70,6 @@ import {
   resolveCapabilityPlaygroundConfig,
   type CapabilityPlaygroundConfigMap,
 } from "@/lib/playground-config";
-import {
-  DEFAULT_QUIZ_CONFIG,
-  buildQuizWSConfig,
-  type DeepQuestionFormConfig,
-} from "@/lib/quiz-types";
-import {
-  DEFAULT_VISUALIZE_CONFIG,
-  buildVisualizeWSConfig,
-  type VisualizeFormConfig,
-} from "@/lib/visualize-types";
-import {
-  buildResearchWSConfig,
-  createEmptyResearchConfig,
-  validateResearchConfig,
-  type DeepResearchFormConfig,
-  type OutlineItem,
-} from "@/lib/research-types";
 import { listKnowledgeBases } from "@/lib/knowledge-api";
 import { getSubagentSettings } from "@/lib/subagents-api";
 import { listLLMOptions, type LLMOption } from "@/lib/llm-options";
@@ -145,26 +123,6 @@ const SaveToNotebookModal = dynamic(
     ssr: false,
   },
 );
-// Activity-panel config card hosts the capability-specific form (Quiz /
-// Animator / Visualize / Research). Lazy-loaded so capabilities that
-// don't need a form (Chat / Solve) don't ship the form JS.
-const CapabilityConfigCard = dynamic(
-  () => import("@/components/chat/home/CapabilityConfigCard"),
-  { ssr: false },
-);
-const QuizConfigPanel = dynamic(
-  () => import("@/components/quiz/QuizConfigPanel"),
-  { ssr: false },
-);
-const VisualizeConfigPanel = dynamic(
-  () => import("@/components/visualize/VisualizeConfigPanel"),
-  { ssr: false },
-);
-const ResearchConfigPanel = dynamic(
-  () => import("@/components/research/ResearchConfigPanel"),
-  { ssr: false },
-);
-
 /* ------------------------------------------------------------------ */
 /*  Type & data definitions                                           */
 /* ------------------------------------------------------------------ */
@@ -227,52 +185,6 @@ const CAPABILITIES: CapabilityDef[] = [
       "videogen",
     ],
     defaultTools: [],
-  },
-  {
-    value: "deep_solve",
-    label: "Solve",
-    description: "Multi-step reasoning & problem solving",
-    icon: BrainCircuit,
-    allowedTools: ["web_search", "code_execution", "reason"],
-    defaultTools: ["web_search", "code_execution", "reason"],
-    loopEngine: true,
-  },
-  {
-    value: "deep_question",
-    label: "Quiz",
-    description: "Auto-validated question generation",
-    icon: PenLine,
-    allowedTools: ["web_search", "code_execution"],
-    defaultTools: ["web_search", "code_execution"],
-  },
-  {
-    value: "deep_research",
-    label: "Research",
-    description: "Comprehensive multi-agent research",
-    icon: Microscope,
-    allowedTools: ["web_search", "paper_search", "code_execution"],
-    defaultTools: ["web_search", "paper_search", "code_execution"],
-  },
-  {
-    value: "visualize",
-    label: "Visualize",
-    description:
-      "Generate charts, diagrams, interactive pages, or math animations",
-    icon: BarChart3,
-    allowedTools: [],
-    defaultTools: [],
-  },
-  {
-    value: "mastery_path",
-    label: "Mastery Path",
-    description: "Mastery-based tutoring with a hard gate",
-    icon: GraduationCap,
-    // The mastery tools (status/quiz/grade/assess/build) auto-mount server-side
-    // when this capability is active; rag auto-mounts when a KB is attached.
-    // These are only the extra optional tools the tutor may also reach for.
-    allowedTools: ["web_search", "code_execution"],
-    defaultTools: [],
-    loopEngine: true,
   },
 ];
 
@@ -416,83 +328,6 @@ export default function ChatPage() {
     null,
   );
   const [capMenuOpen, setCapMenuOpen] = useState(false);
-  const [quizConfig, setQuizConfig] = useState<DeepQuestionFormConfig>({
-    ...DEFAULT_QUIZ_CONFIG,
-  });
-  const [quizPdf, setQuizPdf] = useState<File | null>(null);
-  const [visualizeConfig, setVisualizeConfig] = useState<VisualizeFormConfig>({
-    ...DEFAULT_VISUALIZE_CONFIG,
-  });
-  const [researchConfig, setResearchConfig] = useState<DeepResearchFormConfig>(
-    createEmptyResearchConfig(),
-  );
-  // Capability-config confirmation gate.
-  //
-  // For capabilities that need explicit configuration (Quiz, Visualize,
-  // Research), the user must click *Confirm* in the right-side Activity
-  // panel before sending. Any subsequent edit to the underlying config
-  // invalidates the confirmation, so the user re-confirms once they've
-  // adjusted settings. Capability switches also reset this flag.
-  const [capabilityConfigConfirmed, setCapabilityConfigConfirmed] =
-    useState(false);
-  // Per-session persistence of the capability-config form. The form lives
-  // in local React state, so anything that remounts the page (browser
-  // back/forward to /home/<id>, URL-driven session swap, etc.) would
-  // otherwise wipe a confirmed-and-already-sent setup back to defaults.
-  // Storing the form by sessionId in localStorage keeps the selections —
-  // and the Confirmed badge — stable for the rest of the session.
-  const capabilityConfigStorageKey = useMemo(() => {
-    const sid = state.sessionId || sessionIdParam || "";
-    return sid ? `dt:chat:capability-config:${sid}` : null;
-  }, [state.sessionId, sessionIdParam]);
-  const lastHydratedConfigKeyRef = useRef<string | null>(null);
-  // Hydrate the form configs on first encounter of each session id, so
-  // the user's prior selections come back when they return to a session.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!capabilityConfigStorageKey) return;
-    if (lastHydratedConfigKeyRef.current === capabilityConfigStorageKey) return;
-    lastHydratedConfigKeyRef.current = capabilityConfigStorageKey;
-    const raw = window.localStorage.getItem(capabilityConfigStorageKey);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as {
-        quizConfig?: DeepQuestionFormConfig;
-        visualizeConfig?: VisualizeFormConfig;
-        researchConfig?: DeepResearchFormConfig;
-        capabilityConfigConfirmed?: boolean;
-      };
-      if (parsed.quizConfig) setQuizConfig(parsed.quizConfig);
-      if (parsed.visualizeConfig) setVisualizeConfig(parsed.visualizeConfig);
-      if (parsed.researchConfig) setResearchConfig(parsed.researchConfig);
-      if (typeof parsed.capabilityConfigConfirmed === "boolean") {
-        setCapabilityConfigConfirmed(parsed.capabilityConfigConfirmed);
-      }
-    } catch {
-      /* corrupted entry — ignore */
-    }
-  }, [capabilityConfigStorageKey]);
-  // Persist on every change. Write is synchronous and small, and
-  // localStorage already de-dupes identical writes at the browser level.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!capabilityConfigStorageKey) return;
-    window.localStorage.setItem(
-      capabilityConfigStorageKey,
-      JSON.stringify({
-        quizConfig,
-        visualizeConfig,
-        researchConfig,
-        capabilityConfigConfirmed,
-      }),
-    );
-  }, [
-    capabilityConfigStorageKey,
-    quizConfig,
-    visualizeConfig,
-    researchConfig,
-    capabilityConfigConfirmed,
-  ]);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showNotebookPicker, setShowNotebookPicker] = useState(false);
   const [showBookPicker, setShowBookPicker] = useState(false);
@@ -558,60 +393,6 @@ export default function ChatPage() {
     () => getCapability(state.activeCapability),
     [state.activeCapability],
   );
-  const isQuizMode = activeCap.value === "deep_question";
-  const isVisualizeMode = activeCap.value === "visualize";
-  const isResearchMode = activeCap.value === "deep_research";
-  const capabilityNeedsConfig = isQuizMode || isVisualizeMode || isResearchMode;
-
-  // Edit-invalidates-confirm wrappers — flipping any field after the user
-  // hit *Confirm* should restore the gate so they re-confirm intentionally.
-  // `useCallback` keeps identities stable so the memoized ChatComposer /
-  // CapabilityConfigCard don't churn on every keystroke.
-  const handleChangeQuizConfig = useCallback((next: DeepQuestionFormConfig) => {
-    setQuizConfig(next);
-    setCapabilityConfigConfirmed(false);
-  }, []);
-  const handleUploadQuizPdf = useCallback((file: File | null) => {
-    setQuizPdf(file);
-    setCapabilityConfigConfirmed(false);
-  }, []);
-  const handleChangeVisualizeConfig = useCallback(
-    (next: VisualizeFormConfig) => {
-      setVisualizeConfig(next);
-      setCapabilityConfigConfirmed(false);
-    },
-    [],
-  );
-  const handleChangeResearchConfig = useCallback(
-    (next: DeepResearchFormConfig) => {
-      setResearchConfig(next);
-      setCapabilityConfigConfirmed(false);
-    },
-    [],
-  );
-  const handleConfirmCapabilityConfig = useCallback(() => {
-    setCapabilityConfigConfirmed(true);
-  }, []);
-
-  /**
-   * Auto-open the right-side Activity panel when the user switches into a
-   * capability that requires manual configuration (Quiz / Animator /
-   * Visualize / Research). We only fire on the transition from "doesn't
-   * need config" → "needs config" so we don't fight the user if they
-   * close the panel themselves while still in a config-needing mode.
-   *
-   * Tracking via a ref (instead of deps) avoids re-firing whenever the
-   * panel toggles — the open-state flip should be one-shot per cap
-   * transition.
-   */
-  const lastCapabilityNeedsConfigRef = useRef(capabilityNeedsConfig);
-  useEffect(() => {
-    const prev = lastCapabilityNeedsConfigRef.current;
-    lastCapabilityNeedsConfigRef.current = capabilityNeedsConfig;
-    if (!prev && capabilityNeedsConfig) {
-      ensureActivityPanelOpen();
-    }
-  }, [capabilityNeedsConfig, ensureActivityPanelOpen]);
   const hasMessages = state.messages.length > 0;
   // Time-of-day greeting: seeded once on mount from the user's local clock so
   // the heading stays stable while they're on the page. State (not useMemo)
@@ -745,10 +526,6 @@ export default function ChatPage() {
   );
   const { ref: composerRef, height: composerHeight } =
     useMeasuredHeight<HTMLDivElement>();
-  const researchValidation = useMemo(
-    () => validateResearchConfig(researchConfig),
-    [researchConfig],
-  );
   const notebookReferenceGroups = useMemo(() => {
     const groups = new Map<string, { notebookName: string; count: number }>();
     selectedNotebookRecords.forEach((record) => {
@@ -1128,9 +905,6 @@ export default function ChatPage() {
           );
       setTools(enabledToolsForCap);
       if (config.knowledgeBase) setKBs([config.knowledgeBase]);
-      // Switching capability invalidates any prior config confirmation —
-      // the new capability has its own form that needs explicit confirm.
-      setCapabilityConfigConfirmed(false);
       setCapMenuOpen(false);
     },
     [capabilityConfigs, setCapability, setKBs, setTools, userEnabledTools],
@@ -1256,88 +1030,6 @@ export default function ChatPage() {
     [state.messages],
   );
 
-  /**
-   * Capability-config card rendered at the bottom of the Activity panel.
-   *
-   * Returns null for capabilities that don't need explicit configuration
-   * (Chat / Solve) — the Activity panel falls back to its standard
-   * sections (tools, KBs, space, attachments) plus the empty-state card.
-   *
-   * For Quiz / Animator / Visualize / Research, we wrap the matching bare
-   * ConfigPanel in a `CapabilityConfigCard` that provides the header,
-   * Confirm button, and validation-error display. The Confirm gate is
-   * wired through `capabilityConfigConfirmed` / `handleConfirmCapabilityConfig`.
-   */
-  const capabilityConfigSection = useMemo(() => {
-    if (!capabilityNeedsConfig) return null;
-    if (isQuizMode) {
-      return (
-        <CapabilityConfigCard
-          capability="deep_question"
-          confirmed={capabilityConfigConfirmed}
-          canConfirm
-          onConfirm={handleConfirmCapabilityConfig}
-        >
-          <QuizConfigPanel
-            value={quizConfig}
-            onChange={handleChangeQuizConfig}
-            uploadedPdf={quizPdf}
-            onUploadPdf={handleUploadQuizPdf}
-          />
-        </CapabilityConfigCard>
-      );
-    }
-    if (isVisualizeMode) {
-      return (
-        <CapabilityConfigCard
-          capability="visualize"
-          confirmed={capabilityConfigConfirmed}
-          canConfirm
-          onConfirm={handleConfirmCapabilityConfig}
-        >
-          <VisualizeConfigPanel
-            value={visualizeConfig}
-            onChange={handleChangeVisualizeConfig}
-          />
-        </CapabilityConfigCard>
-      );
-    }
-    // Research: forward validation errors so the user sees what's missing
-    // before they hit Confirm. `canConfirm` only flips false when there's
-    // an actual error (e.g. mode/depth not selected).
-    const researchErrorMessages = Object.values(researchValidation.errors);
-    return (
-      <CapabilityConfigCard
-        capability="deep_research"
-        confirmed={capabilityConfigConfirmed}
-        canConfirm={researchErrorMessages.length === 0}
-        validationErrors={researchErrorMessages}
-        onConfirm={handleConfirmCapabilityConfig}
-      >
-        <ResearchConfigPanel
-          value={researchConfig}
-          errors={researchValidation.errors}
-          onChange={handleChangeResearchConfig}
-        />
-      </CapabilityConfigCard>
-    );
-  }, [
-    capabilityNeedsConfig,
-    isQuizMode,
-    isVisualizeMode,
-    capabilityConfigConfirmed,
-    handleConfirmCapabilityConfig,
-    quizConfig,
-    quizPdf,
-    handleChangeQuizConfig,
-    handleUploadQuizPdf,
-    visualizeConfig,
-    handleChangeVisualizeConfig,
-    researchConfig,
-    researchValidation.errors,
-    handleChangeResearchConfig,
-  ]);
-
   // Clicking an attachment (from the Activity home or from a chat message)
   // routes into the panel as a new file tab. It auto-opens and the
   // preference is persisted so a follow-up click feels instant.
@@ -1459,28 +1151,6 @@ export default function ChatPage() {
       }));
       let config: Record<string, unknown> | undefined;
 
-      if (isQuizMode) {
-        config = buildQuizWSConfig(quizConfig);
-        if (quizConfig.mode === "mimic" && quizPdf) {
-          const b64 = extractBase64FromDataUrl(
-            await readFileAsDataUrl(quizPdf),
-          );
-          extraAttachments = [
-            ...extraAttachments,
-            {
-              type: "pdf",
-              filename: quizPdf.name,
-              base64: b64,
-              mime_type: "application/pdf",
-            },
-          ];
-        }
-      }
-      if (isVisualizeMode) config = buildVisualizeWSConfig(visualizeConfig);
-      if (isResearchMode) {
-        if (!researchValidation.valid) return;
-        config = buildResearchWSConfig(researchConfig);
-      }
       // When a connected agent is selected, carry the per-turn consult budget
       // (how many times DeepTutor may ask it) so the subagent capability uses it.
       if (selectedAgent && subagentBudget) {
@@ -1528,16 +1198,9 @@ export default function ChatPage() {
       attachments,
       bookReferencesPayload,
       historyReferencesPayload,
-      isQuizMode,
-      isResearchMode,
-      isVisualizeMode,
       memoryReferencesPayload,
       notebookReferencesPayload,
       questionNotebookReferencesPayload,
-      quizConfig,
-      quizPdf,
-      researchConfig,
-      researchValidation,
       selectedAgent,
       selectedHistorySessions.length,
       selectedAgentSessions.length,
@@ -1550,52 +1213,7 @@ export default function ChatPage() {
       state.isStreaming,
       subagentBudget,
       t,
-      visualizeConfig,
     ],
-  );
-
-  const handleConfirmOutline = useCallback(
-    (
-      outline: OutlineItem[],
-      _topic: string,
-      originalConfig?: Record<string, unknown> | null,
-      originalSnapshot?: MessageRequestSnapshot | null,
-    ) => {
-      const config: Record<string, unknown> = {
-        ...(originalConfig ?? {
-          mode: researchConfig.mode,
-          depth: researchConfig.depth,
-        }),
-        confirmed_outline: outline,
-      };
-      const requestSnapshotOverride: MessageRequestSnapshot | undefined =
-        originalSnapshot
-          ? {
-              ...originalSnapshot,
-              content: _topic,
-              capability: "deep_research",
-              config,
-            }
-          : undefined;
-      sendMessage(
-        _topic,
-        originalSnapshot?.attachments ?? [],
-        config,
-        originalSnapshot?.notebookReferences,
-        originalSnapshot?.historyReferences,
-        {
-          displayUserMessage: false,
-          persistUserMessage: false,
-          requestSnapshotOverride,
-          bookReferences: originalSnapshot?.bookReferences,
-        },
-        originalSnapshot?.questionNotebookReferences,
-        originalSnapshot?.persona,
-        originalSnapshot?.memoryReferences,
-      );
-      shouldAutoScrollRef.current = true;
-    },
-    [researchConfig, sendMessage, shouldAutoScrollRef],
   );
 
   const handleRegenerateMessage = useCallback(() => {
@@ -1903,7 +1521,6 @@ export default function ChatPage() {
                     language={state.language}
                     onCopyAssistantMessage={copyAssistantMessage}
                     onRegenerateMessage={handleRegenerateMessage}
-                    onConfirmOutline={handleConfirmOutline}
                     onPreviewAttachment={handlePreviewMessageAttachment}
                     onDeleteTurn={deleteTurn}
                     selectedBranches={state.selectedBranches}
@@ -1946,9 +1563,9 @@ export default function ChatPage() {
               selectedMemoryFiles={selectedMemoryFiles}
               selectedKnowledgeBases={selectedKbOnly}
               isStreaming={state.isStreaming}
-              isVisualizeMode={isVisualizeMode}
-              capabilityNeedsConfig={capabilityNeedsConfig}
-              capabilityConfigConfirmed={capabilityConfigConfirmed}
+              isVisualizeMode={false}
+              capabilityNeedsConfig={false}
+              capabilityConfigConfirmed={false}
               onRequestConfigConfirm={ensureActivityPanelOpen}
               capabilities={CAPABILITIES}
               onSetCapMenuOpen={setCapMenuOpen}
@@ -2035,7 +1652,6 @@ export default function ChatPage() {
             open={viewerPanelOpen && previewSource === null}
             sessionId={state.sessionId}
             activity={sessionActivity}
-            configSection={capabilityConfigSection}
             onClose={() => setViewerOpen(false)}
             onAutoOpen={() => setViewerOpen(true)}
           />
