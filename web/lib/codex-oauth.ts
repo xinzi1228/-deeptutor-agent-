@@ -134,7 +134,7 @@ export async function requestCodex<T>(
     } catch {
       throw new CodexOAuthApiError(
         "invalid_response",
-        "标注星图 returned an invalid Codex OAuth response.",
+        "Annotation Star Map returned an invalid Codex OAuth response.",
       );
     }
   }
