@@ -72,9 +72,11 @@ Progress 页: CheckinCalendar (热力图) + BadgeWall (徽章墙)
 | `first_step` | 新手上路 | 有任意学习记录 |
 | `streak_3` | 小有坚持 | streak ≥ 3 天 |
 | `streak_7` | 持之以恒 | streak ≥ 7 天 |
-| `first_pass` | 初战告捷 | 存在 bbox 练习记录且 F1 ≥ 0.7 |
+| `first_pass` | 初战告捷 | 存在练习记录（annotation_exercise）且 F1 ≥ 0.7 |
 | `practice_10` | 熟能生巧 | 累计 annotation_exercise 记录 ≥ 10 |
 | `module_clear` | 阶段通关 | 完成任一模块（见 4.3） |
+
+> **first_pass 范围说明**：初战告捷适用于任意练习任务类型（bbox / 分类 / 多边形等），只要该练习为 `annotation_exercise` 且 F1 ≥ 0.7 即触发；不限于 bbox 练习。
 
 ### 4.3 阶段通关（module_clear）定义
 

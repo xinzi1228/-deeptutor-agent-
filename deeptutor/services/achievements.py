@@ -40,6 +40,17 @@ def _local_date(ts: str) -> str | None:
         return None
 
 
+def _is_timed(r: dict) -> bool:
+    """A usable timestamp is a non-empty string; anything else is treated as absent."""
+    ts = r.get("timestamp")
+    return isinstance(ts, str) and bool(ts)
+
+
+def _timestamps(records: list[dict]) -> list[str]:
+    """Non-empty string timestamps, in record order."""
+    return [r["timestamp"] for r in records if _is_timed(r)]
+
+
 class AchievementService:
     """Deterministic check-in + badge derivation over learning records."""
 
@@ -72,9 +83,9 @@ class AchievementService:
     def badges(self) -> list[dict]:
         checkin = self.checkin()
         streak = checkin["streak"]
-        practices = [r for r in self._records if r.get("type") == PRACTICE_TYPE]
+        practices = [r for r in self._records if r.get("type") == PRACTICE_TYPE and _is_timed(r)]
         first_pass_dt = next(
-            (r.get("timestamp") for r in practices if _as_float(r.get("f1")) is not None and _as_float(r.get("f1")) >= 0.7),
+            (r["timestamp"] for r in practices if _as_float(r.get("f1")) is not None and _as_float(r.get("f1")) >= 0.7),
             None,
         )
         module_clear_at = self._module_clear_time()
@@ -87,7 +98,7 @@ class AchievementService:
             "module_clear": module_clear_at is not None,
         }
         unlocked_at = {
-            "first_step": min((r.get("timestamp") for r in self._records), default=None) if conditions["first_step"] else None,
+            "first_step": min(_timestamps(self._records), default=None) if conditions["first_step"] else None,
             "streak_3": self._streak_unlock_time(streak, 3),
             "streak_7": self._streak_unlock_time(streak, 7),
             "first_pass": first_pass_dt,
@@ -108,27 +119,28 @@ class AchievementService:
 
     def _module_clear_time(self) -> str | None:
         plan = _load_course_plan()
-        if plan and plan.get("modules"):
+        has_plan = bool(plan and plan.get("modules"))
+        if has_plan:
             for module in plan["modules"]:
                 tasks = [t for t in module.get("tasks", []) if isinstance(t, str)]
                 if not tasks:
                     continue
                 task_f1s: dict[str, float] = {}
                 for r in self._records:
-                    if r.get("type") == PRACTICE_TYPE and r.get("task_id") in tasks:
+                    if r.get("type") == PRACTICE_TYPE and _is_timed(r) and r.get("task_id") in tasks:
                         f1 = _as_float(r.get("f1"))
                         if f1 is not None:
                             prev = task_f1s.get(r["task_id"])
                             task_f1s[r["task_id"]] = max(prev, f1) if prev is not None else f1
                 if all(task_f1s.get(t, 0) >= 0.7 for t in tasks):
-                    return max(
-                        (r.get("timestamp") for r in self._records
-                         if r.get("type") == PRACTICE_TYPE and r.get("task_id") in tasks),
-                        default=None,
-                    )
+                    return max(_timestamps([
+                        r for r in self._records
+                        if r.get("type") == PRACTICE_TYPE and _is_timed(r) and r.get("task_id") in tasks
+                    ]), default=None)
+            return None
         practiced = {r.get("task_id") for r in self._records if r.get("type") == PRACTICE_TYPE and r.get("task_id")}
         if len(practiced) >= MODULE_CLEAR_MIN_DISTINCT_TASKS:
-            return max((r.get("timestamp") for r in self._records if r.get("type") == PRACTICE_TYPE), default=None)
+            return max(_timestamps([r for r in self._records if r.get("type") == PRACTICE_TYPE]), default=None)
         return None
 
     def _streak_unlock_time(self, streak: int, n: int) -> str | None:
@@ -142,15 +154,15 @@ class AchievementService:
         target = cursor - timedelta(days=n - 1)
         if target.isoformat() in dates:
             for r in self._records:
-                if _local_date(r.get("timestamp", "")) == target.isoformat():
-                    return r.get("timestamp")
+                if _is_timed(r) and _local_date(r["timestamp"]) == target.isoformat():
+                    return r["timestamp"]
         return None
 
     def _practice_10_time(self, practices: list[dict]) -> str | None:
         if len(practices) < 10:
             return None
-        sorted_p = sorted(practices, key=lambda r: r.get("timestamp", ""))
-        return sorted_p[9].get("timestamp")
+        sorted_p = sorted(practices, key=lambda r: r["timestamp"])
+        return sorted_p[9]["timestamp"]
 
 
 def _as_float(v: Any) -> float | None:

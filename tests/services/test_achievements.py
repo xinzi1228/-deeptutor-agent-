@@ -140,3 +140,63 @@ def test_deterministic():
     b = AchievementService(records=recs, now=now)
     assert a.checkin() == b.checkin()
     assert a.badges() == b.badges()
+
+
+def test_badge_module_clear_fallback_ignored_when_plan_present(monkeypatch):
+    # plan authoritative: practiced 5 distinct tasks but cleared no module -> NOT unlocked
+    import deeptutor.services.achievements as mod
+
+    plan = {"modules": [{"name": "标注基础", "tasks": ["task1", "task3", "task5"]}]}
+    monkeypatch.setattr(mod, "_load_course_plan", lambda: plan)
+
+    recs = [
+        _rec(task_id="task1", f1=0.8, ts="2026-08-01T10:00:00+00:00"),
+        _rec(task_id="task2", f1=0.8, ts="2026-08-02T10:00:00+00:00"),
+        _rec(task_id="task4", f1=0.8, ts="2026-08-03T10:00:00+00:00"),
+        _rec(task_id="task6", f1=0.8, ts="2026-08-04T10:00:00+00:00"),
+        _rec(task_id="task7", f1=0.8, ts="2026-08-05T10:00:00+00:00"),
+    ]
+    svc = _service(recs)
+    assert _badge_map(svc)["module_clear"]["unlocked"] is False
+
+
+def test_badge_module_clear_fallback_when_plan_has_no_modules(monkeypatch):
+    import deeptutor.services.achievements as mod
+
+    monkeypatch.setattr(mod, "_load_course_plan", lambda: {"modules": []})
+
+    recs = [_rec(task_id=f"task{i}", f1=0.8, ts=f"2026-08-0{d}T10:00:00+00:00") for i, d in zip(range(1, 6), range(1, 6))]
+    svc = _service(recs)
+    assert _badge_map(svc)["module_clear"]["unlocked"] is True
+
+
+def test_badge_tolerates_missing_timestamp():
+    svc = _service([
+        {"type": "annotation_exercise", "task_id": "task1", "f1": 0.9, "timestamp": None},
+        _rec(type="diagnosis", task_id="", ts="2026-08-01T10:00:00+00:00"),
+        _rec(task_id="task2", f1=0.95, ts="2026-08-01T11:00:00+00:00"),
+        {"type": "annotation_exercise", "task_id": "task3", "f1": 0.9, "timestamp": ""},
+    ])
+    badges = _badge_map(svc)
+    assert len(badges) == 6
+    assert badges["first_step"]["unlocked"] is True
+    assert badges["first_pass"]["unlocked"] is True
+    assert isinstance(badges["first_pass"]["unlocked_at"], str) and badges["first_pass"]["unlocked_at"]
+    assert badges["first_step"]["unlocked_at"] == "2026-08-01T10:00:00+00:00"
+    assert badges["module_clear"]["unlocked"] is False
+
+
+def test_empty_records_all_badges_locked():
+    svc = _service([])
+    badges = _badge_map(svc)
+    for badge in BADGES:
+        assert badges[badge["id"]]["unlocked"] is False
+        assert badges[badge["id"]]["unlocked_at"] is None
+
+
+def test_unlocked_at_is_nonempty_string_when_unlocked():
+    svc = _service([_rec(type="diagnosis", ts="2026-08-01T10:00:00+00:00")])
+    badges = _badge_map(svc)
+    assert badges["first_step"]["unlocked"] is True
+    assert isinstance(badges["first_step"]["unlocked_at"], str)
+    assert badges["first_step"]["unlocked_at"]
