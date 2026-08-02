@@ -278,6 +278,23 @@
 
 学习记录库 ｜ 知识图谱引擎 ｜ 记忆演化（合并/归档） ｜ 教学自改进 ｜ 课程引擎（+docx） ｜ 对抗性评估 ｜ CRAG 校验 ｜ MCP 接口 ｜ 15+ API
 
+### 对话内可视化（竞赛模块⑤对标）
+
+对话不再是纯文字——4 类图表卡片直接显示在对话流里，全部由确定性数据驱动（LLM 不画图）：
+
+| 图表 | 触发 | 呈现 |
+|------|------|------|
+| **练习成绩单** | 学生提交标注后 `annotation_check` 评测 | matplotlib 生成 PNG 图（F1/Precision/Recall 分数条）直接显示，可截图进报告 |
+| **能力雷达** | 学生问"我能力怎么样" → `ability_radar` 工具 | Chart.js 交互雷达图（五维能力，可悬停） |
+| **学习进度** | 诊断建课后 `finalize_diagnosis` | 进度条 + 计划vs实际（4 模块） |
+| **图谱风险链** | 老师查风险 `graph_query` | cytoscape 技能依赖图（缺失=黄/挣扎=红/受影响=紫） |
+
+- **设计文档**: `docs/specs/visualization-design.md`
+- **实施计划**: `docs/specs/visualization-implementation-plan.md`
+- **后端**: `chart_cards.py`（契约构造器+成绩单图）+ 各工具返回 `metadata.chart`
+- **前端**: `ChatChartCard.tsx` 组件 + `AssistantMessage` 接线
+- **对标竞赛**: 模块⑤"学习报告插件 JS渲染：进度条/成绩单/薄弱项图表"
+
 ### 演示启动命令
 
 ```powershell
