@@ -31,6 +31,19 @@ async def test_trace_log_annotation_exercise_has_f1_and_readiness():
 
 
 @pytest.mark.asyncio
+async def test_trace_log_attaches_nearby_decision():
+    from deeptutor.api.routers.profile import trace_log
+
+    result = await trace_log(limit=30)
+    exercises = [t for t in result["traces"] if t["type"] == "annotation_exercise"]
+    assert exercises, "expected at least one annotation_exercise in demo data"
+    assert any(ex["decision"] for ex in exercises), (
+        "expected a time-adjacent decision attached to at least one exercise "
+        "(route_choice/readiness_judgment are seconds away from task1 in demo data)"
+    )
+
+
+@pytest.mark.asyncio
 async def test_trace_log_limit():
     from deeptutor.api.routers.profile import trace_log
 
