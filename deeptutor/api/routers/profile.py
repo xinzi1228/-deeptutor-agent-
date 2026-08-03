@@ -10,9 +10,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
-from deeptutor.core.i18n import t
 from deeptutor.services.learning_records import LearningStats
 
 router = APIRouter()
@@ -149,6 +148,75 @@ async def decisions(limit: int = 20) -> dict[str, Any]:
 
     rows = LearningRecordStore().list_decisions(limit=max(1, min(limit, 100)))
     return {"decisions": rows}
+
+
+@router.get("/trace-log")
+async def trace_log(limit: int = 30) -> dict[str, Any]:
+    """Teaching-turn trace: records + time-adjacent decisions/interventions, desc by time."""
+    from datetime import datetime, timezone
+
+    from deeptutor.services.learning_records import LearningRecordStore
+
+    records = _all_records()
+    decisions = LearningRecordStore().list_decisions(limit=100000)
+
+    def _ts(ts_str):
+        try:
+            parsed = datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed
+        except Exception:
+            return None
+
+    def _near(a, b, minutes=10):
+        if not a or not b:
+            return False
+        return abs((a - b).total_seconds()) <= minutes * 60
+
+    traces = []
+    for r in records:
+        rt = _ts(r.get("timestamp"))
+        if not rt:
+            continue
+        trace = {
+            "timestamp": r.get("timestamp"),
+            "date": str(rt.date()) if rt else None,
+            "type": r.get("type"),
+            "task_id": r.get("task_id"),
+            "knowledge_point": r.get("knowledge_point"),
+            "f1": r.get("f1"),
+            "precision": r.get("precision"),
+            "recall": r.get("recall"),
+            "readiness": r.get("readiness"),
+            "knowledge_points": r.get("knowledge_points"),
+            "foresight_verified": r.get("foresight_verified"),
+            "foresight_hit": r.get("foresight_hit"),
+            "intervention": None,
+            "decision": None,
+        }
+        for d in decisions:
+            dt = _ts(d.get("timestamp"))
+            if not _near(rt, dt):
+                continue
+            kind = str(d.get("kind") or "")
+            if "struggle" in kind:
+                trace["intervention"] = {
+                    "kind": kind,
+                    "target": d.get("target"),
+                    "rationale": d.get("rationale"),
+                    "timestamp": d.get("timestamp"),
+                }
+            elif any(k in kind for k in ("task_recommendation", "route_choice", "推进", "readiness")):
+                trace["decision"] = {
+                    "kind": kind,
+                    "target": d.get("target"),
+                    "rationale": d.get("rationale"),
+                }
+        traces.append(trace)
+
+    traces.sort(key=lambda trace: trace["timestamp"] or "", reverse=True)
+    return {"traces": traces[: max(1, min(limit, 200))]}
 
 
 @router.get("/evaluations")
