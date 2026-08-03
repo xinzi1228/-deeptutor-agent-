@@ -64,7 +64,7 @@ DEFAULT_SIDEBAR_NAV_ORDER = {
 DEFAULT_UI_SETTINGS = {
     # "snow" is the pure-white neutral theme, shown as "Default" in the UI.
     "theme": "snow",
-    "language": "en",
+    "language": "zh",
     "sidebar_description": "✨ Data Intelligence Lab @ HKU",
     "sidebar_nav_order": DEFAULT_SIDEBAR_NAV_ORDER,
     # User-toggleable chat tools. Default = all on; the /settings/tools page

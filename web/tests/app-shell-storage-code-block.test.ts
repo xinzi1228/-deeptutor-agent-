@@ -37,10 +37,13 @@ mockWindow();
 import {
   CODE_BLOCK_THEME_STORAGE_KEY,
   DEFAULT_CODE_BLOCK_THEME,
-  readStoredCodeBlockTheme,
   CODE_BLOCK_SHOW_LINE_NUMBERS_STORAGE_KEY,
   DEFAULT_CODE_BLOCK_SHOW_LINE_NUMBERS,
+  LANGUAGE_STORAGE_KEY,
+  normalizeLanguage,
+  readStoredCodeBlockTheme,
   readStoredCodeBlockShowLineNumbers,
+  readStoredLanguage,
   writeStoredCodeBlockTheme,
   writeStoredCodeBlockShowLineNumbers,
   CODE_BLOCK_WRAP_LONG_LINES_STORAGE_KEY,
@@ -155,4 +158,36 @@ test("app-shell-storage: write dispatches CODE_BLOCK_SETTINGS_EVENT", () => {
   assert.equal(dispatchedEvents.length, 3);
   assert.equal(dispatchedEvents[2].type, CODE_BLOCK_SETTINGS_EVENT);
   assert.equal(dispatchedEvents[2].detail.codeBlockWrapLongLines, false);
+});
+
+test("app-shell-storage: language defaults to zh", () => {
+  assert.equal(LANGUAGE_STORAGE_KEY, "deeptutor-language");
+  assert.equal(normalizeLanguage(undefined), "zh");
+  assert.equal(normalizeLanguage(null), "zh");
+  assert.equal(normalizeLanguage(""), "zh");
+  assert.equal(normalizeLanguage("zh"), "zh");
+  assert.equal(normalizeLanguage("en"), "en");
+});
+
+test("app-shell-storage: readStoredLanguage defaults to zh on SSR and empty storage", () => {
+  // No stored value → zh.
+  mockLocalStorage = {};
+  assert.equal(readStoredLanguage(), "zh");
+
+  // SSR (no window object) → zh.
+  const savedWindow = global.window;
+  (global as any).window = undefined;
+  try {
+    assert.equal(readStoredLanguage(), "zh");
+  } finally {
+    (global as any).window = savedWindow;
+  }
+
+  // Explicitly stored "en" is honored.
+  mockLocalStorage[LANGUAGE_STORAGE_KEY] = "en";
+  assert.equal(readStoredLanguage(), "en");
+
+  // Explicitly stored "zh" is honored.
+  mockLocalStorage[LANGUAGE_STORAGE_KEY] = "zh";
+  assert.equal(readStoredLanguage(), "zh");
 });

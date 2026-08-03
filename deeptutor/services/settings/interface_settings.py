@@ -15,7 +15,7 @@ from deeptutor.services.path_service import get_path_service
 DEFAULT_UI_SETTINGS: dict[str, Any] = {
     # "snow" is the pure-white neutral theme, shown as "Default" in the UI.
     "theme": "snow",
-    "language": "en",
+    "language": "zh",
 }
 
 

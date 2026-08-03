@@ -45,8 +45,4 @@ export function initI18n(language?: unknown) {
 
 export async function ensureLanguage(language: AppLanguage) {
   if (i18n.hasResourceBundle(language, "app")) return;
-  if (language === "zh") {
-    const zhApp = (await import("@/locales/zh/app.json")).default;
-    i18n.addResourceBundle("zh", "app", zhApp, true, true);
-  }
 }
