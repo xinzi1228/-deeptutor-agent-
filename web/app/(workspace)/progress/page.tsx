@@ -11,7 +11,7 @@ import {
   getEvaluations,
   getCoursePlan,
   getCoursePlanDocx,
-  getEpisodes,
+  getTraceLog,
   getForesightStats,
   getCoachMetrics,
   reflectMemory,
@@ -23,10 +23,10 @@ import {
   type DecisionLog,
   type CoursePlan,
   type TeachingEvaluation,
-  type Episode,
   type ForesightStats,
   type CoachMetrics,
   type KnowledgeGraphData,
+  type TraceItem,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
 import { RadarChart } from "@/components/learning-stats/RadarChart";
@@ -60,7 +60,7 @@ export default function ProgressPage() {
   const [decisions, setDecisions] = useState<DecisionLog[]>([]);
   const [evaluations, setEvaluations] = useState<TeachingEvaluation[]>([]);
   const [coursePlan, setCoursePlan] = useState<CoursePlan | null>(null);
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [traces, setTraces] = useState<TraceItem[]>([]);
   const [foresight, setForesight] = useState<ForesightStats | null>(null);
   const [coachMetrics, setCoachMetrics] = useState<CoachMetrics | null>(null);
   const [knowledgeGraph, setKnowledgeGraph] = useState<KnowledgeGraphData | null>(null);
@@ -69,7 +69,7 @@ export default function ProgressPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, radar, f1, tree, dec, ev, plan, ep, fs, cm, kg] = await Promise.all([
+        const [ov, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg] = await Promise.all([
           getLearningOverview(),
           getRadarDimensions(),
           getF1Trend(),
@@ -77,7 +77,7 @@ export default function ProgressPage() {
           getDecisions(),
           getEvaluations(),
           getCoursePlan().catch(() => ({ plan: null as any })),
-          getEpisodes(),
+          getTraceLog().catch(() => ({ traces: [] as TraceItem[] })),
           getForesightStats(),
           getCoachMetrics(),
           getKnowledgeGraph().catch(() => null),
@@ -90,7 +90,7 @@ export default function ProgressPage() {
         setDecisions(dec.decisions);
         setEvaluations(ev.evaluations);
         setCoursePlan(plan.plan || null);
-        setEpisodes(ep.episodes);
+        setTraces(tr.traces);
         setForesight(fs);
         setCoachMetrics(cm);
         setKnowledgeGraph(kg);
@@ -224,7 +224,7 @@ export default function ProgressPage() {
             )}
           </div>
 
-          <Timeline episodes={episodes} />
+          <Timeline traces={traces} />
         </>
       )}
 

@@ -93,6 +93,32 @@ export interface CoachMetrics {
   tasks_completed: number;
 }
 
+export type TraceItem = {
+  timestamp: string;
+  date?: string | null;
+  type: string;
+  task_id?: string | null;
+  knowledge_point?: string | null;
+  f1?: number | null;
+  precision?: number | null;
+  recall?: number | null;
+  readiness?: string | null;
+  knowledge_points?: string[] | null;
+  foresight_verified?: boolean;
+  foresight_hit?: boolean;
+  intervention?: {
+    kind: string;
+    target?: string;
+    rationale?: string;
+    timestamp?: string;
+  } | null;
+  decision?: {
+    kind: string;
+    target?: string;
+    rationale?: string;
+  } | null;
+};
+
 async function fetchJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API ${url} returned ${res.status}`);
@@ -156,6 +182,12 @@ export function getCoursePlanDocx(): Promise<{ docx: { url: string | null; path:
 
 export function getEpisodes(): Promise<{ episodes: Episode[] }> {
   return fetchJSON(`${API_BASE}/episodes`);
+}
+
+export async function getTraceLog(limit = 30): Promise<{ traces: TraceItem[] }> {
+  const res = await fetch(`${API_BASE}/trace-log?limit=${limit}`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Failed to load trace log: ${res.status}`);
+  return res.json();
 }
 
 export function getForesightStats(): Promise<ForesightStats> {
