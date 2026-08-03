@@ -1,7 +1,7 @@
-# 会话交接文档（Compression Handoff v3）
+# 会话交接文档（Compression Handoff v4）
 
 > 用途: 压缩上下文前的状态快照。恢复后据此无缝继续。
-> 创建: 2026-08-02（v3 更新——多专家角色体系已实施完成）
+> 创建: 2026-08-02（v4 更新——界面全中文化完成 + 成熟度差距归档）
 
 ---
 
@@ -11,9 +11,9 @@
 - **竞赛**: 科大讯飞 XA-202603（星辰 Agent 平台）——**平台开放自由选择，DeepTutor 可作为交付**
 - **竞赛核心**: 6 模块（①学习计划 ②会话管理 ③任务引导 ④困难检测 ⑤学习报告 ⑥练习批改）+ 6 份交付材料
 - **竞赛文件**: `标注星图_团队分工与周报模板_v5.5.docx`（团队 6 人，目标 2026-09-01）
-- **产品**: 品牌「标注星图」/ "Annotation Star Map"，前端只留 Home/Annotation/Progress/Memory/Settings + 认证/admin
+- **产品**: 品牌「标注星图」/ "Annotation Star Map"，前端只留 Home/Annotation/Progress/Memory/Settings + 认证/admin。**界面默认全中文**（保留 en/zh 切换）
 
-## 二、当前完成度（竞赛 6 模块 + 3 优化方向）
+## 二、当前完成度（竞赛 6 模块 + 3 优化方向 + 界面中文化）
 
 | 模块/方向 | 状态 |
 |-----------|------|
@@ -27,6 +27,8 @@
 | 优化 2: 任务引导引擎化 | ✅ |
 | 优化 3: 语音/打卡徽章 | ✅（语音基础已有不动，打卡+6 徽章完成） |
 | **多专家角色体系**（借鉴 agency-agents） | ✅ **已实施完成**（6 专家卡 + manifest 索引 + expert_route + 自动 readiness，全量回归无新失败） |
+| **界面全中文化** | ✅ **已完成**（默认 zh + 保留 en 切换，冒烟验证侧边栏中文，`710823fa`→`1c0d0916`） |
+| **成熟度差距归档** | ✅ **已完成**（`docs/maturity-gap-analysis.md`，6 大类 + 前端功能对照 + 6 项逐项探索结论） |
 
 ## 三、近期完成的功能（全部已提交）
 
@@ -65,14 +67,15 @@
 - 诊断式教学/决策审计/对抗评估/foresight/教学自改进/CRAG/docx 手册/Coach 绩效
 - 3 份 fork 文档（docs/fork-features*.md）
 
-## 四、当前待办（多专家体系已完成，剩余可选后续）
+## 四、当前待办（多专家体系 + 界面中文化已完成，剩余可选后续）
 
 ### A. 已记录的可选后续（非阻塞）
-- 死代码清理（orphaned 组件: space/* agents/* knowledge/* partners/* CapabilityConfigCard；ChatComposer config-gating props；reference-picker dialogs）
+- **界面残留小英文**（final review 记录）: 组件级 aria-label/提示（"Select persona"/"Record voice"/"Open Next.js Dev Tools"）+ 可视化模块 fallback 标签（diagram/interactive/chart，模块已下线可忽略）
+- **成熟度差距可立项项**（`docs/maturity-gap-analysis.md` §12 逐项探索）: ①分享/嵌入（需先补会话鉴权）②调用链运营视图（P0，数据全有）③定时任务 UI（cron 服务现成）④流程状态可视化（轻量）⑤技能市场页 ⑥整体引导 Tour
+- 死代码清理（orphaned 组件: space/* agents/* knowledge/* partners/* CapabilityConfigCard；ChatComposer config-gating props；reference-picker dialogs）——**前端死代码清理已完成**（`b36b6180`→`53c6c381`，61 文件）
 - 热力图列顺序（新→旧 vs GitHub 旧→新）+ 两组件重复 fetch 提共享 helper
 - `course_plan` task10-12 模块映射 + `KP_TO_SKILL_ALIASES` 新知识点
-- `error_case` 评分语义（学生只列错误 id 得 2/3）
-- 多专家体系已知小缺口（final review 记录）: `auto_readiness` docstring 注明只发 4/6 判定（step_down/diagnose_again 留给 Coach/struggle 决策）；学习记录 readiness 落盘依赖 Coach 信任（工具 schema 已支持）；会话级 EXPERT_ROUTE 键（onboarding/theory/report/session/struggle）目前无 current_step 驱动（前向设计）
+- `error_case` 评分语义（学生只列错误 id 得 2/3）——**已完成**（`b28826d8`，未列出视为隐式无误）
 - 全量验证: build 需清 proxy（`127.0.0.1:7890` 坏，fonts.gstatic.com 拉取失败）
 
 ## 五、演示环境与数据状态
@@ -110,7 +113,7 @@
 ## 七、git 状态
 
 - 分支: main（用户批准直接 main 提交，不用功能分支）
-- HEAD: `e469d8fe`（多专家角色体系实施完成，8 提交 `e77b044d`→`e469d8fe`）
+- HEAD: `1c0d0916`（界面全中文化完成，`710823fa`→`1c0d0916` 5 提交）
 - docs/ 被 gitignore，提交需 `git add -f docs/...`
 - data/ 被 gitignore，task_bank.json/flow_state.json 提交需 `git add -f`
 - 未跟踪（无关）: `coze_teach.txt`、`scripts/analyze_coze.py`、`工具开发/`、`研究与学习/`、`标注星图_*.docx`、`.playwright-mcp/`
@@ -121,9 +124,9 @@
 
 **交接提示词**（压缩后直接说这句即可无缝继续）:
 
-> 读 docs/session-handoff.md，继续标注星图开发。多专家角色体系已完成，可从 B 项可选后续（死代码清理 / error_case 评分语义 / auto_readiness docstring 等）或竞赛交付材料准备开始。
+> 读 docs/session-handoff.md，继续标注星图开发。多专家体系 + 界面全中文化已完成，可从成熟度差距可立项项（P0: 调用链运营视图 / 引用溯源 / 流程可视化）或竞赛交付材料准备开始。
 
 **恢复步骤**:
 1. 读 `docs/session-handoff.md`（本文件）
-2. 竞赛 6 模块 + 3 优化方向 + 多专家体系已全部完成
-3. 可选后续: B 项死代码清理等 + final review 记录的多专家小缺口 + 竞赛交付材料准备
+2. 竞赛 6 模块 + 3 优化方向 + 多专家体系 + 界面全中文化均已完成
+3. 可选后续: 成熟度差距可立项项（见 §十二）+ final review 残留小英文 + 竞赛交付材料准备
