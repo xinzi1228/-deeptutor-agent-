@@ -162,11 +162,13 @@ const HTML_SRCDOC_ATTR_REGEX = new RegExp(
 const HTML_UNSAFE_URL_ATTR_REGEX =
   /\s+(href|src|xlink:href|formaction)\s*=\s*(?:"\s*(?:javascript:|data:text\/html|data:image\/svg\+xml)[^"]*"|'\s*(?:javascript:|data:text\/html|data:image\/svg\+xml)[^']*'|(?:javascript:|data:text\/html|data:image\/svg\+xml)[^\s"'=<>`]+)/gi;
 // ``attachment`` lets the model place generated-file cards inline via
-// ``[label](attachment:NAME)`` links (see components/common/InlineFileCard.tsx).
-// The renderers always intercept these — they're never emitted as real
-// navigable anchors — so allow-listing the scheme keeps the href intact
-// without widening the attack surface.
-const SAFE_MARKDOWN_PROTOCOL_REGEX = /^(https?|ircs?|mailto|xmpp|attachment)$/i;
+// ``[label](attachment:NAME)`` links (see components/common/InlineFileCard.tsx),
+// and ``standard`` carries in-chat `〔规范: docId§section〕` citations
+// (see lib/standards-markdown.ts). The renderers always intercept these —
+// they're never emitted as real navigable anchors — so allow-listing the
+// schemes keeps the href intact without widening the attack surface.
+const SAFE_MARKDOWN_PROTOCOL_REGEX =
+  /^(https?|ircs?|mailto|xmpp|attachment|standard)$/i;
 const SAFE_RASTER_DATA_IMAGE_REGEX =
   /^data:image\/(?:png|jpe?g|gif|webp|bmp|tiff?|avif);base64,[a-z0-9+/=\s]+$/i;
 

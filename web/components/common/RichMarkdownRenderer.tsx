@@ -25,6 +25,11 @@ import {
   parseAttachmentHref,
   useInlineFileCardContext,
 } from "@/components/common/InlineFileCard";
+import { StandardDialog } from "@/components/common/StandardDialog";
+import {
+  makeStandardRefRemarkPlugin,
+  parseStandardHref,
+} from "@/lib/standards-markdown";
 import type { MarkdownRendererProps } from "./MarkdownRenderer";
 
 function MermaidLoading() {
@@ -175,6 +180,10 @@ export default function RichMarkdownRenderer({
     [content, trackSourceLines],
   );
   const [plugins, setPlugins] = useState<PluginBundle>({});
+  const [standardRef, setStandardRef] = useState<{
+    docId: string;
+    section?: string | null;
+  } | null>(null);
   const isTrace = variant === "trace";
   const gap = isTrace ? "my-1" : variant === "compact" ? "my-2" : "my-4";
   const cellPad = isTrace
@@ -571,6 +580,24 @@ export default function RichMarkdownRenderer({
       );
     },
     a: ({ node, href, children, title, ...props }: any) => {
+      const standardRefMatch = parseStandardHref(href);
+      if (standardRefMatch) {
+        return (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              setStandardRef(standardRefMatch);
+            }}
+            className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 align-baseline text-xs font-medium text-blue-500 transition-colors hover:bg-blue-500/20"
+          >
+            <span className="truncate">
+              📖 {standardRefMatch.docId}
+              {standardRefMatch.section ? ` §${standardRefMatch.section}` : ""}
+            </span>
+          </button>
+        );
+      }
       const attachmentName = parseAttachmentHref(href);
       if (attachmentName) {
         return <InlineFileCard name={attachmentName} fallback={children} />;
@@ -727,12 +754,16 @@ export default function RichMarkdownRenderer({
     () => makeFileLinkRemarkPlugin(fileCtx?.files ?? []),
     [fileCtx?.files],
   );
+  // Rewrite `〔规范: docId§section〕` markers into `standard:` links that the
+  // `a` component below renders as clickable chips opening StandardDialog.
+  const standardRefPlugin = useMemo(() => makeStandardRefRemarkPlugin(), []);
   const remarkPlugins = useMemo(() => {
     const p: Array<any> = [remarkGfm];
     if (plugins.remarkMath) p.push(plugins.remarkMath as never);
+    if (standardRefPlugin) p.push(standardRefPlugin as never);
     if (fileLinkPlugin) p.push(fileLinkPlugin as never);
     return p;
-  }, [plugins.remarkMath, fileLinkPlugin]);
+  }, [plugins.remarkMath, standardRefPlugin, fileLinkPlugin]);
 
   const rehypePlugins = useMemo(() => {
     const p: Array<any> = [];
@@ -751,6 +782,13 @@ export default function RichMarkdownRenderer({
       >
         {processedContent}
       </ReactMarkdown>
+      {standardRef && (
+        <StandardDialog
+          docId={standardRef.docId}
+          section={standardRef.section}
+          onClose={() => setStandardRef(null)}
+        />
+      )}
     </div>
   );
 }
