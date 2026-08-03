@@ -148,3 +148,51 @@
 | P2 | 免登录分享/嵌入 | 演示 | 中 |
 | P2 | 生成式 UI | 视觉冲击 | 大 |
 | P2 | 语音 agent 循环 | 完整度 | 大 |
+
+---
+
+## 十二、逐项探索结论与方案（2026-08-02）
+
+> 对前端页面功能差距逐项代码级探索，确认后端依赖现状 + 落地工作量。共性结论：**后端能力大多现成，主要工作在前端页面 + 少量聚合 API**。
+
+### ① 免登录分享 + Iframe 嵌入
+- **FastGPT 做法**：分享按钮 → 生成 `shareToken` 免登录链接 → 白名单校验 → 只读访问该应用；同一 URL 可 `<iframe>` 嵌入任意站点
+- **可复用**：`sessions.py` 会话数据返回现成；`SessionViewerPanel` 只读渲染可复用
+- **关键安全约束**：当前 `get_session(session_id)` **无任何鉴权**（AUTH_ENABLED 时路由级拦截，但单机模式=读全部）。分享不能直接暴露只读 API，否则放大风险——**必须先补会话鉴权**
+- **方案**：`share.py` 路由（`POST /api/v1/shares` 登录创建 → 随机 token + 关联 session + 过期；`GET /api/v1/share/{token}` 挂公共路由绕过 auth → 只读快照）+ 前端 `/share/{token}` 只读页（禁用 composer）+ Home 会话菜单「分享」按钮 + 可选 Iframe 嵌入片段
+- **工作量**：中（安全隔离是前提）
+
+### ② 调用链路运营视图
+- **FastGPT 做法**：应用「运行日志」展开对话看每节点输入/输出/耗时/LLM 调用
+- **可复用**：`TracePanels.tsx`（2447 行）已实时渲染 tool trace + research 阶段卡（`AssistantActivity` 在用）；`getTraceMeta` 已复用；profile API 14 端点全有
+- **真实缺口**：非缺 trace 渲染，缺**跨会话聚合的教师视角**——"按时间/任务过滤的评测+工具调用记录"，和"评测→卡住→介入→落盘"整条因果链（现分散 records/decisions/flow_state 三处）
+- **方案**：`GET /api/v1/profile/trace-log?limit&task_id` 聚合生成「教学回合列表」+ Progress 页「教学轨迹」面板（行展开复用 getTraceMeta 渲染）
+- **工作量**：小（数据全有，后端聚合 + 前端 1 面板）
+
+### ③ 定时任务管理 UI
+- **标杆做法**：LobeHub Schedule / OpenHands Automations 前端创建/编辑/启停定时任务
+- **可复用**：`CronService` 完整（`CronSchedule` at/every/cron + `CronJob` + JSON 持久化 + `compute_next_run`），main.py lifespan 已启停
+- **真实缺口**：无任何 cron API、无业务调用方（完全空置）
+- **教学应用**：「每日 20:00 提醒」「连续 3 天未练主动推送」走已有 partners 渠道
+- **方案**：`cron.py` 路由（list/create/patch/delete + runs 历史，action 限消息模板白名单）+ Settings「定时任务」页 + 预置教学模板
+- **工作量**：中（cron 服务现成不用重写）
+
+### ④ 可视化工作流画布
+- **标杆做法**：FastGPT Flow（ReactFlow 拖拽）、RAGFlow agentic workflow
+- **关键判断**：**不建议做完整画布**——教学是线性流程（诊断→计划→理论→练习→反馈→记录），无并行/复杂分支；现有 TeachingFlowEngine 已验证+全测试，重做编排=重构核心教学层风险高；cytoscape（已有）是图展示非图编排
+- **轻量替代**：**流程状态可视化（非编排）**——Progress 页「教学流程」6 步横向状态条，高亮当前步 + 阻塞原因；数据源 `flow_state.json` 现成；纯 CSS/SVG 无需 reactflow
+- **工作量**：小（可与②合并为「教学轨迹」面板）
+
+### ⑤ 技能/插件市场页
+- **标杆做法**：LobeHub 独立市场页浏览安装
+- **可复用**：`SkillService` CRUD + install_tree + hub-lock 溯源；skills API `/list` `/tags/*` `/hub/catalog` `/hub/detail` `/install`；ClawHub 集成
+- **真实缺口**：**纯前端市场 UI 页**
+- **方案**：Settings「技能市场」页（Tab A 已安装 / Tab B ClawHub 市场安装）；低配版只做「已安装」卡片列表
+- **工作量**：小-中（后端全现成）
+
+### ⑥ 引导 Tour / 演示态
+- **标杆做法**：所有成熟产品 first-run 引导（选目标→配模型→首个交互）
+- **可复用**：`SettingsTourOverlay` 跨路由引导框架（data-tour + Spotlight + 键盘导航）；演示数据已有预跑
+- **真实缺口**：无首次启动整体引导、无未配模型前置检测
+- **方案**：Home 挂载查 `/api/v1/settings` 是否有 active LLM profile → 无则横幅引导；复用 Tour 框架新增 Home/Annotation/Progress 步骤（localStorage 标记首次触发）；Home 欢迎语带示例提问 chip
+- **工作量**：小-中（框架现成）
