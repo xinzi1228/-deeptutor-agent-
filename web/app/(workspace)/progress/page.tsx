@@ -40,7 +40,17 @@ import { KnowledgeGraphPanel } from "@/components/learning-stats/KnowledgeGraphP
 import { CheckinCalendar } from "@/components/learning-stats/CheckinCalendar";
 import { BadgeWall } from "@/components/learning-stats/BadgeWall";
 
+type Tab = "overview" | "records" | "achievements" | "graph";
+
+const TABS: Array<{ key: Tab; label: string }> = [
+  { key: "overview", label: "概览" },
+  { key: "records", label: "记录" },
+  { key: "achievements", label: "成就" },
+  { key: "graph", label: "图谱" },
+];
+
 export default function ProgressPage() {
+  const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [overview, setOverview] = useState<ProfileOverview | null>(null);
@@ -137,78 +147,110 @@ export default function ProgressPage() {
         </button>
       </div>
 
-      <StatCards overview={overview} foresight={foresight} />
-
-      <CoachMetricsPanel metrics={coachMetrics} />
-
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="space-y-3 lg:col-span-3">
-          <h3 className="text-sm font-semibold">五维能力雷达</h3>
-          <RadarChart dimensions={dimensions} />
-        </div>
-        <div className="space-y-3 lg:col-span-2">
-          <SkillTree tree={skillTree} />
-        </div>
+      <div className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--background)] p-1">
+        {TABS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={
+              "rounded-md px-3 py-1.5 text-[12px] font-medium transition " +
+              (tab === key
+                ? "bg-[var(--muted)] text-[var(--foreground)]"
+                : "text-[var(--muted-foreground)] hover:bg-[var(--muted)]/60")
+            }
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold">F1 成长曲线</h3>
-        <F1Curve points={f1Points} />
-      </div>
+      {tab === "overview" && (
+        <>
+          <StatCards overview={overview} foresight={foresight} />
 
-      {knowledgeGraph && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold">知识图谱</h3>
-          <KnowledgeGraphPanel data={knowledgeGraph} />
+          <div className="grid gap-6 lg:grid-cols-5">
+            <div className="space-y-3 lg:col-span-3">
+              <h3 className="text-sm font-semibold">五维能力雷达</h3>
+              <RadarChart dimensions={dimensions} />
+            </div>
+            <div className="space-y-3 lg:col-span-2">
+              <SkillTree tree={skillTree} />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">F1 成长曲线</h3>
+            <F1Curve points={f1Points} />
+          </div>
+        </>
+      )}
+
+      {tab === "records" && (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <DecisionLogPanel decisions={decisions} />
+            {coursePlan && (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">课程计划</h3>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const d = await getCoursePlanDocx();
+                        if (d.docx.url) window.open(d.docx.url, "_blank");
+                      } catch {}
+                    }}
+                    className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--muted-foreground)] transition-colors hover:bg-[var(--border)]"
+                  >
+                    下载手册
+                  </button>
+                </div>
+                <ul className="space-y-2">
+                  {coursePlan.modules.map((m) => (
+                    <li key={m.name} className="text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{m.name}</span>
+                        <span className="text-[10px] text-[var(--muted-foreground)]">{m.target}</span>
+                      </div>
+                      <div className="mt-0.5 text-[var(--muted-foreground)]">
+                        {m.concepts.length ? m.concepts.slice(0, 3).join(" · ") : "—"}
+                        {m.concepts.length > 3 ? " …" : ""}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <Timeline episodes={episodes} />
+        </>
+      )}
+
+      {tab === "achievements" && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <CheckinCalendar />
+          </div>
+          <BadgeWall />
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <CheckinCalendar />
-        </div>
-        <BadgeWall />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <DecisionLogPanel decisions={decisions} />
-        {coursePlan && (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">课程计划</h3>
-              <button
-                onClick={async () => {
-                  try {
-                    const d = await getCoursePlanDocx();
-                    if (d.docx.url) window.open(d.docx.url, "_blank");
-                  } catch {}
-                }}
-                className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--muted-foreground)] transition-colors hover:bg-[var(--border)]"
-              >
-                下载手册
-              </button>
+      {tab === "graph" && (
+        <>
+          {knowledgeGraph && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold">知识图谱</h3>
+              <KnowledgeGraphPanel data={knowledgeGraph} />
             </div>
-            <ul className="space-y-2">
-              {coursePlan.modules.map((m) => (
-                <li key={m.name} className="text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{m.name}</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)]">{m.target}</span>
-                  </div>
-                  <div className="mt-0.5 text-[var(--muted-foreground)]">
-                    {m.concepts.length ? m.concepts.slice(0, 3).join(" · ") : "—"}
-                    {m.concepts.length > 3 ? " …" : ""}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+          )}
 
-      <EvaluationPanel evaluations={evaluations} />
+          <EvaluationPanel evaluations={evaluations} />
 
-      <Timeline episodes={episodes} />
+          <CoachMetricsPanel metrics={coachMetrics} />
+        </>
+      )}
     </div>
   );
 }
