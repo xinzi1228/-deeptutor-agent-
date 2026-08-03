@@ -192,7 +192,7 @@ export default function QuizViewer({
   questions,
   sessionId,
   turnId,
-  language = "en",
+  language = "zh",
 }: QuizViewerProps) {
   const { t } = useTranslation();
   const followupController = useQuizFollowupController();
