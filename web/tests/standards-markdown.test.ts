@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  containsStandardMarker,
   parseStandardHref,
   parseStandardRef,
   STANDARD_HREF_PREFIX,
@@ -77,4 +78,27 @@ test("markdownUrlTransform keeps standard: scheme hrefs", () => {
 test("normalizeMarkdownForDisplay passes 〔规范: ...〕 markers through untouched", () => {
   const input = "请参照〔规范: bbox-guide§边界框绘制〕完成标注。";
   assert.equal(normalizeMarkdownForDisplay(input), input);
+});
+
+test("containsStandardMarker detects a marker-only message", () => {
+  assert.equal(containsStandardMarker("〔规范: bbox-guide§边界框绘制〕"), true);
+  assert.equal(containsStandardMarker("〔规范: bbox-guide〕"), true);
+});
+
+test("containsStandardMarker detects the marker inside surrounding prose", () => {
+  assert.equal(
+    containsStandardMarker("请参照〔规范: bbox-guide〕完成标注。"),
+    true,
+  );
+});
+
+test("containsStandardMarker is monotonic on a partial streaming marker", () => {
+  assert.equal(containsStandardMarker("请参照〔规范:"), true);
+  assert.equal(containsStandardMarker("〔规范: bbox-guide§边"), true);
+});
+
+test("containsStandardMarker rejects plain text and ascii lookalikes", () => {
+  assert.equal(containsStandardMarker("普通文本"), false);
+  assert.equal(containsStandardMarker("[规范: bbox-guide]"), false);
+  assert.equal(containsStandardMarker(""), false);
 });

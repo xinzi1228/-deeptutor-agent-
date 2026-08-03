@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import SimpleMarkdownRenderer from "./SimpleMarkdownRenderer";
+import { containsStandardMarker } from "@/lib/standards-markdown";
 
 const RichMarkdownRenderer = dynamic(() => import("./RichMarkdownRenderer"), {
   ssr: false,
@@ -86,7 +87,8 @@ export default function MarkdownRenderer({
       resolvedEnableMath ||
       resolvedEnableCode ||
       resolvedEnableMermaid ||
-      resolvedAllowHtml);
+      resolvedAllowHtml ||
+      containsStandardMarker(content));
 
   if (!shouldUseRich) {
     return (

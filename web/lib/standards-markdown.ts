@@ -20,6 +20,17 @@ export const STANDARD_REF_REGEX = /〔规范:\s*([^〕§]+?)(?:§([^〕]+?))?〕
 
 export const STANDARD_HREF_PREFIX = "standard:";
 
+/**
+ * True when the content starts a `〔规范: ...〕` marker. Matches the opening
+ * token (`〔规范:`) rather than the full marker with its closing `〕`, so
+ * detection during streaming is monotonic — once the coach begins a marker the
+ * renderer can commit to the rich path without flipping back as more tokens
+ * arrive.
+ */
+export function containsStandardMarker(content: string): boolean {
+  return /〔规范\s*:/.test(content);
+}
+
 /** Parse the first `〔规范: docId§section〕` marker out of a text string. */
 export function parseStandardRef(text: string): StandardRef | null {
   STANDARD_REF_REGEX.lastIndex = 0;

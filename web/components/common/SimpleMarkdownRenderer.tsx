@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { findCitationAnchor } from "@/lib/markdown-anchors";
@@ -16,6 +16,11 @@ import {
   parseAttachmentHref,
   useInlineFileCardContext,
 } from "@/components/common/InlineFileCard";
+import { StandardDialog } from "@/components/common/StandardDialog";
+import {
+  makeStandardRefRemarkPlugin,
+  parseStandardHref,
+} from "@/lib/standards-markdown";
 import type { MarkdownRendererProps } from "./MarkdownRenderer";
 
 function extractText(children: React.ReactNode): string {
@@ -84,6 +89,10 @@ export default function SimpleMarkdownRenderer({
     () => normalizeMarkdownForDisplay(content),
     [content],
   );
+  const [standardRef, setStandardRef] = useState<{
+    docId: string;
+    section?: string | null;
+  } | null>(null);
   const isTrace = variant === "trace";
   const gap = isTrace ? "my-1" : variant === "compact" ? "my-2" : "my-4";
   const cellPad = isTrace
@@ -349,6 +358,24 @@ export default function SimpleMarkdownRenderer({
       );
     },
     a: ({ node, href, children, title, ...props }: any) => {
+      const standardRefMatch = parseStandardHref(href);
+      if (standardRefMatch) {
+        return (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              setStandardRef(standardRefMatch);
+            }}
+            className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 align-baseline text-xs font-medium text-blue-500 transition-colors hover:bg-blue-500/20"
+          >
+            <span className="truncate">
+              📖 {standardRefMatch.docId}
+              {standardRefMatch.section ? ` §${standardRefMatch.section}` : ""}
+            </span>
+          </button>
+        );
+      }
       const attachmentName = parseAttachmentHref(href);
       if (attachmentName) {
         return <InlineFileCard name={attachmentName} fallback={children} />;
@@ -493,9 +520,16 @@ export default function SimpleMarkdownRenderer({
     () => makeFileLinkRemarkPlugin(fileCtx?.files ?? []),
     [fileCtx?.files],
   );
+  // Rewrite `〔规范: docId§section〕` markers into `standard:` links that the
+  // `a` component below renders as clickable chips opening StandardDialog.
+  const standardRefPlugin = useMemo(() => makeStandardRefRemarkPlugin(), []);
   const remarkPlugins = useMemo(
-    () => (fileLinkPlugin ? [remarkGfm, fileLinkPlugin] : [remarkGfm]),
-    [fileLinkPlugin],
+    () => [
+      remarkGfm,
+      standardRefPlugin,
+      ...(fileLinkPlugin ? [fileLinkPlugin] : []),
+    ],
+    [standardRefPlugin, fileLinkPlugin],
   );
 
   const rootClasses = isTrace
@@ -513,6 +547,13 @@ export default function SimpleMarkdownRenderer({
       >
         {normalizedContent}
       </ReactMarkdown>
+      {standardRef && (
+        <StandardDialog
+          docId={standardRef.docId}
+          section={standardRef.section}
+          onClose={() => setStandardRef(null)}
+        />
+      )}
     </div>
   );
 }
