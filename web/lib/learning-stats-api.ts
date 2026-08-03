@@ -93,7 +93,7 @@ export interface CoachMetrics {
   tasks_completed: number;
 }
 
-export type TraceItem = {
+export interface TraceItem {
   timestamp: string;
   date?: string | null;
   type: string;
@@ -117,7 +117,7 @@ export type TraceItem = {
     target?: string;
     rationale?: string;
   } | null;
-};
+}
 
 async function fetchJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);

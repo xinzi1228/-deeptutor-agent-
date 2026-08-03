@@ -70,12 +70,15 @@ export function Timeline({ traces }: { traces: TraceItem[] }) {
                 const isExercise = t.type === "annotation_exercise";
                 const key = traceKey(t, i);
                 const isOpen = expanded.has(key);
+                const detailId = `trace-detail-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
                 return (
                   <li key={key} className="text-xs">
                     {isExercise ? (
                       <button
                         type="button"
                         onClick={() => toggle(key)}
+                        aria-expanded={isOpen}
+                        aria-controls={detailId}
                         className="flex w-full items-start gap-2 text-left"
                       >
                         <Icon className={`mt-0.5 h-3 w-3 shrink-0 ${meta.color}`} />
@@ -110,12 +113,23 @@ export function Timeline({ traces }: { traces: TraceItem[] }) {
                       </div>
                     )}
                     {isOpen && (
-                      <div className="ml-5 mt-1.5 space-y-1.5">
+                      <div id={detailId} className="ml-5 mt-1.5 space-y-1.5">
                         {t.knowledge_points?.length ? (
                           <div className="text-[10px] text-[var(--muted-foreground)]">
                             {t.knowledge_points.join(" · ")}
                           </div>
                         ) : null}
+                        {t.foresight_verified && (
+                          <div
+                            className={`rounded px-2 py-1 text-[10px] ${
+                              t.foresight_hit
+                                ? "bg-green-500/10 text-green-500"
+                                : "bg-red-500/10 text-red-500"
+                            }`}
+                          >
+                            预测{t.foresight_hit ? "命中" : "未中"}
+                          </div>
+                        )}
                         {t.intervention && (
                           <div className="rounded bg-red-500/10 px-2 py-1 text-[10px] text-red-500">
                             卡住介入: {t.intervention.rationale}
