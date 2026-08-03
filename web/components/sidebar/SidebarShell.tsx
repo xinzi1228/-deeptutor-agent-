@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useAppShell } from "@/context/AppShellContext";
 import {
+  BookOpen,
   BookText,
   Brain,
   ChevronDown,
@@ -60,6 +61,7 @@ const PRIMARY_NAV: NavEntry[] = [
 
 const SECONDARY_NAV: NavEntry[] = [
   { href: "/memory", label: "Memory", icon: Brain, tooltipKey: "Memory tooltip" },
+  { href: "/standards", label: "标注规范", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 const GITHUB_REPO_URL = "https://github.com/HKUDS/DeepTutor";
