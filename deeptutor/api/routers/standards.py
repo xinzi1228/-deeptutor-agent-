@@ -40,7 +40,7 @@ async def standards() -> dict[str, Any]:
     if _STANDARDS_DIR.exists():
         for md in sorted(_STANDARDS_DIR.glob("*.md")):
             try:
-                text = md.read_text(encoding="utf-8")
+                text = md.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
             docs.append({
