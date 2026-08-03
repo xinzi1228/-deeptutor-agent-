@@ -330,6 +330,7 @@ from deeptutor.api.routers import (
     sessions,
     settings,
     skills,
+    standards,
     subagents,
     system,
     unified_ws,
@@ -410,6 +411,7 @@ app.include_router(
     dependencies=_auth,
 )
 app.include_router(skills.router, prefix="/api/v1/skills", tags=["skills"], dependencies=_auth)
+app.include_router(standards.router, prefix="/api/v1", tags=["standards"], dependencies=_auth)
 app.include_router(
     subagents.router, prefix="/api/v1/subagents", tags=["subagents"], dependencies=_auth
 )
