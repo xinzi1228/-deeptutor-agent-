@@ -60,6 +60,23 @@ test("parseStandardHref round-trips docId only", () => {
   assert.deepEqual(parseStandardHref(href), { docId: "bbox-guide" });
 });
 
+test("parseStandardHref decodes percent-encoded § and CJK (coach output path)", () => {
+  const href = `${STANDARD_HREF_PREFIX}bbox-guide%C2%A7%E9%81%AE%E6%8C%A1%E7%9B%AE%E6%A0%87%E5%A4%84%E7%90%86`;
+  assert.deepEqual(parseStandardHref(href), {
+    docId: "bbox-guide",
+    section: "遮挡目标处理",
+  });
+});
+
+test("parseStandardHref tolerates invalid percent-encoding without crashing", () => {
+  // decodeURIComponent throws on %ZZ; the function must not crash and should
+  // fall back to the raw href. Whether the section parses depends on the raw
+  // bytes — the important guarantee is "no throw".
+  const href = `${STANDARD_HREF_PREFIX}bbox-guide%C2%A7%ZZ`;
+  const result = parseStandardHref(href);
+  assert.ok(result);
+});
+
 test("parseStandardHref returns null for non-standard hrefs", () => {
   assert.equal(parseStandardHref("#references"), null);
   assert.equal(parseStandardHref("attachment:foo.pdf"), null);

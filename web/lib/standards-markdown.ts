@@ -47,7 +47,14 @@ export function parseStandardHref(
   href?: string,
 ): StandardRef | null {
   if (!href || !href.startsWith(STANDARD_HREF_PREFIX)) return null;
-  const raw = href.slice(STANDARD_HREF_PREFIX.length);
+  let raw = href.slice(STANDARD_HREF_PREFIX.length);
+  // Markdown URL-sanitization percent-encodes `§` and CJK — decode before
+  // splitting so docId/section come back readable and match the dialog lookup.
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // leave raw as-is if it isn't valid percent-encoding
+  }
   const sep = raw.indexOf("§");
   const docId = (sep >= 0 ? raw.slice(0, sep) : raw).trim();
   if (!docId) return null;
