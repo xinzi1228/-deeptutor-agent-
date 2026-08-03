@@ -8,12 +8,13 @@ export default function StandardsPage() {
   const [docs, setDocs] = useState<StandardDoc[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     getStandards()
       .then((r) => { if (!cancelled) setDocs(r.standards); })
-      .catch(() => { if (!cancelled) setDocs([]); })
+      .catch(() => { if (!cancelled) { setDocs([]); setError(true); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -36,14 +37,17 @@ export default function StandardsPage() {
             <p className="text-sm text-[var(--muted-foreground)]">数据标注行业标准与操作规范</p>
           </div>
         </div>
-        {docs.length === 0 && (
+        {error ? (
+          <p className="text-sm text-[var(--muted-foreground)]">加载失败</p>
+        ) : docs.length === 0 ? (
           <p className="text-sm text-[var(--muted-foreground)]">暂无规范文档</p>
-        )}
+        ) : null}
         {docs.map((doc) => (
           <div key={doc.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)]">
             <button
               type="button"
               onClick={() => setOpenId(openId === doc.id ? null : doc.id)}
+              aria-expanded={openId === doc.id}
               className="flex w-full items-center gap-2 px-4 py-3 text-left"
             >
               <ChevronRight className={`h-4 w-4 transition-transform ${openId === doc.id ? "rotate-90" : ""}`} />
@@ -53,8 +57,8 @@ export default function StandardsPage() {
             {openId === doc.id && (
               <div className="border-t border-[var(--border)] px-4 py-3">
                 <div className="mb-3 flex flex-wrap gap-1.5">
-                  {doc.sections.map((s) => (
-                    <a key={s} href={`#${doc.id}-${s}`} className="rounded bg-[var(--muted)] px-2 py-0.5 text-xs text-[var(--muted-foreground)]">{s}</a>
+                  {doc.sections.map((s, i) => (
+                    <span key={`${doc.id}-${i}`} className="rounded bg-[var(--muted)] px-2 py-0.5 text-xs text-[var(--muted-foreground)]">{s}</span>
                   ))}
                 </div>
                 <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-[var(--foreground)]">
