@@ -10,6 +10,7 @@ import {
   BookText,
   Brain,
   ChevronDown,
+  Clock,
   Github,
   House,
   Lock,
@@ -62,6 +63,7 @@ const PRIMARY_NAV: NavEntry[] = [
 const SECONDARY_NAV: NavEntry[] = [
   { href: "/memory", label: "Memory", icon: Brain, tooltipKey: "Memory tooltip" },
   { href: "/standards", label: "标注规范", icon: BookOpen },
+  { href: "/tasks", label: "定时任务", icon: Clock },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 const GITHUB_REPO_URL = "https://github.com/HKUDS/DeepTutor";
