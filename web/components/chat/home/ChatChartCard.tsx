@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ChartData =
   | { type: "scorecard"; data: { f1: number; precision: number; recall: number; passed: boolean } }
   | { type: "radar"; data: { labels: string[]; values: number[] } }
   | { type: "progress"; data: { completed: number; total: number; modules: { name: string; done: number; total: number }[] } }
-  | { type: "graph"; data: { nodes: { id: string; label: string; status: string }[]; edges: { source: string; target: string }[] } };
+  | { type: "graph"; data: { nodes: { id: string; label: string; status: string }[]; edges: { source: string; target: string }[] } }
+  | { type: "quiz_card"; data: { question: string; options: string[]; answer_index: number; explanation?: string | null; knowledge_point?: string | null } };
 
 export function ChatChartCard({ chart }: { chart: ChartData }) {
   if (chart.type === "scorecard") {
@@ -65,6 +66,10 @@ export function ChatChartCard({ chart }: { chart: ChartData }) {
     return <GraphCard nodes={chart.data.nodes} edges={chart.data.edges} />;
   }
 
+  if (chart.type === "quiz_card") {
+    return <QuizCard data={chart.data} />;
+  }
+
   return null;
 }
 
@@ -121,4 +126,49 @@ function GraphCard({ nodes, edges }: { nodes: { id: string; label: string; statu
     return () => cy?.destroy();
   }, [nodes, edges]);
   return <div ref={ref} className="my-2 h-40 rounded-xl border border-[var(--border)] bg-[var(--card)]" />;
+}
+
+function QuizCard({ data }: { data: { question: string; options: string[]; answer_index: number; explanation?: string | null; knowledge_point?: string | null } }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const answered = selected !== null;
+  return (
+    <div className="my-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+      {data.knowledge_point && (
+        <div className="mb-1 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
+          {data.knowledge_point}
+        </div>
+      )}
+      <div className="mb-2 text-sm font-medium text-[var(--foreground)]">{data.question}</div>
+      <div className="space-y-1.5">
+        {data.options.map((opt, idx) => {
+          const isCorrect = idx === data.answer_index;
+          const isSelected = idx === selected;
+          let style = "border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--muted)]";
+          if (answered) {
+            if (isCorrect) style = "border-emerald-500/40 bg-emerald-500/10 text-emerald-600";
+            else if (isSelected) style = "border-rose-500/40 bg-rose-500/10 text-rose-600";
+            else style = "border-[var(--border)] text-[var(--muted-foreground)] opacity-50";
+          }
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setSelected(idx)}
+              disabled={answered}
+              className={`w-full rounded-lg border bg-[var(--card)] px-3 py-1.5 text-left text-xs transition-colors ${style}`}
+            >
+              <span className="font-semibold">{String.fromCharCode(65 + idx)}.</span> {opt}
+              {answered && isCorrect && <span className="ml-1 text-emerald-600">✓</span>}
+              {answered && isSelected && !isCorrect && <span className="ml-1 text-rose-600">✗</span>}
+            </button>
+          );
+        })}
+      </div>
+      {answered && data.explanation && (
+        <div className="mt-2 rounded bg-[var(--muted)]/40 px-3 py-2 text-xs text-[var(--muted-foreground)]">
+          {data.explanation}
+        </div>
+      )}
+    </div>
+  );
 }
