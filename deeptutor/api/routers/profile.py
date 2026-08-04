@@ -219,6 +219,22 @@ async def trace_log(limit: int = 30) -> dict[str, Any]:
     return {"traces": traces[: max(1, min(limit, 200))]}
 
 
+@router.get("/teaching-flow")
+async def teaching_flow_state() -> dict[str, Any]:
+    """当前教学流程 6 步状态（TeachingFlowEngine flow_state.json 只读）。"""
+    from deeptutor.services.teaching_flow import TeachingFlowEngine
+
+    state = TeachingFlowEngine().get_state()
+    return {
+        "has_flow": bool(state.get("task_id")),
+        "task_id": state.get("task_id"),
+        "current_step": state.get("current_step"),
+        "expert": state.get("expert"),
+        "blocked": state.get("blocked"),
+        "steps": state.get("steps", {}),
+    }
+
+
 @router.get("/evaluations")
 async def evaluations(limit: int = 10) -> dict[str, Any]:
     """Recent adversarial teaching-plan evaluations."""
