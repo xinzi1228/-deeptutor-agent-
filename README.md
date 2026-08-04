@@ -72,10 +72,11 @@ cd web
 npx next dev --port 3782
 
 # 终端3 - Label Studio (可选，专业标注界面增强；不装不影响核心教学)
-# 启用后 Coach 可通过 REST API 建项目/导数据，需装 label-studio 并配：
-#   set LABEL_STUDIO_URL=http://localhost:8080
-#   set LABEL_STUDIO_API_TOKEN=<你的 LS token>
-label-studio start --port 8080
+start_label_studio.bat
+#   - 首次运行自动初始化数据库 + 账号 (admin@localhost / admin123，登录后请改密)
+#   - Coach 通过 REST API 建项目/导数据，环境变量：
+#     set LABEL_STUDIO_URL=http://localhost:8080
+#     set LABEL_STUDIO_API_TOKEN=<你的 LS token>
 ```
 
 ### 4. 验证安装
@@ -91,6 +92,28 @@ deeptutor run chat "你好"
 打开 `http://localhost:3782`：
 - **Chat 页** → 选 `annotation-coach` Persona → 说"我要练习标注"
 - **Annotation 页** → 左侧菜单 → 选任务 → 鼠标画框 → 点"检查标注"
+  - 顶部可切「基础模式 / 专业模式」：**专业模式 = Label Studio 嵌入界面**（需 LS 已启动）
+
+## Label Studio（专业标注界面）
+
+> 可选增强。不装不影响核心教学（Chat 出题 + Canvas 画框检查）。演示"专业标注界面"卖点时使用。
+
+```bash
+# 1. 安装
+pip install label-studio
+
+# 2. 一键启动（自动初始化数据库 + 账号）
+start_label_studio.bat
+# 或手动：label-studio start --init --data-dir data/label-studio --username admin@localhost --password admin123 --port 8080
+
+# 3. 访问 http://localhost:8080，账号 admin@localhost / admin123（登录后请修改密码）
+```
+
+- **前端入口**：Annotation 页 →「专业模式」（iframe 嵌入 `http://localhost:8080`）
+- **Coach 自动建项目/导数据**：后端 `label_studio_tool` 通过 REST API 工作，需设置：
+  - `LABEL_STUDIO_URL=http://localhost:8080`
+  - `LABEL_STUDIO_API_TOKEN=<LS 的 API token>`（LS 账号页 → Account & Settings → Access Token）
+- **数据位置**：`data/label-studio/`（运行时数据，已在 .gitignore）
 
 ## 项目结构
 

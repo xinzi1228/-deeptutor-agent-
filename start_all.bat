@@ -26,9 +26,19 @@ start "AnnotationStarMap-Backend" cmd /k "python -m uvicorn deeptutor.api.main:a
 echo [3/3] Starting frontend on http://localhost:3782 ...
 start "AnnotationStarMap-Frontend" cmd /k "set DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001&& cd web&& npx next dev --port 3782"
 
+REM --- Optional: Label Studio professional annotation UI (Annotation page "Pro" mode) ---
+where label-studio >nul 2>nul
+if errorlevel 1 (
+    echo [Optional] Label Studio not installed - skip. Install with: pip install label-studio
+) else (
+    echo [Optional] Starting Label Studio on http://localhost:8080 ...
+    start "AnnotationStarMap-LabelStudio" cmd /k "call start_label_studio.bat"
+)
+
 echo.
-echo  Backend  : http://127.0.0.1:8001/docs
-echo  Frontend : http://localhost:3782
-echo  Hint     : First LLM setup happens in the UI settings page
-echo  Hint     : If port 8001 is busy, close other DeepTutor instances first.
+echo  Backend       : http://127.0.0.1:8001/docs
+echo  Frontend      : http://localhost:3782
+echo  Label Studio  : http://localhost:8080   ^(Annotation page - Pro mode^)
+echo  Hint          : First LLM setup happens in the UI settings page.
+echo  Hint          : If port 8001 is busy, close other DeepTutor instances first.
 endlocal
