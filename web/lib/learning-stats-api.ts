@@ -190,6 +190,32 @@ export async function getTraceLog(limit = 30): Promise<{ traces: TraceItem[] }> 
   return res.json();
 }
 
+export type TeachingFlowStep = {
+  status: string;
+  ts?: string | null;
+  f1?: number | null;
+  readiness?: string | null;
+};
+
+export type TeachingFlowState = {
+  has_flow: boolean;
+  task_id?: string | null;
+  current_step?: string | null;
+  expert?: string | null;
+  blocked?: {
+    step: string;
+    reason: string;
+    next_action: string;
+  } | null;
+  steps?: Record<string, TeachingFlowStep>;
+};
+
+export async function getTeachingFlow(): Promise<TeachingFlowState> {
+  const res = await fetch(`${API_BASE}/teaching-flow`, { credentials: "include" });
+  if (!res.ok) throw new Error(`Failed to load teaching flow: ${res.status}`);
+  return res.json();
+}
+
 export function getForesightStats(): Promise<ForesightStats> {
   return fetchJSON(`${API_BASE}/foresights`);
 }

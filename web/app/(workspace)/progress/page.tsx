@@ -12,6 +12,7 @@ import {
   getCoursePlan,
   getCoursePlanDocx,
   getTraceLog,
+  getTeachingFlow,
   getForesightStats,
   getCoachMetrics,
   reflectMemory,
@@ -27,6 +28,7 @@ import {
   type CoachMetrics,
   type KnowledgeGraphData,
   type TraceItem,
+  type TeachingFlowState,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
 import { RadarChart } from "@/components/learning-stats/RadarChart";
@@ -35,6 +37,7 @@ import { SkillTree } from "@/components/learning-stats/SkillTree";
 import { DecisionLog as DecisionLogPanel } from "@/components/learning-stats/DecisionLog";
 import { EvaluationPanel } from "@/components/learning-stats/EvaluationPanel";
 import { Timeline } from "@/components/learning-stats/Timeline";
+import { TeachingFlowPanel } from "@/components/learning-stats/TeachingFlowPanel";
 import { CoachMetricsPanel } from "@/components/learning-stats/CoachMetrics";
 import { KnowledgeGraphPanel } from "@/components/learning-stats/KnowledgeGraphPanel";
 import { CheckinCalendar } from "@/components/learning-stats/CheckinCalendar";
@@ -64,12 +67,13 @@ export default function ProgressPage() {
   const [foresight, setForesight] = useState<ForesightStats | null>(null);
   const [coachMetrics, setCoachMetrics] = useState<CoachMetrics | null>(null);
   const [knowledgeGraph, setKnowledgeGraph] = useState<KnowledgeGraphData | null>(null);
+  const [teachingFlow, setTeachingFlow] = useState<TeachingFlowState | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg] = await Promise.all([
+        const [ov, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
           getLearningOverview(),
           getRadarDimensions(),
           getF1Trend(),
@@ -81,6 +85,7 @@ export default function ProgressPage() {
           getForesightStats(),
           getCoachMetrics(),
           getKnowledgeGraph().catch(() => null),
+          getTeachingFlow().catch(() => null),
         ]);
         if (cancelled) return;
         setOverview(ov.overview);
@@ -94,6 +99,7 @@ export default function ProgressPage() {
         setForesight(fs);
         setCoachMetrics(cm);
         setKnowledgeGraph(kg);
+        setTeachingFlow(tf);
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load");
       } finally {
@@ -224,6 +230,7 @@ export default function ProgressPage() {
             )}
           </div>
 
+          <TeachingFlowPanel flow={teachingFlow} />
           <Timeline traces={traces} />
         </>
       )}
