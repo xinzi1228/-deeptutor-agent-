@@ -9,7 +9,7 @@
 - **标注题库** — 12 个真实任务（车辆/马匹检测、动物分类、标准合规、改错题），5 种题型
 - **标注检查工具** — 自动计算 IOU/F1/精确率/召回率，逐框反馈
 - **Canvas 标注工作台** — 鼠标画框标注，内置即时检查
-- **Label Studio 集成** — 嵌入 LS 作为专业标注界面
+- **Label Studio 集成** — 嵌入 LS 作为专业标注界面（可选增强，不装不影响核心教学）
 - **记忆追踪** — Coach 记录每次练习成绩，推荐渐进式学习路径
 - **教学轨迹/流程可视化** — 进度面板、回合链追溯、能力雷达
 - **规范引用溯源** — 引用标注标准（GB/T 41867-2022 等）时给出可点击出处
@@ -71,7 +71,10 @@ set DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001
 cd web
 npx next dev --port 3782
 
-# 终端3 - Label Studio (可选)
+# 终端3 - Label Studio (可选，专业标注界面增强；不装不影响核心教学)
+# 启用后 Coach 可通过 REST API 建项目/导数据，需装 label-studio 并配：
+#   set LABEL_STUDIO_URL=http://localhost:8080
+#   set LABEL_STUDIO_API_TOKEN=<你的 LS token>
 label-studio start --port 8080
 ```
 
