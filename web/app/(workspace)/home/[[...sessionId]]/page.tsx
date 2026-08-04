@@ -49,7 +49,7 @@ import {
   GeogebraTabProvider,
   useGeogebraTabOpener,
 } from "@/context/GeogebraTabContext";
-import { BookmarkPlus, Download, PanelRight } from "lucide-react";
+import { BookmarkPlus, Download, PanelRight, Share2, X } from "lucide-react";
 import {
   useUnifiedChat,
   type MessageAttachment,
@@ -78,6 +78,7 @@ import {
   invalidateEnabledOptionalToolsCache,
 } from "@/lib/tools-settings";
 import { downloadChatMarkdown } from "@/lib/chat-export";
+import { createShare } from "@/lib/shares-api";
 import type { SpaceMemoryFile } from "@/lib/space-items";
 import {
   selectedBooksToPayload,
@@ -318,6 +319,14 @@ export default function ChatPage() {
   );
   const [capMenuOpen, setCapMenuOpen] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareData, setShareData] = useState<{
+    token: string;
+    url: string;
+    session_id: string;
+  } | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState<"url" | "iframe" | null>(null);
   const [showNotebookPicker, setShowNotebookPicker] = useState(false);
   const [showBookPicker, setShowBookPicker] = useState(false);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
@@ -1359,6 +1368,40 @@ export default function ChatPage() {
     downloadChatMarkdown(state.messages, { title });
   }, [state.messages]);
 
+  const handleOpenShare = useCallback(async () => {
+    if (!state.sessionId || shareBusy) return;
+    setShareBusy(true);
+    setShareError(null);
+    setShareCopied(null);
+    try {
+      const data = await createShare(state.sessionId);
+      setShareData(data);
+    } catch (error) {
+      console.error("Failed to create share:", error);
+      setShareError("分享创建失败");
+    } finally {
+      setShareBusy(false);
+    }
+  }, [state.sessionId, shareBusy, t]);
+
+  const handleCopyShare = useCallback(
+    async (text: string, kind: "url" | "iframe") => {
+      try {
+        await navigator.clipboard.writeText(text);
+        setShareCopied(kind);
+      } catch (error) {
+        console.error("Failed to copy share text:", error);
+      }
+    },
+    [],
+  );
+
+  const closeShareDialog = useCallback(() => {
+    setShareData(null);
+    setShareError(null);
+    setShareCopied(null);
+  }, []);
+
   return (
     <QuizFollowupProvider>
       <GeogebraTabProvider>
@@ -1437,6 +1480,15 @@ export default function ChatPage() {
                 label={t("Download Markdown")}
                 title={t("Download chat history as Markdown")}
               />
+              {state.sessionId ? (
+                <HeaderActionButton
+                  onClick={() => void handleOpenShare()}
+                  disabled={shareBusy}
+                  icon={Share2}
+                  label="分享"
+                  title="生成只读分享链接"
+                />
+              ) : null}
               <HeaderActionButton
                 onClick={toggleViewerPanel}
                 active={viewerPanelOpen}
@@ -1628,6 +1680,97 @@ export default function ChatPage() {
             messages={chatSaveMessages}
             onClose={handleCloseSaveModal}
           />
+          {shareData ? (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+              onClick={closeShareDialog}
+            >
+              <div
+                className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Share2 className="h-4 w-4 text-blue-500" />
+                    <h3 className="text-sm font-bold">分享会话</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeShareDialog}
+                    aria-label="关闭"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {shareError ? (
+                  <p className="mb-3 text-sm text-[var(--destructive)]">
+                    {shareError}
+                  </p>
+                ) : null}
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                      分享链接
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={`${window.location.origin}${shareData.url}`}
+                        onFocus={(e) => e.target.select()}
+                        className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--background)] px-2.5 py-1.5 text-xs text-[var(--foreground)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleCopyShare(
+                            `${window.location.origin}${shareData.url}`,
+                            "url",
+                          )
+                        }
+                        className="rounded-md border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted-foreground)] transition-colors hover:border-[var(--primary)]/40 hover:text-[var(--foreground)]"
+                      >
+                        {shareCopied === "url" ? "已复制" : "复制"}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[var(--muted-foreground)]">
+                      嵌入代码 (iframe)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={`<iframe src="${window.location.origin}${shareData.url}" width="100%" height="600">`}
+                        onFocus={(e) => e.target.select()}
+                        className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--background)] px-2.5 py-1.5 font-mono text-xs text-[var(--foreground)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleCopyShare(
+                            `<iframe src="${window.location.origin}${shareData.url}" width="100%" height="600">`,
+                            "iframe",
+                          )
+                        }
+                        className="rounded-md border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-medium text-[var(--muted-foreground)] transition-colors hover:border-[var(--primary)]/40 hover:text-[var(--foreground)]"
+                      >
+                        {shareCopied === "iframe" ? "已复制" : "复制"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={closeShareDialog}
+                      className="rounded-xl bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
+                    >
+                      关闭
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <FilePreviewDrawer
             open={previewSource !== null}
             source={previewSource}
