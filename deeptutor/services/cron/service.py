@@ -279,6 +279,19 @@ class CronService:
         self._wake.set()
         return True
 
+    def set_job_enabled(self, job_id: str, enabled: bool, *, owner_key: str | None = None) -> bool:
+        """Toggle a job's enabled flag (persisted)."""
+        self._load()
+        job = self._jobs.get(job_id)
+        if job is None:
+            return False
+        if owner_key is not None and job.owner.key != owner_key:
+            return False
+        job.enabled = bool(enabled)
+        self._save()
+        self._wake.set()
+        return True
+
     def remove_owner_jobs(self, owner_key: str) -> int:
         """Drop every job belonging to *owner_key* (e.g. a destroyed partner)."""
         self._load()
