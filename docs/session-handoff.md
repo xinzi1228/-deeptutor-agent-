@@ -1,7 +1,7 @@
-# 会话交接文档（Compression Handoff v4）
+# 会话交接文档（Compression Handoff v5）
 
 > 用途: 压缩上下文前的状态快照。恢复后据此无缝继续。
-> 创建: 2026-08-02（v4 更新——界面全中文化完成 + 成熟度差距归档）
+> 创建: 2026-08-02（v5 更新——8/4 全部增强完成 + 完整交接文档体系就绪）
 
 ---
 
@@ -98,35 +98,51 @@
 
 - **测试**: pytest + pytest-asyncio（function-scoped event loop）；PowerShell 需 `$env:PYTHONIOENCODING="utf-8"` 防中文乱码；前端 `npx tsc --noEmit`
 - **工具注册**: `builtin/__init__.py`（import + BUILTIN_TOOL_TYPES + __all__ + CONFIGURABLE_BUILTIN_TOOL_NAMES）+ `tool_composition.py` always_on tuple
-- **always_on 教学工具 15 个**: competency_map/job_analysis/get_annotation_task/annotation_check/write_learning_record/generate_iou_demo/log_decision/evaluate_teaching_plan/verify_foresight/improve_teaching_flow/finalize_diagnosis/graph_query/ability_radar/struggle_detect/teaching_flow
+- **always_on 教学工具 16 个**: competency_map/job_analysis/get_annotation_task/annotation_check/write_learning_record/generate_iou_demo/log_decision/evaluate_teaching_plan/verify_foresight/improve_teaching_flow/finalize_diagnosis/graph_query/ability_radar/struggle_detect/teaching_flow/render_ui
 - **循环导入规避**: 服务层懒加载（import 放函数内），避免 builtin→tool→services→runtime→registry→builtin 循环
 - **工具注册测试**: `BUILTIN_TOOL_NAMES` 由 `BUILTIN_TOOL_TYPES` 派生；`_TOOLS` 在 learner_server 是 `mcp.types.Tool` 对象（用 `.name`）
-- **chart 契约**: `metadata.chart = {type: scorecard|radar|progress|graph, data}`，从 tool_result 事件的 `metadata.tool_metadata.chart` 读取
+- **chart 契约**: `metadata.chart = {type: scorecard|radar|progress|graph|quiz_card, data}`，从 tool_result 事件的 `metadata.tool_metadata.chart` 读取；quiz_card 由 `render_ui` 工具产出（可交互练习卡片）
 - **flow 镜像**: flow-*.md 有 2 份拷贝（skill references + persona references）需同步；PERSONA.md 有 preset + workspace 副本（workspace gitignored 但运行时生效）
-- **TeachingFlowEngine**: 无参构造持久化到 `data/user/workspace/learning/flow_state.json`；`in_memory=True` 显式 opt-in；`advance/block` 未知 step 抛 ValueError；`on_evaluated(task_id, f1)` 自动推进 evaluate→feedback
+- **TeachingFlowEngine**: 无参构造持久化到 `data/user/workspace/learning/flow_state.json`；`in_memory=True` 显式 opt-in；`advance/block` 未知 step 抛 ValueError；`on_evaluated(task_id, f1, readiness=None)` 自动推进 evaluate→feedback
 - **readiness_gate 6 判定**: advance/advance_with_caution/review_first/step_down/diagnose_again/more_practice（decision-matrix.md）
-- **自动 readiness 阈值**（多专家计划 Task 4 将加）: F1≥0.85→advance / 0.7-0.85→advance_with_caution / 0.65-0.7→more_practice / <0.65→review_first
+- **自动 readiness 阈值**: F1≥0.85→advance / 0.7-0.85→advance_with_caution / 0.65-0.7→more_practice / <0.65→review_first（annotation_check 自动判定）
 - **learning records 字段**: type(diagnosis/theory_mastered/annotation_exercise) + f1/error_pattern/pattern_status/readiness/knowledge_point/task_id/timestamp/foresight
+- **分享机制**: `ShareStore`（token_urlsafe(16)）+ `POST /api/v1/shares`（鉴权）+ `GET /api/v1/share/{token}`（公共路由 token 白名单只读）
+- **cron 管理**: `CronService.set_job_enabled` + `GET/DELETE/PATCH /api/v1/cron/jobs`（owner 隔离 chat:local-admin）
+- **前端启动必须**: `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001`（localhost 解析到 ::1 而后端只绑 IPv4）；next build 需清 HTTP_PROXY/HTTPS_PROXY
 - **docx 竞赛文件读取**: python-docx
 - **pyBKT 结论**: 数据稀疏不引入库
 
 ## 七、git 状态
 
 - 分支: main（用户批准直接 main 提交，不用功能分支）
-- HEAD: `1c0d0916`（界面全中文化完成，`710823fa`→`1c0d0916` 5 提交）
+- HEAD: `69cbe6df`（8/4 全部增强完成 + 交接文档体系就绪）
+- 备份 tag: `backup-2026-08-04-share-done`（已推送远程）
 - docs/ 被 gitignore，提交需 `git add -f docs/...`
 - data/ 被 gitignore，task_bank.json/flow_state.json 提交需 `git add -f`
 - 未跟踪（无关）: `coze_teach.txt`、`scripts/analyze_coze.py`、`工具开发/`、`研究与学习/`、`标注星图_*.docx`、`.playwright-mcp/`
 - 已知: `web/next-env.d.ts` 是 Next.js 工具产物（next build 后可能变 M，无关）
-- 全量测试预存在失败 ~33（Windows 路径/GBK/可选依赖 telegram/slack/sandbox），均与功能无关；多专家实施无新增失败（2979 passed）
+- 全量测试预存在失败 ~33（Windows 路径/GBK/可选依赖 telegram/slack/sandbox），均与功能无关（2985 passed）
 
-## 八、恢复后第一步 + 交接提示词
+## 八、交接文档体系（发给接力 AI 前必读）
+
+| 文档 | 内容 |
+|------|------|
+| **`docs/august-changes-record.md`** | 8 月 130 提交完整记录（按天+按功能，含每项借鉴来源 GitHub 地址 + 实现方式 + 验证）——**最全，主用** |
+| `docs/session-handoff.md` | 本文件（压缩恢复入口） |
+| `docs/handoff-to-ai.md` | fork 起点以来全部改动总览 + 借鉴 GitHub 地址 |
+| `docs/fork-changes-full-handoff.md` | clone 后 164 提交 + 借鉴 + 实现 |
+| `docs/maturity-gap-analysis.md` | 成熟度差距分析（6 大类 + 逐项探索） |
+| `docs/fork-features.md` | 功能清单（触发方式 + 产物） |
+| `docs/smoke-checklist.md` | 冒烟清单 |
+
+## 九、恢复后第一步 + 交接提示词
 
 **交接提示词**（压缩后直接说这句即可无缝继续）:
 
-> 读 docs/session-handoff.md，继续标注星图开发。多专家体系 + 界面全中文化已完成，可从成熟度差距可立项项（P0: 调用链运营视图 / 引用溯源 / 流程可视化）或竞赛交付材料准备开始。
+> 读 docs/session-handoff.md + docs/august-changes-record.md，继续标注星图开发。竞赛 6 模块 + 3 优化 + 全部差距项（多专家/全中文/教学轨迹/流程可视化/规范引用/定时提醒/定时任务/分享/生成式UI）已完成。当前最紧要的是**竞赛交付材料**（01报名表/02Demo说明/05合规/06材料包，9/1 截止），素材在 docs/ 已齐全。
 
 **恢复步骤**:
-1. 读 `docs/session-handoff.md`（本文件）
-2. 竞赛 6 模块 + 3 优化方向 + 多专家体系 + 界面全中文化均已完成
-3. 可选后续: 成熟度差距可立项项（见 §十二）+ final review 残留小英文 + 竞赛交付材料准备
+1. 读 `docs/session-handoff.md`（本文件）+ `docs/august-changes-record.md`（8 月全记录）
+2. 竞赛 6 模块 + 3 优化 + 全部差距项已完成
+3. 下一步优先: 竞赛交付材料（9/1 硬要求）→ 可选语音 agent / 小遗留项
