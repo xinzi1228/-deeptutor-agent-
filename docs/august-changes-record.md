@@ -2,7 +2,51 @@
 
 > 用途: 发给 AI 接力工作的专项文档。8 月 1 日起共 **130 提交**，是 fork 后最核心的工作。
 > 更新: 2026-08-04 | 上游: HKUDS/DeepTutor | 远程: https://github.com/xinzi1228/-deeptutor-agent-.git
-> 借鉴来源汇总: lumen / edumcp / Multi-Agent-Study-Assistant / Vibe-learning / EverOS / awesome-llm-apps / agency-agents / TradingAgents / feynman-tutor / AG-UI / FastGPT / RAGFlow / OpenHands / LobeHub
+
+---
+
+## 借鉴来源 GitHub 仓库索引（完整地址）
+
+> 所有借鉴均来自以下开源项目/Skill。可按地址查证每个借鉴点的原实现。
+
+### 教育 Agent 项目（`docs/agent-projects-review.md` 调研）
+
+| 借鉴点 | GitHub 仓库 | 借鉴了什么 |
+|--------|------------|-----------|
+| 学习者状态 MCP | [aieducations/edumcp](https://github.com/aieducations/edumcp) | 学习记录/学习者状态暴露为 MCP 资源（→ learner_server.py） |
+| 诊断 brief + 建课 | [ahmedEid1/lumen](https://github.com/ahmedEid1/lumen) | 诊断 intake→brief→orchestrator、可重跑建课、决策审计 |
+| 前置依赖链 | [A-R007/Multi-Agent-Study-Assistant](https://github.com/A-R007/Multi-Agent-Study-Assistant) | Analyzer/Roadmap 多角色分工、competency 前置链 |
+| Never-Answer + 双 SOT | [idoforgod/Vibe-learning-AgenticWorkflow](https://github.com/idoforgod/Vibe-learning-AgenticWorkflow) | 回答以问题结尾、records 分 scope、3-Phase |
+| 三层学习者笔记 | [koukekoukej-glitch/feynman-tutor](https://github.com/koukekoukej-glitch/feynman-tutor) | 三层笔记、意图分诊、事实vs推理、可视化转交 |
+
+### 记忆系统（`docs/everos-review.md`）
+
+| 借鉴点 | GitHub 仓库 | 借鉴了什么 |
+|--------|------------|-----------|
+| 分层记忆 + reflection | [EverMind-AI/EverOS](https://github.com/EverMind-AI/EverOS) | 记忆进化 Reflection、foresights 预测验证、episodes 时间线 |
+
+### 模板/框架集
+
+| 借鉴点 | GitHub 仓库 | 借鉴了什么 |
+|--------|------------|-----------|
+| Self-Improving / CRAG / Teaching Team | [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps) | 教学自改进循环、CRAG 相关性校验、学习手册 docx |
+| 多专家角色体系 | [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) | agent 角色封装（frontmatter+身份/使命/规则/能力/流程）+ divisions.json 索引 |
+| 对抗评估 | [TradingAgents-AI/TradingAgents](https://github.com/TradingAgents-AI/TradingAgents) | 多角色辩论、独立评估员质疑 |
+| 生成式 UI | [ag-ui-protocol/ag-ui](https://github.com/ag-ui-protocol/ag-ui) | structured-message 协议（agent 输出组件 JSON → 前端渲染） |
+| 免登录分享/运行日志 | [labring/FastGPT](https://github.com/labring/FastGPT) | 免登录分享窗口、调用链路日志、定时任务管理 |
+| RAG 溯源参照 | [infiniflow/ragflow](https://github.com/infiniflow/ragflow) | 引用溯源可视化、chunk 级管理 |
+| 运营面板参照 | [All-Hands-AI/OpenHands](https://github.com/All-Hands-AI/OpenHands) | 调用链运营视图、automations |
+| 聊天 UI 参照 | [lobehub/lobehub](https://github.com/lobehub/lobehub) | 中文界面、技能市场、白盒记忆 |
+
+### 教学 Skill（PERSONA 融合）
+
+| 借鉴点 | Skill 来源 | 借鉴了什么 |
+|--------|-----------|-----------|
+| universal-diagnostic-tutor | [obra/universal-diagnostic-tutor](https://github.com/obra/universal-diagnostic-tutor) | error_to_intervention、readiness_gate、understanding_check |
+| education-agent-skills | [mattpocock/education-agent-skills](https://github.com/mattpocock/education-agent-skills) | Retrieve-First、渐进提示梯 L0-L5、Teach-Back |
+| teach | [mattpocock/teach](https://github.com/mattpocock/teach) | MISSION 驱动、lessons 教学单元 |
+| synapse | [mattpocock/synapse](https://github.com/mattpocock/synapse) | confidence/source/pattern/correction 四维记忆 |
+| learning-assessor | [mattpocock/learning-assessor](https://github.com/mattpocock/learning-assessor) | Rubric 设计、Bloom 认知层次、学习分析维度 |
 
 ---
 

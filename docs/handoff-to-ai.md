@@ -159,3 +159,19 @@ cd web; cmd /c "set DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001& npx next dev -
 ## 十、给接力 AI 的提示词
 
 > 这是 DeepTutor fork「标注星图」数据标注教学 Agent 产品的接力工作。上游是 HKUDS/DeepTutor，fork 起点 `43805736`，之后 164 个提交。产品已完成竞赛 6 模块 + 3 优化 + 全部差距项（多专家/全中文/教学轨迹/流程可视化/规范引用/定时提醒/定时任务管理/免登录分享/生成式 UI），界面全中文。当前最紧要的是**竞赛交付材料**（01报名表/02Demo说明/05合规/06材料包，9/1 截止）——素材在 docs/ 已齐全。项目从 `docs/session-handoff.md` + `docs/maturity-gap-analysis.md` 了解全貌，从 `docs/fork-features.md` 看功能清单。启动需带 `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001` 解决 IPv6。测试基线 2985 passed / 33 预存在失败。可用 subagent-driven-development 分任务实施。
+
+## 十一、借鉴来源 GitHub 仓库地址
+
+> 每个借鉴点的完整来源、具体借鉴了什么、对应提交，见 **`docs/august-changes-record.md`** 开头「借鉴来源 GitHub 仓库索引」表。摘要：
+
+| 借鉴点 | GitHub 仓库 |
+|--------|------------|
+| 教育 Agent（MCP/brief/前置链/双SOT/三层笔记） | [aieducations/edumcp](https://github.com/aieducations/edumcp) · [ahmedEid1/lumen](https://github.com/ahmedEid1/lumen) · [A-R007/Multi-Agent-Study-Assistant](https://github.com/A-R007/Multi-Agent-Study-Assistant) · [idoforgod/Vibe-learning-AgenticWorkflow](https://github.com/idoforgod/Vibe-learning-AgenticWorkflow) · [koukekoukej-glitch/feynman-tutor](https://github.com/koukekoukej-glitch/feynman-tutor) |
+| 记忆 reflection | [EverMind-AI/EverOS](https://github.com/EverMind-AI/EverOS) |
+| 自改进/CRAG/教学团队 | [Shubhamsaboo/awesome-llm-apps](https://github.com/Shubhamsaboo/awesome-llm-apps) |
+| 多专家角色 | [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) |
+| 对抗评估 | [TradingAgents-AI/TradingAgents](https://github.com/TradingAgents-AI/TradingAgents) |
+| 生成式 UI | [ag-ui-protocol/ag-ui](https://github.com/ag-ui-protocol/ag-ui) |
+| 分享/运行日志 | [labring/FastGPT](https://github.com/labring/FastGPT) |
+| 运营/界面参照 | [infiniflow/ragflow](https://github.com/infiniflow/ragflow) · [All-Hands-AI/OpenHands](https://github.com/All-Hands-AI/OpenHands) · [lobehub/lobehub](https://github.com/lobehub/lobehub) |
+| 教学 Skill | [obra/universal-diagnostic-tutor](https://github.com/obra/universal-diagnostic-tutor) · [mattpocock/education-agent-skills](https://github.com/mattpocock/education-agent-skills) · [mattpocock/teach](https://github.com/mattpocock/teach) · [mattpocock/synapse](https://github.com/mattpocock/synapse) · [mattpocock/learning-assessor](https://github.com/mattpocock/learning-assessor) |
