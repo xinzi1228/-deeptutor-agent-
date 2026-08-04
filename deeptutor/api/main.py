@@ -330,6 +330,7 @@ from deeptutor.api.routers import (
     quiz_judge,
     sessions,
     settings,
+    shares,
     skills,
     standards,
     subagents,
@@ -413,6 +414,11 @@ app.include_router(
 )
 app.include_router(skills.router, prefix="/api/v1/skills", tags=["skills"], dependencies=_auth)
 app.include_router(standards.router, prefix="/api/v1", tags=["standards"], dependencies=_auth)
+
+# Shares: create/revoke are authed; the public GET /share/{token} is the only
+# unauthenticated session-read path — guarded by the 16-byte random token.
+app.include_router(shares.router, prefix="/api/v1", tags=["shares"], dependencies=_auth)
+app.include_router(shares.public_router, prefix="/api/v1", tags=["shares"])
 app.include_router(cron.router, prefix="/api/v1", tags=["cron"], dependencies=_auth)
 app.include_router(
     subagents.router, prefix="/api/v1/subagents", tags=["subagents"], dependencies=_auth
