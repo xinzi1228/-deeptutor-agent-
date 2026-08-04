@@ -313,6 +313,7 @@ from deeptutor.api.routers import (
     capabilities_settings,
     chat,
     co_writer,
+    cron,
     dashboard,
     imports,
     knowledge,
@@ -412,6 +413,7 @@ app.include_router(
 )
 app.include_router(skills.router, prefix="/api/v1/skills", tags=["skills"], dependencies=_auth)
 app.include_router(standards.router, prefix="/api/v1", tags=["standards"], dependencies=_auth)
+app.include_router(cron.router, prefix="/api/v1", tags=["cron"], dependencies=_auth)
 app.include_router(
     subagents.router, prefix="/api/v1/subagents", tags=["subagents"], dependencies=_auth
 )
