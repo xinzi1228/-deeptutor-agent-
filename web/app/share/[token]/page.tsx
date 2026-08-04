@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { BookOpen } from "lucide-react";
 
 type SharedMessage = { role: string; content?: string };
 
-export default function SharePage({ params }: { params: { token: string } }) {
+export default function SharePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
   const [session, setSession] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/v1/share/${params.token}`)
+    fetch(`/api/v1/share/${token}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -28,7 +29,7 @@ export default function SharePage({ params }: { params: { token: string } }) {
     return () => {
       cancelled = true;
     };
-  }, [params.token]);
+  }, [token]);
 
   if (loading)
     return (
