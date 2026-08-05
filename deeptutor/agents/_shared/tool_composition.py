@@ -200,6 +200,7 @@ def compose_enabled_tools(
         "render_ui",
         "route_input",
         "verify_output",
+        "kb_search",
         "job_analysis",
         "get_annotation_task",
         "annotation_check",
