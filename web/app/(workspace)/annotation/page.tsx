@@ -32,7 +32,7 @@ export default function AnnotationPage() {
             }`}
           >
             <PenLine className="h-3.5 w-3.5" />
-            {t("annotation.basicMode")}
+            图片标注
           </button>
           <button
             onClick={() => setMode("text")}
