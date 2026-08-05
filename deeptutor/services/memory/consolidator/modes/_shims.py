@@ -55,6 +55,7 @@ async def consolidate_l2(
     user_label: str = "anonymous",
     on_event: OnEvent | None = None,
     apply_ops: bool = True,
+    bucket: str | None = None,
 ) -> ConsolidateResult:
     result = await run_update(
         "L2",
@@ -62,9 +63,10 @@ async def consolidate_l2(
         language=language,
         user_label=user_label,
         on_event=on_event,
+        bucket=bucket,
     )
     if not apply_ops:
-        _rollback_new_entries("L2", surface, result.new_entry_ids)
+        _rollback_new_entries("L2", surface, result.new_entry_ids, bucket=bucket)
     return _to_consolidate_result(result)
 
 
@@ -107,7 +109,9 @@ def _to_consolidate_result(result: UpdateResult) -> ConsolidateResult:
     )
 
 
-def _rollback_new_entries(layer: str, key: str, ids: list[str]) -> None:
+def _rollback_new_entries(
+    layer: str, key: str, ids: list[str], *, bucket: str | None = None
+) -> None:
     """Remove entries by id (used by ``apply_ops=False`` preview mode).
 
     This is best-effort: if the doc was edited externally between the
@@ -115,7 +119,11 @@ def _rollback_new_entries(layer: str, key: str, ids: list[str]) -> None:
     """
     if not ids:
         return
-    path = paths.l2_file(key) if layer == "L2" else paths.l3_file(key)  # type: ignore[arg-type]
+    path = (
+        paths.l2_file(key, bucket)  # type: ignore[arg-type]
+        if layer == "L2"
+        else paths.l3_file(key)  # type: ignore[arg-type]
+    )
     if not path.exists():
         return
     doc = parse(path.read_text(encoding="utf-8"))

@@ -86,6 +86,7 @@ async def run_update(
     budget: int | None = None,
     llm_selection: dict | None = None,
     on_event: OnEvent | None = None,
+    bucket: str | None = None,
 ) -> UpdateResult:
     """Dispatch to the layer-specific update implementation.
 
@@ -118,6 +119,7 @@ async def run_update(
                 llm_selection=llm_selection,
                 on_event=on_event,
                 settings=settings,
+                bucket=bucket,
             )
         if layer == "L3":
             return await _run_update_l3(
@@ -146,8 +148,9 @@ async def _run_update_l2(
     llm_selection: dict | None,
     on_event: OnEvent | None,
     settings,
+    bucket: str | None = None,
 ) -> UpdateResult:
-    meta = load_l2_meta(surface)
+    meta = load_l2_meta(surface, bucket=bucket)
     all_entities = sorted(
         snap.read_snapshot(surface),
         key=lambda e: (e.ts or "", e.id),
@@ -169,7 +172,7 @@ async def _run_update_l2(
     if not new_entities:
         # Still persist a fresh meta so the "last_update_at" timestamp
         # moves; this signals "we checked, nothing new".
-        save_l2_meta(surface, seen_entity_refs=seen_now)
+        save_l2_meta(surface, seen_entity_refs=seen_now, bucket=bucket)
         # Even when no facts were added we still run merge — the doc may
         # be in the legacy entry-keyed footnote layout and the user
         # expects "click update" to clean it up.
@@ -209,7 +212,7 @@ async def _run_update_l2(
 
     prompt = load_prompt("update_l2", language)
     focus, sections = surface_focus(language, surface)
-    l2_path = paths.l2_file(surface)
+    l2_path = paths.l2_file(surface, bucket)
     doc = load_doc(l2_path, default_title=f"{surface} memory")
 
     facts_added = 0
@@ -309,7 +312,7 @@ async def _run_update_l2(
             },
         )
 
-    save_l2_meta(surface, seen_entity_refs=seen_now)
+    save_l2_meta(surface, seen_entity_refs=seen_now, bucket=bucket)
 
     await emit(
         on_event,

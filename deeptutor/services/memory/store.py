@@ -147,8 +147,9 @@ class MemoryStore:
         user_label: str = "anonymous",
         on_event: OnEvent | None = None,
         apply_ops: bool = True,
+        bucket: str | None = None,
     ) -> ConsolidateResult:
-        path = paths.l2_file(surface)
+        path = paths.l2_file(surface, bucket)
         async with self._lock_for(path):
             return await consolidator.consolidate_l2(
                 surface,
@@ -156,6 +157,7 @@ class MemoryStore:
                 user_label=user_label,
                 on_event=on_event,
                 apply_ops=apply_ops,
+                bucket=bucket,
             )
 
     async def update_l3(

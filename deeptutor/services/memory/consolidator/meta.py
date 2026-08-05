@@ -57,16 +57,24 @@ class L2Meta:
     seen_entity_refs: set[str] = field(default_factory=set)
 
 
-def l2_meta_path(surface: Surface) -> Path:
+def l2_meta_path(surface: Surface, bucket: str | None = None) -> Path:
+    """L2 meta sidecar for a surface, optionally scoped to a memory bucket."""
+    if bucket:
+        return paths.l2_dir() / bucket / f"{surface}.meta.json"
     return paths.l2_dir() / f"{surface}.meta.json"
 
 
-def load_l2_meta(surface: Surface) -> L2Meta:
-    return _load_meta_l2(l2_meta_path(surface))
+def load_l2_meta(surface: Surface, *, bucket: str | None = None) -> L2Meta:
+    return _load_meta_l2(l2_meta_path(surface, bucket))
 
 
-def save_l2_meta(surface: Surface, *, seen_entity_refs: set[str]) -> L2Meta:
-    path = l2_meta_path(surface)
+def save_l2_meta(
+    surface: Surface,
+    *,
+    seen_entity_refs: set[str],
+    bucket: str | None = None,
+) -> L2Meta:
+    path = l2_meta_path(surface, bucket)
     meta = L2Meta(
         last_update_at=_now_iso(),
         seen_entity_refs=set(seen_entity_refs),
