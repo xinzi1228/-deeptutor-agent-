@@ -199,6 +199,7 @@ def compose_enabled_tools(
         "teaching_flow",
         "render_ui",
         "route_input",
+        "verify_output",
         "job_analysis",
         "get_annotation_task",
         "annotation_check",
