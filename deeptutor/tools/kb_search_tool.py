@@ -30,20 +30,18 @@ def _tokenize(text: str) -> list[str]:
     tokens: list[str] = []
     cjk = re.findall(r"[\u4e00-\u9fff]+", text.lower())
     for chunk in cjk:
-        if len(chunk) == 1:
-            tokens.append(chunk)
-        else:
+        if len(chunk) > 2:
             tokens.extend(chunk[i : i + 2] for i in range(len(chunk) - 1))
-            tokens.append(chunk)  # whole chunk as a token too
+        tokens.append(chunk)  # whole chunk (incl. single char / bigram) as a token too
     tokens.extend(re.findall(r"[a-z0-9_]+", text.lower()))
-    return [t for t in tokens if len(t) >= 2]
+    return [t for t in tokens if len(t) >= 2 or re.fullmatch(r"[\u4e00-\u9fff]", t)]
 
 
 def _snippet(text: str, tokens: list[str], width: int = 40) -> str:
     positions = [m.start() for t in tokens for m in re.finditer(re.escape(t), text)]
     if not positions:
         return text[: width * 2].replace("\n", " ")
-    pos = positions[0]
+    pos = min(positions)
     start = max(0, pos - width)
     end = min(len(text), pos + width * 2)
     snippet = text[start:end].replace("\n", " ")
@@ -90,7 +88,7 @@ class KbSearchTool(BaseTool):
             name="kb_search",
             description=(
                 "Search the annotation knowledge base (60 docs across 6 categories: "
-                "基础知识/行业标准/工具操作/质量管控/常见错误/项目管理). Use when teaching a "
+                "基础知识/行业标准/工具操作/质量管控/典型错误/项目管理). Use when teaching a "
                 "knowledge point or citing a standard. Returns top matching docs with "
                 "snippet and source. Category can be limited for precision."
             ),

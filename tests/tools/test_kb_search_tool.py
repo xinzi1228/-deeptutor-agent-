@@ -26,8 +26,8 @@ def test_search_keyword_hits():
 def test_search_category_limited():
     std = next(c for c in CATEGORY_DIRS if "标准" in c)
     hits = search_kb("标注", category=std, top_k=5)
-    if hits:
-        assert all(h["category"] == std for h in hits)
+    assert hits, "query 标注 should hit docs in the 标准 category"
+    assert all(h["category"] == std for h in hits)
 
 
 def test_search_no_hit_returns_empty():
