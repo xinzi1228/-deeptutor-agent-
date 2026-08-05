@@ -57,10 +57,27 @@
 | `docs/3modal-annotation-plan.md` | **详细规划文档**（现状+设计+改动清单+注意事项+验收，供接力 AI 实施） |
 | `docs/3modal-annotation-research.md` | 调研（CVAT/Doccano 范式 + task_type 跨模态矩阵 + 空白机会点） |
 
-## 七、恢复提示词
+## 七、议题实现进度（6 议题 Phase 1 全部完成，2026-08-05 更新）
 
-> 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下三份议题设计，继续标注星图。
+> 严格 subagent-driven-development 流程（implementer + spec/quality review），42+ 测试通过，全部推送。
+
+| 议题 | Phase 1 实现 | 测试 | 剩余 Phase |
+|------|-------------|------|-----------|
+| ⑤ route_input | ✅ `route_input_tool.py`（意图分诊，confuse/off_topic 等 7 类，ask_user 联动） | 9 | — |
+| ⑥ verify_output | ✅ `verify_output_tool.py`（输出质检，防编造/角色漂移/缺依据） | 8 | — |
+| ③ kb_search | ✅ `kb_search_tool.py`（知识库 60 篇关键词检索）+ annotation_kb 进 git | 9 | — |
+| ①② 记忆分区 | ✅ Phase 1 读取隔离：`paths.l2_file(bucket)` + `store.read_bucket` + `read_memory(bucket)` | 5 | Phase 2: consolidator 按 bucket 写入（`_shims.py:118` 透传 bucket，LLM 聚合测试成本高）；Phase 3: API CRUD + 前端 |
+| ④ LS 联动 | ✅ Phase 1 `ls_import_tasks`（导入任务到 LS 项目） | 4 | Phase 2: render_ui 卡片跳转；Phase 3: 自建标注台 + 拟人化 Coach（前端大工程） |
+| ⑦ 总控 | ✅ Phase 1 `delegate_to_expert`（专家卡委派，上下文隔离，真实 LLM 验证） | 7 | Phase 2: 分管 agent 独立 AgentLoop + 全量受限工具 |
+
+**实现计划文档**：`docs/superpowers/plans/2026-08-05-route-input.md`、`-verify-output.md`、`-kb-search.md`、`-memory-bucket-phase1.md`、`-ls-import-tool.md`、`-delegate-expert.md`
+
+**冒烟结论**：route_input 7 类分类正确；verify_output 检出编造/角色漂移；kb_search 命中带来源；记忆区读取隔离；LS 真实建项目+导入；delegate 委派 grading_expert 正确判 advance_with_caution。
+
+## 八、恢复提示词
+
+> 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下七份议题设计 + docs/superpowers/plans/ 下六份实现计划，继续标注星图。
 > 当前两条线：
-> ① 7 议题 brainstorming：⑤⑥③ 已完成设计，剩余 ①②（记忆分区，已调研待写文档）、④（LS 联动）、⑦（总控）
-> ② **三模态标注拓展（文本/图像/视频）**：规划文档已由用户确认，见 `docs/3modal-annotation-plan.md`（直接可实施，P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`
+> ① 7 议题：**设计文档全部完成 + Phase 1 实现全部完成**。剩余 Phase：记忆分区 Phase 2（consolidator 写入分区）/ LS 卡片跳转 / LS 自建标注台+拟人化 / 总控 AgentLoop——用户逐个选择推进。
+> ② **三模态标注拓展（文本/图像/视频）**：规划文档已确认，见 `docs/3modal-annotation-plan.md`（P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`
 > 启动需 `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001`；next build 清代理；测试基线 2985/33。
