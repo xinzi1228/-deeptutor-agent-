@@ -198,6 +198,7 @@ def compose_enabled_tools(
         "struggle_detect",
         "teaching_flow",
         "render_ui",
+        "route_input",
         "job_analysis",
         "get_annotation_task",
         "annotation_check",

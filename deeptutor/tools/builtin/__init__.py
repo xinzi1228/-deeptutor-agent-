@@ -37,6 +37,7 @@ from deeptutor.tools.partner_memory import (
 )
 from deeptutor.tools.prompting import load_prompt_hints
 from deeptutor.tools.render_ui_tool import RenderUiTool
+from deeptutor.tools.route_input_tool import RouteInputTool
 from deeptutor.tools.struggle_tool import StruggleDetectTool
 from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 from deeptutor.tools.teaching_flow_tool import TeachingFlowTool
@@ -1621,6 +1622,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     StruggleDetectTool,
     TeachingFlowTool,
     RenderUiTool,
+    RouteInputTool,
     JobAnalysisTool,
     WriteLearningRecordTool,
     GenerateIouDemoTool,
@@ -1728,6 +1730,7 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "struggle_detect",
     "teaching_flow",
     "render_ui",
+    "route_input",
     "job_analysis",
     "ask_user",
 )
@@ -1759,6 +1762,7 @@ __all__ = [
     "StruggleDetectTool",
     "TeachingFlowTool",
     "RenderUiTool",
+    "RouteInputTool",
     "JobAnalysisTool",
     "WriteLearningRecordTool",
     "GenerateIouDemoTool",
