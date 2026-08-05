@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Tag, PenLine, Wrench } from "lucide-react";
+import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
 
 export default function AnnotationPage() {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<"basic" | "pro">("basic");
+  const [mode, setMode] = useState<"image" | "text" | "audio" | "video" | "pro">("image");
 
   return (
     <div className="flex h-full flex-col bg-[var(--background)]">
@@ -24,15 +24,48 @@ export default function AnnotationPage() {
         </div>
         <div className="flex rounded-lg border border-[var(--border)] bg-[var(--card)] p-1">
           <button
-            onClick={() => setMode("basic")}
+            onClick={() => setMode("image")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              mode === "basic"
+              mode === "image"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
             }`}
           >
             <PenLine className="h-3.5 w-3.5" />
             {t("annotation.basicMode")}
+          </button>
+          <button
+            onClick={() => setMode("text")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              mode === "text"
+                ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            文本标注
+          </button>
+          <button
+            onClick={() => setMode("audio")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              mode === "audio"
+                ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            <Mic className="h-3.5 w-3.5" />
+            音频标注
+          </button>
+          <button
+            onClick={() => setMode("video")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              mode === "video"
+                ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            <Video className="h-3.5 w-3.5" />
+            视频标注
           </button>
           <button
             onClick={() => setMode("pro")}
@@ -49,11 +82,32 @@ export default function AnnotationPage() {
       </header>
 
       <div className="flex-1">
-        {mode === "basic" ? (
+        {mode === "image" ? (
           <iframe
             src="/annotation_tool.html"
             className="h-full w-full border-0"
-            title="Basic Annotation Tool"
+            title="Image Annotation Tool"
+            sandbox="allow-scripts allow-same-origin allow-top-navigation allow-popups"
+          />
+        ) : mode === "text" ? (
+          <iframe
+            src="/annotation_tool_text.html"
+            className="h-full w-full border-0"
+            title="Text Annotation Tool"
+            sandbox="allow-scripts allow-same-origin allow-top-navigation allow-popups"
+          />
+        ) : mode === "audio" ? (
+          <iframe
+            src="/annotation_tool_audio.html"
+            className="h-full w-full border-0"
+            title="Audio Annotation Tool"
+            sandbox="allow-scripts allow-same-origin allow-top-navigation allow-popups"
+          />
+        ) : mode === "video" ? (
+          <iframe
+            src="/annotation_tool_video.html"
+            className="h-full w-full border-0"
+            title="Video Annotation Tool"
             sandbox="allow-scripts allow-same-origin allow-top-navigation allow-popups"
           />
         ) : (

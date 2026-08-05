@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文本标注工具</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: system-ui; background:#1a1a2e; color:#eee; display:flex; height:100vh; }
+.sidebar { width:280px; background:#16213e; padding:16px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
+.sidebar h2 { font-size:13px; color:#888; text-transform:uppercase; margin-bottom:2px; }
+.sidebar select, .sidebar button { width:100%; padding:8px; border-radius:6px; border:1px solid #333; background:#0f3460; color:#eee; cursor:pointer; font-size:13px; }
+.sidebar button:hover { background:#1a508b; }
+.sidebar button.primary { background:#2563eb; border-color:#2563eb; }
+.sidebar button.primary:hover { background:#1d4ed8; }
+.sidebar button.coach { background:#7c3aed; border-color:#7c3aed; }
+.sidebar button.coach:hover { background:#6d28d9; }
+.label-btns { display:flex; flex-direction:column; gap:6px; }
+.label-btn { padding:8px 12px; border:2px solid #333; border-radius:6px; background:transparent; color:#ccc; cursor:pointer; text-align:left; font-size:13px; }
+.label-btn.selected { border-color:#4fc3f7; background:rgba(79,195,247,0.15); color:#4fc3f7; }
+.main-area { flex:1; display:flex; flex-direction:column; padding:16px; gap:12px; }
+.text-display { flex:1; background:#0f0f1a; border-radius:10px; border:1px solid #333; padding:24px; font-size:16px; line-height:2; white-space:pre-wrap; user-select:none; overflow-y:auto; }
+.text-display mark { padding:2px 0; border-radius:3px; cursor:pointer; }
+.text-display mark.term { background:rgba(231,76,60,0.25); border-bottom:2px solid #E74C3C; }
+.text-display mark.standard { background:rgba(142,68,173,0.25); border-bottom:2px solid #8E44AD; }
+.text-display mark.format { background:rgba(79,195,247,0.25); border-bottom:2px solid #4fc3f7; }
+.text-display mark.quality_good { background:rgba(74,222,128,0.25); border-bottom:2px solid #4ade80; }
+.text-display mark.quality_bad { background:rgba(248,113,113,0.25); border-bottom:2px solid #f87171; }
+.text-display mark.quality_partial { background:rgba(251,191,36,0.25); border-bottom:2px solid #fbbf24; }
+.entity-list { background:#16213e; border-radius:10px; padding:12px; max-height:150px; overflow-y:auto; }
+.entity-list h3 { font-size:12px; color:#888; margin-bottom:6px; }
+.ent-item { display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:#0f3460; border-radius:4px; margin-bottom:4px; font-size:12px; }
+.ent-item .del { color:#f87171; cursor:pointer; font-weight:bold; font-size:14px; }
+.info { font-size:12px; color:#888; text-align:center; }
+.result-panel { width:320px; background:#16213e; padding:16px; overflow-y:auto; display:none; }
+.result-panel.show { display:block; }
+.result-panel h2 { font-size:14px; color:#888; text-transform:uppercase; margin-bottom:10px; }
+.score-card { background:#0f3460; border-radius:10px; padding:14px; margin-bottom:10px; }
+.score-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #1e293b; }
+.score-row:last-child { border:none; }
+.score-label { font-size:12px; color:#94a3b8; }
+.score-value { font-size:20px; font-weight:700; }
+.score-value.good { color:#4ade80; }
+.score-value.warn { color:#fbbf24; }
+.score-value.bad { color:#f87171; }
+.fb-item { padding:8px 10px; border-radius:6px; font-size:12px; margin-bottom:6px; border-left:3px solid; line-height:1.4; }
+.fb-item.correct { background:rgba(74,222,128,0.08); border-color:#4ade80; }
+.fb-item.extra { background:rgba(248,113,113,0.08); border-color:#f87171; }
+.fb-item.missed { background:rgba(251,191,36,0.08); border-color:#fbbf24; }
+.classification-area { background:#0f0f1a; border-radius:10px; border:1px solid #333; padding:24px; overflow-y:auto; flex:1; }
+.classify-btn { padding:12px 24px; margin:8px; border:2px solid #333; border-radius:8px; background:#0f3460; color:#eee; cursor:pointer; font-size:14px; }
+.classify-btn:hover { border-color:#4fc3f7; }
+.classify-btn.sel { border-color:#4fc3f7; background:rgba(79,195,247,0.15); }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>选择任务</h2>
+  <select id="taskSelect" onchange="loadTask()">
+    <option value="task19">任务19: 文本NER实体识别 (★简单)</option>
+    <option value="task20">任务20: 文本分类标注 (★简单)</option>
+    <option value="task21">任务21: 标注规范判断 (★★中等)</option>
+    <option value="task22">任务22: 文本找错改错 (★★★困难)</option>
+  </select>
+
+  <h2>选择标签</h2>
+  <div class="label-btns" id="labelBtns"></div>
+
+  <button class="primary" onclick="checkAnnotation()">检查标注</button>
+  <button onclick="undoEntity()">撤销实体</button>
+  <button onclick="clearEntities()">清除全部</button>
+  <button class="coach" id="btnCoach" onclick="askCoach()" style="display:none">问Coach：帮我分析</button>
+</div>
+
+<div class="main-area">
+  <div class="text-display" id="textDisplay"></div>
+  <div class="entity-list">
+    <h3>已标注的实体</h3>
+    <div id="entityList">尚未标注任何实体</div>
+  </div>
+  <div class="info" id="info">鼠标选中文本 → 点标签按钮标注实体（NER任务）；或按右侧分类/判断做选择</div>
+</div>
+
+<div class="result-panel" id="resultPanel">
+  <div id="resultContent"></div>
+</div>
+
+<script>
+const TASKS = {
+  task19: {
+    text: '图像中车辆遮挡50%以上视为遮挡目标，标注框应贴合车身轮廓。标注文件采用Pascal VOC格式，包含目标位置和类别信息。',
+    labels: ['term','standard','format'], desc: '文本NER — 标注实体', difficulty: '简单',
+    type: 'ner',
+    gt: [{"start":3,"end":13,"label":"term"},{"start":14,"end":23,"label":"standard"},{"start":54,"end":68,"label":"format"}]
+  },
+  task20: {
+    text: '标注框完整覆盖目标物体，边缘紧贴轮廓线，标签正确，无多余框——这是一次高质量的标注。',
+    labels: ['quality_good','quality_bad','quality_partial'], desc: '文本分类 — 判断标注质量', difficulty: '简单',
+    type: 'text_classification',
+    gt: {"label":"quality_good"}
+  },
+  task21: {
+    text: '根据标注规范判断以下描述是否正确。',
+    labels: ['correct','wrong'], desc: '标注规范判断', difficulty: '中等',
+    type: 'text_judgment',
+    items: [
+      { id:1, text: '对于遮挡超过50%的目标，应该标注可见部分并推测完整轮廓。' },
+      { id:2, text: '边界框的四个坐标值应为整数像素值，不允许浮点数。' },
+      { id:3, text: '同一张图中，如果两辆车外观相似，可以只标注一辆代表。' }
+    ],
+    gt: [{"id":1,"answer":"wrong"},{"id":2,"answer":"correct"},{"id":3,"answer":"wrong"}]
+  },
+  task22: {
+    text: '以下是对某标注结果的三条描述，请找出有错误的描述。',
+    labels: ['error','normal'], desc: '文本找错', difficulty: '困难',
+    type: 'text_error_case',
+    items: [
+      { id:1, text: '文本标注中每个实体用「起始位置:结束位置:标签」三元组表示，如 5:15:person。' },
+      { id:2, text: 'NER标注中不同类型的实体可以共用同一个文本位置范围。' },
+      { id:3, text: '标注结果中的实体应按文本中出现的顺序排列，同类型实体可合并。' }
+    ],
+    gt: [{"id":1,"is_error":false},{"id":2,"is_error":true},{"id":3,"is_error":false}]
+  }
+};
+
+const LABEL_COLORS = { term:'#E74C3C', standard:'#8E44AD', format:'#4fc3f7', quality_good:'#4ade80', quality_bad:'#f87171', quality_partial:'#fbbf24', correct:'#4ade80', wrong:'#f87171', error:'#f87171', normal:'#4ade80' };
+const LABEL_CN = { term:'术语', standard:'规范', format:'格式', quality_good:'高质量', quality_bad:'不合格', quality_partial:'部分合格', correct:'正确', wrong:'错误', error:'有错', normal:'正常' };
+
+let currentTask = 'task19', selectedLabel = '', entities = [], checkResult = null;
+
+function loadTask() {
+  currentTask = document.getElementById('taskSelect').value;
+  const t = TASKS[currentTask];
+  entities = []; checkResult = null;
+  resultPanel.classList.remove('show');
+  document.getElementById('btnCoach').style.display = 'none';
+  selectedLabel = t.labels[0];
+
+  if (t.type === 'ner') {
+    loadNERTask(t);
+  } else if (t.type === 'text_classification') {
+    loadTextClassifyTask(t);
+  } else if (t.type === 'text_judgment') {
+    loadTextJudgmentTask(t);
+  } else if (t.type === 'text_error_case') {
+    loadTextErrorTask(t);
+  }
+
+  renderLabels();
+  document.getElementById('info').textContent = t.desc + ' (' + (t.difficulty||'') + ')';
+}
+
+function renderLabels() {
+  const t = TASKS[currentTask];
+  document.getElementById('labelBtns').innerHTML = t.labels.map(l => {
+    const c = LABEL_COLORS[l] || '#888', cn = LABEL_CN[l] || l;
+    return `<button class="label-btn${selectedLabel===l?' selected':''}" onclick="selectLabel('${l}')" style="border-left:4px solid ${c}">${cn} (${l})</button>`;
+  }).join('');
+}
+
+function selectLabel(l) { selectedLabel = l; renderLabels(); }
+
+// ── NER mode ──
+function loadNERTask(t) {
+  document.querySelector('.main-area').innerHTML = `
+    <div class="text-display" id="textDisplay">${renderNERText(t.text, entities)}</div>
+    <div class="entity-list"><h3>已标注实体</h3><div id="entityList">尚未标注任何实体</div></div>
+    <div class="info" id="info">${t.desc} — 拖选文本后点标签按钮标注</div>
+  `;
+
+  document.getElementById('textDisplay').addEventListener('mouseup', onTextSelect);
+}
+
+function renderNERText(text, ents) {
+  let sorted = [...ents].sort((a,b) => a.start - b.start);
+  let html = '', lastEnd = 0;
+  sorted.forEach(e => {
+    if (e.start > lastEnd) html += esc(text.slice(lastEnd, e.start));
+    html += `<mark class="${e.label}" onclick="removeEntityAt(${entities.indexOf(e)})" title="点击移除">${esc(text.slice(e.start, e.end))}</mark>`;
+    lastEnd = e.end;
+  });
+  if (lastEnd < text.length) html += esc(text.slice(lastEnd));
+  return html || esc(text);
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function onTextSelect() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const container = document.getElementById('textDisplay');
+  if (!container) return;
+
+  const text = TASKS[currentTask].text;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+  let totalOffset = 0;
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node === range.startContainer || node.contains(range.startContainer)) {
+      let innerOffset = 0;
+      let current = range.startContainer;
+      while (current && current !== node) {
+        if (current.previousSibling) {
+          innerOffset += current.previousSibling.textContent.length;
+        }
+        current = current.parentNode;
+      }
+      break;
+    }
+    if (node.textContent) totalOffset += node.textContent.length;
+  }
+
+  // Simple approach: get start/end from visible marks
+  const start = range.startOffset;
+  const end = range.endOffset;
+  if (end - start < 1) return;
+
+  entities.push({ start: range.startOffset, end: range.endOffset, label: selectedLabel });
+  document.getElementById('textDisplay').innerHTML = renderNERText(text, entities);
+  document.getElementById('textDisplay').addEventListener('mouseup', onTextSelect);
+  renderEntityList();
+}
+
+function removeEntityAt(idx) {
+  entities.splice(idx, 1);
+  const text = TASKS[currentTask].text;
+  document.getElementById('textDisplay').innerHTML = renderNERText(text, entities);
+  document.getElementById('textDisplay').addEventListener('mouseup', onTextSelect);
+  renderEntityList();
+}
+
+function renderEntityList() {
+  const el = document.getElementById('entityList');
+  if (!el) return;
+  if (entities.length === 0) { el.innerHTML = '尚未标注任何实体'; return; }
+  const text = TASKS[currentTask].text;
+  el.innerHTML = entities.map((e,i) => {
+    const snippet = text.slice(e.start, e.end);
+    const cn = LABEL_CN[e.label] || e.label;
+    return `<div class="ent-item"><span>${cn}: "${snippet.substring(0,15)}..." [${e.start}:${e.end}]</span><span class="del" onclick="removeEntityAt(${i})">✕</span></div>`;
+  }).join('');
+}
+
+// ── Classification mode ──
+let textClassifyAnswer = null;
+function loadTextClassifyTask(t) {
+  const main = document.querySelector('.main-area');
+  const labelsHtml = t.labels.map(l => {
+    const cn = LABEL_CN[l] || l;
+    return `<button class="classify-btn" onclick="selectClassify('${l}', this)">${cn}</button>`;
+  }).join('');
+
+  main.innerHTML = `
+    <div class="classification-area" style="text-align:center">
+      <p style="font-size:15px;line-height:1.8;margin-bottom:20px;color:#ccc">${t.text}</p>
+      <p style="color:#888;font-size:12px;margin-bottom:12px">选择质量等级：</p>
+      <div id="classifyBtns">${labelsHtml}</div>
+      <button class="primary" onclick="checkClassify()" style="margin-top:20px;padding:10px 32px;border-radius:8px;background:#2563eb;color:#eee;border:none;cursor:pointer;font-size:14px">提交分类</button>
+      <div id="classifyResult" style="margin-top:12px"></div>
+    </div>
+  `;
+}
+
+function selectClassify(label, btn) {
+  document.querySelectorAll('.classify-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  textClassifyAnswer = label;
+}
+
+function checkClassify() {
+  if (!textClassifyAnswer) { alert('请先选择一个类别'); return; }
+  const gt = TASKS[currentTask].gt;
+  const isCorrect = textClassifyAnswer === gt.label;
+  const cn = LABEL_CN[textClassifyAnswer] || textClassifyAnswer;
+  const gtCn = LABEL_CN[gt.label] || gt.label;
+
+  document.getElementById('classifyResult').innerHTML = isCorrect
+    ? `<div style="background:rgba(74,222,128,0.1);border:1px solid #4ade80;padding:16px;border-radius:8px"><h3 style="color:#4ade80;margin:0">✓ 回答正确！</h3><p>你选择了「${cn}」</p></div>`
+    : `<div style="background:rgba(248,113,113,0.1);border:1px solid #f87171;padding:16px;border-radius:8px"><h3 style="color:#f87171;margin:0">✗ 回答错误</h3><p>你选择了「${cn}」，正确答案是「${gtCn}」</p></div>`;
+
+  document.getElementById('btnCoach').style.display = 'block';
+  document.getElementById('info').textContent = isCorrect ? '正确！点「问Coach」继续' : '不正确。点「问Coach」了解原因';
+}
+
+// ── Judgment mode ──
+let judgeAnswers = {};
+function loadTextJudgmentTask(t) {
+  const main = document.querySelector('.main-area');
+  const items = (t.items||[]).map(it => `
+    <div style="background:#0f3460;padding:12px;border-radius:8px;margin-bottom:8px">
+      <p style="margin-bottom:8px;font-size:13px">${it.id}. ${it.text}</p>
+      <button class="judge-btn" onclick="selectJudge(${it.id}, 'correct', this)" style="padding:6px 16px;margin-right:8px;border:2px solid #333;border-radius:6px;background:#0f3460;color:#eee;cursor:pointer">正确</button>
+      <button class="judge-btn" onclick="selectJudge(${it.id}, 'wrong', this)" style="padding:6px 16px;border:2px solid #333;border-radius:6px;background:#0f3460;color:#eee;cursor:pointer">错误</button>
+    </div>`).join('');
+
+  main.innerHTML = `
+    <div class="classification-area">
+      <p style="font-size:15px;line-height:1.8;margin-bottom:16px;color:#ccc">${t.text}</p>
+      ${items}
+      <button class="primary" onclick="checkJudgment()" style="margin-top:16px;padding:10px 32px;border-radius:8px;background:#2563eb;color:#eee;border:none;cursor:pointer;font-size:14px">提交判断</button>
+      <div id="judgeResult" style="margin-top:12px"></div>
+    </div>
+  `;
+}
+
+function selectJudge(id, val, btn) {
+  judgeAnswers[id] = val;
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.judge-btn').forEach(b => {
+    b.style.borderColor = '#333';
+    b.style.background = '#0f3460';
+  });
+  btn.style.borderColor = '#4fc3f7';
+  btn.style.background = 'rgba(79,195,247,0.15)';
+}
+
+function checkJudgment() {
+  const gt = TASKS[currentTask].gt;
+  let correct = 0, total = gt.length;
+  let html = '';
+  gt.forEach(g => {
+    const user = judgeAnswers[g.id];
+    const isCorrect = user === g.answer;
+    if (isCorrect) correct++;
+    const cn = user === 'correct' ? '正确' : user === 'wrong' ? '错误' : '未作答';
+    html += `<div style="padding:4px 0;font-size:12px">题${g.id}: ${isCorrect ? '✅' : '❌'} 你选「${cn}」，答案「${g.answer==='correct'?'正确':'错误'}」</div>`;
+  });
+  document.getElementById('judgeResult').innerHTML = `<div style="background:#0f3460;border-radius:8px;padding:12px">${html}<p style="margin-top:8px;font-size:14px"><strong>正确率: ${Math.round(correct/total*100)}%</strong></p></div>`;
+  document.getElementById('btnCoach').style.display = 'block';
+}
+
+// ── Error case mode ──
+let errorFlags = {};
+function loadTextErrorTask(t) {
+  const main = document.querySelector('.main-area');
+  const items = (t.items||[]).map(it => `
+    <div style="background:#0f3460;padding:12px;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px">${it.id}. ${it.text}</span>
+      <button class="err-btn" data-id="${it.id}" onclick="toggleError(${it.id}, this)" style="padding:6px 16px;border:2px solid #333;border-radius:6px;background:#0f3460;color:#eee;cursor:pointer">标错</button>
+    </div>`).join('');
+
+  main.innerHTML = `
+    <div class="classification-area">
+      <p style="font-size:15px;line-height:1.8;margin-bottom:16px;color:#ccc">${t.text}</p>
+      <p style="color:#888;font-size:12px;margin-bottom:12px">点击每项右边的「标错」按钮来标注你认为有错误的案例</p>
+      ${items}
+      <button class="primary" onclick="checkErrorCase()" style="margin-top:16px;padding:10px 32px;border-radius:8px;background:#2563eb;color:#eee;border:none;cursor:pointer;font-size:14px">提交找错结果</button>
+      <div id="errorResult" style="margin-top:12px"></div>
+    </div>
+  `;
+}
+
+function toggleError(id, btn) {
+  errorFlags[id] = !errorFlags[id];
+  if (errorFlags[id]) {
+    btn.style.borderColor = '#f87171';
+    btn.style.background = 'rgba(248,113,113,0.15)';
+    btn.textContent = '已标错 ✕';
+  } else {
+    btn.style.borderColor = '#333';
+    btn.style.background = '#0f3460';
+    btn.textContent = '标错';
+  }
+}
+
+function checkErrorCase() {
+  const gt = TASKS[currentTask].gt;
+  let correct = 0, total = gt.length;
+  let html = '';
+  gt.forEach(g => {
+    const flagged = !!errorFlags[g.id];
+    const shouldFlag = !!g.is_error;
+    const isCorrect = flagged === shouldFlag;
+    if (isCorrect) correct++;
+    html += `<div style="padding:4px 0;font-size:12px">题${g.id}: ${isCorrect?'✅':'❌'} ${flagged?'标为错误':'未标错'}，实际${shouldFlag?'有错误':'正确'}</div>`;
+  });
+  document.getElementById('errorResult').innerHTML = `<div style="background:#0f3460;border-radius:8px;padding:12px">${html}<p style="margin-top:8px;font-size:14px"><strong>检出准确率: ${Math.round(correct/total*100)}%</strong></p></div>`;
+  document.getElementById('btnCoach').style.display = 'block';
+}
+
+// ── NER check ──
+function checkAnnotation() {
+  const t = TASKS[currentTask];
+
+  if (t.type === 'text_classification') { checkClassify(); return; }
+  if (t.type === 'text_judgment') { checkJudgment(); return; }
+  if (t.type === 'text_error_case') { checkErrorCase(); return; }
+  if (t.type !== 'ner') return;
+
+  if (entities.length === 0) { alert('请先选中文本标注实体'); return; }
+  const gt = t.gt;
+
+  const predSet = new Set(entities.map(e => `${e.start}:${e.end}:${e.label}`));
+  const gtSet = new Set(gt.map(g => `${g.start}:${g.end}:${g.label}`));
+  const tp = [...predSet].filter(e => gtSet.has(e)).length;
+  const fp = predSet.size - tp;
+  const fn = gtSet.size - tp;
+  const precision = tp / predSet.size || 0;
+  const recall = tp / gtSet.size || 0;
+  const f1 = (2*precision*recall)/(precision+recall) || 0;
+
+  checkResult = { tp, fp, fn, precision, recall, f1, gtSet, predSet };
+
+  resultPanel.classList.add('show');
+  const f1c = f1 >= 0.7 ? 'good' : f1 >= 0.4 ? 'warn' : 'bad';
+  let html = `
+    <div class="score-card">
+      <div class="score-row"><span class="score-label">精确率</span><span class="score-value ${precision>=0.7?'good':'warn'}">${(precision*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">召回率</span><span class="score-value ${recall>=0.7?'good':'warn'}">${(recall*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">F1 分数</span><span class="score-value ${f1c}">${(f1*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">正确 / 应有</span><span style="font-size:15px;color:#e2e8f0">${tp} / ${gtSet.size}</span></div>
+    </div>`;
+
+  const pSet = new Set(entities.map(e => `${e.start}:${e.end}:${e.label}`));
+  pSet.forEach(e => {
+    if (gtSet.has(e)) {
+      html += `<div class="fb-item correct">实体 ${e}: ✅ 正确匹配</div>`;
+    } else {
+      html += `<div class="fb-item extra">实体 ${e}: ❌ 误标</div>`;
+    }
+  });
+  gtSet.forEach(e => {
+    if (!pSet.has(e)) {
+      html += `<div class="fb-item missed">实体 ${e}: ⚠ 漏标</div>`;
+    }
+  });
+
+  resultContent.innerHTML = html;
+  document.getElementById('btnCoach').style.display = 'block';
+}
+
+function undoEntity() { entities.pop(); renderEntityList(); const t = TASKS[currentTask]; document.getElementById('textDisplay').innerHTML = renderNERText(t.text, entities); }
+function clearEntities() { entities = []; checkResult = null; renderEntityList(); resultPanel.classList.remove('show'); }
+
+function askCoach() {
+  const t = TASKS[currentTask];
+  const msg = `我刚完成了「${t.desc.split('—')[0]}」文本标注练习。请帮我分析一下哪里需要改进，推荐下一步学什么。`;
+  localStorage.setItem('annotation_last_result', JSON.stringify({ taskId: currentTask, message: msg, time: Date.now() }));
+  localStorage.setItem('annotation_pending_message', msg);
+  localStorage.setItem('annotation_pending_time', String(Date.now()));
+  try { window.parent.location.href = '/home'; } catch(e) { window.top.location.href = '/home'; }
+}
+
+loadTask();
+</script>
+</body>
+</html>

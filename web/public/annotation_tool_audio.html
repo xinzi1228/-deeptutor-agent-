@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音频标注工具</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: system-ui; background:#1a1a2e; color:#eee; display:flex; height:100vh; }
+.sidebar { width:280px; background:#16213e; padding:16px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
+.sidebar h2 { font-size:13px; color:#888; text-transform:uppercase; margin-bottom:2px; }
+.sidebar select, .sidebar button { width:100%; padding:8px; border-radius:6px; border:1px solid #333; background:#0f3460; color:#eee; cursor:pointer; font-size:13px; }
+.sidebar button:hover { background:#1a508b; }
+.sidebar button.primary { background:#2563eb; border-color:#2563eb; }
+.sidebar button.primary:hover { background:#1d4ed8; }
+.sidebar button.coach { background:#7c3aed; border-color:#7c3aed; }
+.sidebar button.coach:hover { background:#6d28d9; }
+.label-btns { display:flex; flex-direction:column; gap:6px; }
+.label-btn { padding:8px 12px; border:2px solid #333; border-radius:6px; background:transparent; color:#ccc; cursor:pointer; text-align:left; font-size:13px; }
+.label-btn.selected { border-color:#4fc3f7; background:rgba(79,195,247,0.15); color:#4fc3f7; }
+.main-area { flex:1; display:flex; flex-direction:column; padding:16px; gap:12px; }
+.audio-controls { display:flex; align-items:center; gap:12px; background:#16213e; padding:12px 16px; border-radius:10px; }
+.audio-controls button { padding:8px 16px; border-radius:6px; border:1px solid #333; background:#0f3460; color:#eee; cursor:pointer; font-size:14px; }
+.audio-controls button:hover { background:#1a508b; }
+.audio-controls .time { font-size:14px; color:#4fc3f7; font-family: monospace; min-width:100px; }
+.audio-controls input[type=range] { flex:1; accent-color:#4fc3f7; }
+.timeline-container { flex:1; background:#0f0f1a; border-radius:10px; border:1px solid #333; position:relative; overflow:hidden; min-height:200px; }
+.timeline-container canvas { width:100%; height:100%; }
+.segment-list { background:#16213e; border-radius:10px; padding:12px; max-height:150px; overflow-y:auto; }
+.segment-list h3 { font-size:12px; color:#888; margin-bottom:6px; }
+.seg-item { display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:#0f3460; border-radius:4px; margin-bottom:4px; font-size:12px; }
+.seg-item .del { color:#f87171; cursor:pointer; font-weight:bold; font-size:14px; }
+.info { font-size:12px; color:#888; text-align:center; }
+.result-panel { width:320px; background:#16213e; padding:16px; overflow-y:auto; display:none; }
+.result-panel.show { display:block; }
+.result-panel h2 { font-size:14px; color:#888; text-transform:uppercase; margin-bottom:10px; }
+.score-card { background:#0f3460; border-radius:10px; padding:14px; margin-bottom:10px; }
+.score-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #1e293b; }
+.score-row:last-child { border:none; }
+.score-label { font-size:12px; color:#94a3b8; }
+.score-value { font-size:20px; font-weight:700; }
+.score-value.good { color:#4ade80; }
+.score-value.warn { color:#fbbf24; }
+.score-value.bad { color:#f87171; }
+.fb-item { padding:8px 10px; border-radius:6px; font-size:12px; margin-bottom:6px; border-left:3px solid; line-height:1.4; }
+.fb-item.correct { background:rgba(74,222,128,0.08); border-color:#4ade80; }
+.fb-item.extra { background:rgba(248,113,113,0.08); border-color:#f87171; }
+.fb-item.missed { background:rgba(251,191,36,0.08); border-color:#fbbf24; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>选择任务</h2>
+  <select id="taskSelect" onchange="loadTask()">
+    <option value="task13">任务13: 音频事件检测 (★简单)</option>
+    <option value="task14">任务14: 语音转录 (★★中等)</option>
+  </select>
+
+  <h2>选择标签</h2>
+  <div class="label-btns" id="labelBtns"></div>
+
+  <button class="primary" onclick="checkAnnotation()">检查标注</button>
+  <button onclick="undoSeg()">撤销</button>
+  <button onclick="clearSegs()">清除全部</button>
+  <button class="coach" id="btnCoach" onclick="askCoach()" style="display:none">问Coach：帮我分析</button>
+</div>
+
+<div class="main-area">
+  <div class="audio-controls">
+    <button onclick="togglePlay()" id="btnPlay">▶ 播放</button>
+    <span class="time" id="timeDisplay">00:00.0 / 00:00.0</span>
+    <input type="range" id="seekBar" min="0" max="100" value="0" oninput="seekTo(this.value)">
+  </div>
+
+  <div class="timeline-container" id="timelineContainer">
+    <canvas id="timelineCanvas"></canvas>
+  </div>
+
+  <div class="segment-list">
+    <h3>已标注的事件段</h3>
+    <div id="segList">尚未标注任何事件段</div>
+  </div>
+  <div class="info" id="info">拖拽时间轴选中事件段，选好标签后点「检查标注」</div>
+</div>
+
+<div class="result-panel" id="resultPanel">
+  <div id="resultContent"></div>
+</div>
+
+<script>
+const TASKS = {
+  task13: {
+    url: '/audio/sample1.mp3', labels: ['speech','music','noise'], duration: 10.0,
+    desc: '音频事件检测 — 标出每种声音的起止时间 (3个事件)', difficulty: '简单',
+    type: 'audio_event',
+    gt: [{"start_time":0.5,"end_time":3.2,"label":"speech"},{"start_time":4.0,"end_time":7.5,"label":"music"},{"start_time":8.0,"end_time":9.5,"label":"noise"}]
+  },
+  task14: {
+    url: '/audio/sample2.mp3', labels: ['text'], duration: 10.0,
+    desc: '语音转录 — 听3段语音写出文字 (3段)', difficulty: '中等',
+    type: 'audio_transcription',
+    gt: [
+      {"id":1,"text":"今天天气真好，我们一起去公园散步吧"},
+      {"id":2,"text":"数据标注是人工智能的基础，需要细心和耐心"},
+      {"id":3,"text":"请在标注前仔细阅读标注规范文档"}
+    ]
+  }
+};
+
+const LABEL_COLORS = { speech:'#E74C3C', music:'#8E44AD', noise:'#95A5A6', text:'#4fc3f7' };
+const LABEL_CN = { speech:'人声', music:'音乐', noise:'噪音', text:'文字' };
+
+let currentTask = 'task13', selectedLabel = '', segments = [], checkResult = null;
+let audio = new Audio();
+let isPlaying = false;
+let audioDuration = 10.0;
+let drawing = false, drawStart = 0, drawEnd = 0;
+
+const timelineCanvas = document.getElementById('timelineCanvas');
+const tctx = timelineCanvas.getContext('2d');
+const resultPanel = document.getElementById('resultPanel');
+const resultContent = document.getElementById('resultContent');
+
+function loadTask() {
+  currentTask = document.getElementById('taskSelect').value;
+  const t = TASKS[currentTask];
+
+  if (t.type === 'audio_transcription') {
+    loadTranscriptionTask(t);
+    return;
+  }
+
+  selectedLabel = t.labels[0];
+  segments = []; checkResult = null; drawStart = 0; drawEnd = 0;
+  resultPanel.classList.remove('show');
+  document.getElementById('btnCoach').style.display = 'none';
+  renderLabels();
+
+  audio.pause(); isPlaying = false;
+  audio.src = t.url;
+  audioDuration = t.duration;
+  audio.onseeked = () => { updateTimeDisplay(); };
+  audio.onloadedmetadata = () => {
+    audioDuration = audio.duration || t.duration;
+    document.getElementById('seekBar').max = Math.floor(audioDuration * 10);
+    updateTimeDisplay();
+    drawTimeline();
+  };
+  audio.ontimeupdate = () => updateTimeDisplay();
+  audio.onended = () => { isPlaying = false; document.getElementById('btnPlay').textContent = '▶ 播放'; drawTimeline(); };
+
+  document.getElementById('info').textContent = t.desc + ' (' + (t.difficulty||'') + ')';
+  updateTimeDisplay();
+  setTimeout(drawTimeline, 300);
+}
+
+function renderLabels() {
+  const t = TASKS[currentTask];
+  document.getElementById('labelBtns').innerHTML = t.labels.map(l => {
+    const c = LABEL_COLORS[l] || '#888', cn = LABEL_CN[l] || l;
+    return `<button class="label-btn${selectedLabel===l?' selected':''}" onclick="selectLabel('${l}')" style="border-left:4px solid ${c}">${cn} (${l})</button>`;
+  }).join('');
+}
+
+function selectLabel(l) { selectedLabel = l; renderLabels(); }
+
+function togglePlay() {
+  if (isPlaying) { audio.pause(); isPlaying = false; document.getElementById('btnPlay').textContent = '▶ 播放'; }
+  else { audio.play(); isPlaying = true; document.getElementById('btnPlay').textContent = '⏸ 暂停'; requestAnimationFrame(animLoop); }
+}
+function animLoop() { if (isPlaying) { drawTimeline(); requestAnimationFrame(animLoop); } }
+
+function updateTimeDisplay() {
+  const cur = audio.currentTime || 0;
+  const dur = audioDuration;
+  const fmt = t => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}.${Math.floor((t%1)*10)}`;
+  document.getElementById('timeDisplay').textContent = `${fmt(cur)} / ${fmt(dur)}`;
+  document.getElementById('seekBar').value = Math.floor(cur * 10);
+}
+
+function seekTo(val) {
+  const t = val / 10;
+  audio.currentTime = t;
+  drawTimeline();
+}
+
+function drawTimeline() {
+  const container = document.getElementById('timelineContainer');
+  timelineCanvas.width = container.clientWidth;
+  timelineCanvas.height = container.clientHeight;
+  const w = timelineCanvas.width, h = timelineCanvas.height;
+  const dur = audioDuration;
+  tctx.clearRect(0, 0, w, h);
+
+  // Background grid
+  tctx.strokeStyle = '#222';
+  tctx.lineWidth = 0.5;
+  for (let i = 1; i < dur; i++) {
+    const x = (i / dur) * w;
+    tctx.beginPath(); tctx.moveTo(x, 0); tctx.lineTo(x, h); tctx.stroke();
+  }
+
+  // Time labels
+  tctx.fillStyle = '#666';
+  tctx.font = '10px monospace';
+  for (let i = 0; i <= dur; i += 1) {
+    tctx.fillText(i + 's', (i / dur) * w + 3, h - 6);
+  }
+
+  // Waveform simulation (random bars)
+  tctx.fillStyle = '#2563eb40';
+  const barCount = 200;
+  for (let i = 0; i < barCount; i++) {
+    const t = (i / barCount) * dur;
+    const amplitude = 0.2 + 0.6 * Math.abs(Math.sin(t * 3.7)) * Math.abs(Math.sin(t * 0.8 + 2));
+    const bh = amplitude * (h * 0.5);
+    tctx.fillRect(i * (w / barCount), h / 2 - bh / 2, w / barCount - 1, bh);
+  }
+
+  // Playhead
+  const px = (audio.currentTime / dur) * w;
+  tctx.strokeStyle = '#4fc3f7';
+  tctx.lineWidth = 2;
+  tctx.beginPath(); tctx.moveTo(px, 0); tctx.lineTo(px, h); tctx.stroke();
+
+  // Segments
+  segments.forEach(seg => {
+    const sx = (seg.start_time / dur) * w;
+    const ex = (seg.end_time / dur) * w;
+    const c = LABEL_COLORS[seg.label] || '#888';
+    tctx.fillStyle = c + '30';
+    tctx.fillRect(sx, 0, ex - sx, h);
+    tctx.strokeStyle = c;
+    tctx.lineWidth = 2;
+    tctx.strokeRect(sx, 2, ex - sx, h - 4);
+    tctx.fillStyle = c;
+    tctx.font = '11px system-ui';
+    tctx.fillText(LABEL_CN[seg.label] || seg.label, sx + 4, 16);
+  });
+
+  // GT overlay after check
+  if (checkResult) {
+    checkResult.gt.forEach((gt, gj) => {
+      const matched = checkResult.matchedGt && checkResult.matchedGt.includes(gj);
+      const sx = (gt.start_time / dur) * w;
+      const ex = (gt.end_time / dur) * w;
+      tctx.setLineDash(matched ? [] : [8, 4]);
+      tctx.strokeStyle = matched ? '#4ade80' : '#fbbf24';
+      tctx.lineWidth = matched ? 3 : 2;
+      tctx.strokeRect(sx, h / 2 + 4, ex - sx, h / 2 - 8);
+      tctx.setLineDash([]);
+      if (!matched) {
+        tctx.fillStyle = '#fbbf24';
+        tctx.font = 'bold 12px system-ui';
+        tctx.fillText('漏检!', sx + 4, h / 2 + 20);
+      }
+    });
+  }
+
+  // Drawing preview
+  if (drawing) {
+    const sx = (Math.min(drawStart, drawEnd) / dur) * w;
+    const ex = (Math.max(drawStart, drawEnd) / dur) * w;
+    tctx.fillStyle = (LABEL_COLORS[selectedLabel] || '#888') + '20';
+    tctx.fillRect(sx, 0, ex - sx, h);
+    tctx.strokeStyle = LABEL_COLORS[selectedLabel] || '#888';
+    tctx.lineWidth = 2;
+    tctx.setLineDash([5, 3]);
+    tctx.strokeRect(sx, 2, ex - sx, h - 4);
+    tctx.setLineDash([]);
+  }
+}
+
+// Timeline drag-to-select
+timelineCanvas.addEventListener('mousedown', e => {
+  if (checkResult) return;
+  const r = timelineCanvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width;
+  drawStart = x * audioDuration;
+  drawEnd = drawStart;
+  drawing = true;
+});
+timelineCanvas.addEventListener('mousemove', e => {
+  if (!drawing) return;
+  const r = timelineCanvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width;
+  drawEnd = x * audioDuration;
+  drawTimeline();
+});
+timelineCanvas.addEventListener('mouseup', () => {
+  if (!drawing) return;
+  drawing = false;
+  const s = Math.min(drawStart, drawEnd), e = Math.max(drawStart, drawEnd);
+  if (e - s < 0.1) return;
+  segments.push({ start_time: Math.round(s*10)/10, end_time: Math.round(e*10)/10, label: selectedLabel });
+  drawStart = 0; drawEnd = 0;
+  drawTimeline();
+  renderSegList();
+});
+timelineCanvas.addEventListener('mouseleave', () => { drawing = false; drawStart = 0; drawEnd = 0; drawTimeline(); });
+
+function undoSeg() { segments.pop(); checkResult = null; drawTimeline(); renderSegList(); renderResults(); }
+function clearSegs() { segments = []; checkResult = null; drawTimeline(); renderSegList(); renderResults(); }
+
+function renderSegList() {
+  const el = document.getElementById('segList');
+  if (segments.length === 0) { el.innerHTML = '尚未标注任何事件段'; return; }
+  el.innerHTML = segments.map((s, i) => {
+    const cn = LABEL_CN[s.label] || s.label;
+    return `<div class="seg-item"><span>${cn} [${s.start_time}s–${s.end_time}s]</span><span class="del" onclick="segments.splice(${i},1);drawTimeline();renderSegList()">✕</span></div>`;
+  }).join('');
+}
+
+// tIoU calculation
+function calcTIoU(a, b) {
+  const inter = Math.max(0, Math.min(a.end_time, b.end_time) - Math.max(a.start_time, b.start_time));
+  const union = Math.max(a.end_time, b.end_time) - Math.min(a.start_time, b.start_time);
+  return union > 0 ? inter / union : 0;
+}
+
+function checkAnnotation() {
+  const t = TASKS[currentTask];
+  if (segments.length === 0) { alert('请先在时间轴上拖拽标注事件段'); return; }
+  const gt = t.gt;
+
+  const pairs = [];
+  segments.forEach((p, pi) => gt.forEach((g, gj) => {
+    if (p.label !== g.label) continue;
+    const tiou = calcTIoU(p, g);
+    if (tiou >= 0.3) pairs.push({ tiou, pi, gj });
+  }));
+  pairs.sort((a,b) => b.tiou - a.tiou);
+
+  const mPred = new Set(), mGt = new Set(), matches = [];
+  pairs.forEach(({tiou, pi, gj}) => {
+    if (!mPred.has(pi) && !mGt.has(gj)) { matches.push({ pred_idx:pi, gt_idx:gj, tiou }); mPred.add(pi); mGt.add(gj); }
+  });
+
+  const tp = matches.length, fp = segments.length - tp, fn = gt.length - tp;
+  const precision = tp / segments.length || 0, recall = tp / gt.length || 0;
+  const f1 = (2*precision*recall)/(precision+recall) || 0;
+
+  checkResult = { matches, gt, precision, recall, f1, tp, fp, fn, matchedPred: [...mPred], matchedGt: [...mGt] };
+  drawTimeline();
+  renderResults();
+  document.getElementById('btnCoach').style.display = 'block';
+}
+
+function renderResults() {
+  if (!checkResult) { resultPanel.classList.remove('show'); return; }
+  resultPanel.classList.add('show');
+  const r = checkResult;
+  const f1c = r.f1 >= 0.7 ? 'good' : r.f1 >= 0.4 ? 'warn' : 'bad';
+  const msg = r.f1 >= 0.7 ? '事件检测质量不错！' : r.f1 >= 0.4 ? '还需要改进。' : '偏差较大，建议重新标注。';
+
+  let html = `
+    <div class="score-card">
+      <div class="score-row"><span class="score-label">精确率 Precision</span><span class="score-value ${r.precision>=0.7?'good':'warn'}">${(r.precision*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">召回率 Recall</span><span class="score-value ${r.recall>=0.7?'good':'warn'}">${(r.recall*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">F1 分数</span><span class="score-value ${f1c}">${(r.f1*100).toFixed(0)}%</span></div>
+      <div class="score-row"><span class="score-label">正确 / 应有</span><span style="font-size:15px;color:#e2e8f0">${r.tp} / ${r.gt.length}</span></div>
+    </div>
+    <div class="summary ${f1c}">${msg}</div>`;
+
+  const mps = new Set(r.matchedPred || []), mgs = new Set(r.matchedGt || []);
+
+  r.matches.forEach(m => {
+    const seg = segments[m.pred_idx];
+    const cn = LABEL_CN[seg.label] || seg.label;
+    html += `<div class="fb-item correct">匹配: ${cn} [${seg.start_time}s–${seg.end_time}s] — tIoU=${m.tiou.toFixed(2)}</div>`;
+  });
+
+  segments.forEach((seg, pi) => {
+    if (mps.has(pi)) return;
+    const cn = LABEL_CN[seg.label] || seg.label;
+    html += `<div class="fb-item extra">误报: ${cn} [${seg.start_time}s–${seg.end_time}s] — 无对应真实事件</div>`;
+  });
+
+  r.gt.forEach((g, gj) => {
+    if (mgs.has(gj)) return;
+    const cn = LABEL_CN[g.label] || g.label;
+    html += `<div class="fb-item missed">漏检: ${cn} [${g.start_time}s–${g.end_time}s] — 你没有标出来</div>`;
+  });
+
+  resultContent.innerHTML = html;
+}
+
+// ── Transcription mode ──
+let transcriptionAnswers = {};
+function loadTranscriptionTask(t) {
+  segments = []; checkResult = null;
+  resultPanel.classList.remove('show');
+  document.getElementById('btnCoach').style.display = 'none';
+  transcriptionAnswers = {};
+
+  const main = document.querySelector('.main-area');
+  const items = [
+    { id: 1, start: 0, end: 3, text: '段落 1 (0s–3s): 一段日常对话' },
+    { id: 2, start: 3, end: 7, text: '段落 2 (3s–7s): 一段专业说明' },
+    { id: 3, start: 7, end: 10, text: '段落 3 (7s–10s): 一段操作提醒' }
+  ];
+  const inputs = items.map(it => `
+    <div style="margin-bottom:12px">
+      <div style="font-size:12px;color:#888;margin-bottom:4px">${it.text}</div>
+      <textarea id="trans_${it.id}" rows="2" style="width:100%;padding:8px;border-radius:6px;border:1px solid #333;background:#0f3460;color:#eee;font-size:13px;resize:vertical" placeholder="在此输入转写文字..."></textarea>
+    </div>`).join('');
+
+  main.innerHTML = `
+    <div class="audio-controls">
+      <button onclick="toggleTransPlay()" id="btnTransPlay">▶ 播放</button>
+      <span class="time" id="transTime">00:00.0 / ${t.duration.toFixed(1)}s</span>
+      <input type="range" id="transSeek" min="0" max="${Math.floor(t.duration*10)}" value="0" oninput="seekTrans(this.value)">
+    </div>
+    <div style="background:#0f0f1a;border-radius:10px;border:1px solid #333;padding:16px;overflow-y:auto;flex:1">
+      ${inputs}
+    </div>
+    <button class="primary" onclick="checkTranscription()" style="padding:10px 32px;border-radius:8px;background:#2563eb;color:#eee;border:none;cursor:pointer;font-size:14px;align-self:flex-start">提交转写</button>
+    <div id="transResult" style="margin-top:10px"></div>
+  `;
+
+  audio.pause(); isPlaying = false;
+  audio.src = t.url;
+  audio.onloadedmetadata = () => { audioDuration = audio.duration || t.duration; };
+  audio.ontimeupdate = () => {
+    const cur = audio.currentTime;
+    document.getElementById('transTime').textContent = `${cur.toFixed(1)}s / ${audioDuration.toFixed(1)}s`;
+    document.getElementById('transSeek').value = Math.floor(cur * 10);
+  };
+
+  document.getElementById('info').textContent = t.desc + ' (' + (t.difficulty||'') + ') - 听音频逐段转写';
+}
+
+function toggleTransPlay() {
+  if (isPlaying) { audio.pause(); isPlaying = false; document.getElementById('btnTransPlay').textContent = '▶ 播放'; }
+  else { audio.play(); isPlaying = true; document.getElementById('btnTransPlay').textContent = '⏸ 暂停'; }
+}
+function seekTrans(val) { audio.currentTime = val / 10; }
+
+// Simple WER
+function calcWER(ref, hyp) {
+  const rw = ref.trim().split(''), hw = hyp.trim().split('');
+  const m = rw.length, n = hw.length;
+  if (m === 0) return n > 0 ? 1.0 : 0.0;
+  const dp = Array.from({length: m+1}, (_, i) => [i]);
+  for (let j = 1; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1] + (rw[i-1]===hw[j-1] ? 0 : 1));
+  return dp[m][n] / m;
+}
+
+function checkTranscription() {
+  const gt = TASKS[currentTask].gt;
+  let totalWer = 0, totalCount = 0;
+  let html = '<div style="background:#0f3460;border-radius:10px;padding:14px">';
+
+  gt.forEach(g => {
+    const hyp = document.getElementById('trans_' + g.id)?.value || '';
+    const wer = calcWER(g.text, hyp);
+    totalWer += wer; totalCount++;
+    const color = wer < 0.1 ? '#4ade80' : wer < 0.3 ? '#fbbf24' : '#f87171';
+    html += `<div style="padding:6px 0;border-bottom:1px solid #1e293b">
+      <span style="color:${color}">WER=${(wer*100).toFixed(0)}%</span> — 段落${g.id}
+      <div style="font-size:11px;color:#888">参考: ${g.text}</div>
+      <div style="font-size:11px;color:#94a3b8">你的: ${hyp || '(未填)'}</div>
+    </div>`;
+  });
+
+  const avgWer = totalCount > 0 ? totalWer / totalCount : 1;
+  const accuracy = Math.max(0, 1 - avgWer);
+  html += `<div style="margin-top:10px;font-size:14px"><strong>平均 WER: ${(avgWer*100).toFixed(0)}%</strong> | 准确率: ${(accuracy*100).toFixed(0)}%</div></div>`;
+  document.getElementById('transResult').innerHTML = html;
+
+  const result = {
+    type: 'audio_transcription', taskTitle: TASKS[currentTask].desc,
+    accuracy: accuracy, avgWer: avgWer, answers: gt.map(g => ({id: g.id, text: document.getElementById('trans_'+g.id)?.value||''}))
+  };
+  localStorage.setItem('annotation_last_result', JSON.stringify(result));
+  document.getElementById('btnCoach').style.display = 'block';
+  document.getElementById('info').textContent = accuracy >= 0.7 ? '转录质量不错！点「问Coach」继续' : '还需改进。点「问Coach」获取建议';
+}
+
+// ── Ask Coach ──
+function askCoach() {
+  const t = TASKS[currentTask];
+  let msg;
+  if (t.type === 'audio_transcription') {
+    const stored = JSON.parse(localStorage.getItem('annotation_last_result') || '{}');
+    msg = `我刚完成了「${t.desc.split('—')[0]}」语音转录练习：\n- 平均WER: ${((stored.avgWer||0)*100).toFixed(0)}%\n- 准确率: ${((stored.accuracy||0)*100).toFixed(0)}%\n请帮我分析一下哪里需要改进，推荐下一步学什么。`;
+  } else if (checkResult) {
+    const pct = (checkResult.f1 * 100).toFixed(0);
+    const pText = checkResult.f1 >= 0.7 ? '不错' : checkResult.f1 >= 0.4 ? '一般' : '需要改进';
+    msg = `我刚完成了「${t.desc.split('—')[0]}」音频事件检测：\n- 精确率: ${(checkResult.precision*100).toFixed(0)}%\n- 召回率: ${(checkResult.recall*100).toFixed(0)}%\n- F1分数: ${pct}% (${pText})\n- 正确: ${checkResult.tp}/${checkResult.gt.length}\n- 我的标注: ${JSON.stringify(segments)}\n请帮我分析一下哪里需要改进，推荐下一步学什么。`;
+  } else { return; }
+
+  localStorage.setItem('annotation_last_result', JSON.stringify({
+    taskId: currentTask, taskTitle: t.desc,
+    f1: checkResult?.f1 || 0, precision: checkResult?.precision || 0,
+    recall: checkResult?.recall || 0, tp: checkResult?.tp || 0, total: checkResult?.gt?.length || 0,
+    segments: segments, message: msg, time: Date.now()
+  }));
+  localStorage.setItem('annotation_pending_message', msg);
+  localStorage.setItem('annotation_pending_time', String(Date.now()));
+  try { window.parent.location.href = '/home'; } catch(e) { window.top.location.href = '/home'; }
+}
+
+function checkStoredResult() {
+  const stored = localStorage.getItem('annotation_last_result');
+  if (stored) {
+    document.getElementById('btnCoach').style.display = 'block';
+    document.getElementById('info').textContent = '上次检查有结果，点「问Coach」让AI帮你分析';
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (document.getElementById('timelineContainer') && TASKS[currentTask].type !== 'audio_transcription') {
+    drawTimeline();
+  }
+});
+loadTask();
+checkStoredResult();
+</script>
+</body>
+</html>

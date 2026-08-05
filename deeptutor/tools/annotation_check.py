@@ -35,6 +35,65 @@ def _calculate_iou(box1: dict, box2: dict) -> float:
     return intersection / union if union > 0 else 0.0
 
 
+# ------------------------------------------------------- audio/video temporal metrics
+
+def _calculate_tiou(seg1: dict, seg2: dict) -> float:
+    s1, e1 = seg1["start_time"], seg1["end_time"]
+    s2, e2 = seg2["start_time"], seg2["end_time"]
+    inter = max(0.0, min(e1, e2) - max(s1, s2))
+    union = max(e1, e2) - min(s1, s2)
+    return inter / union if union > 0 else 0.0
+
+
+def _calculate_wer(reference: str, hypothesis: str) -> dict:
+    ref_words = reference.strip().split()
+    hyp_words = hypothesis.strip().split()
+    m, n = len(ref_words), len(hyp_words)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        dp[i][0] = i
+    for j in range(n + 1):
+        dp[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            cost = 0 if ref_words[i - 1] == hyp_words[j - 1] else 1
+            dp[i][j] = min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+    edits = dp[m][n]
+    wer = edits / m if m > 0 else float("inf")
+    return {"wer": wer, "edits": edits, "ref_words": m, "hyp_words": n}
+
+
+def _segment_f1_metrics(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> dict:
+    pairs = []
+    for pi, pred in enumerate(predictions):
+        for gj, gt in enumerate(ground_truth):
+            if pred.get("label", "") != gt.get("label", ""):
+                continue
+            tiou = _calculate_tiou(pred, gt)
+            if tiou >= iou_threshold:
+                pairs.append((tiou, pi, gj))
+    pairs.sort(key=lambda x: x[0], reverse=True)
+    matched_pred: set[int] = set()
+    matched_gt: set[int] = set()
+    matches: list[dict] = []
+    for tiou, pi, gj in pairs:
+        if pi not in matched_pred and gj not in matched_gt:
+            matches.append({"pred_idx": pi, "gt_idx": gj, "tiou": tiou})
+            matched_pred.add(pi)
+            matched_gt.add(gj)
+    tp = len(matches)
+    fp = len(predictions) - tp
+    fn = len(ground_truth) - tp
+    precision = tp / len(predictions) if predictions else 0
+    recall = tp / len(ground_truth) if ground_truth else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    return {
+        "tp": tp, "fp": fp, "fn": fn,
+        "precision": precision, "recall": recall, "f1": f1,
+        "matches": matches, "matched_pred": matched_pred, "matched_gt": matched_gt,
+    }
+
+
 # ------------------------------------------------------- quality heuristics
 
 def check_edge_proximity(boxes: list[dict], image_size: tuple[int, int], threshold: int = 5) -> list[dict]:
@@ -485,17 +544,291 @@ def _error_case_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
     return {"accuracy": round(correct / total, 4) if total else 0, "correct": correct, "total": total}
 
 
+# -------------------------------------------------------- audio event evaluation
+
+def _audio_event_report(predictions: list[dict], ground_truth: list[dict], tiou_threshold: float = 0.5) -> str:
+    metrics = _segment_f1_metrics(predictions, ground_truth, tiou_threshold)
+    tp = metrics["tp"]; fp = metrics["fp"]; fn = metrics["fn"]
+    precision = metrics["precision"]; recall = metrics["recall"]; f1 = metrics["f1"]
+    matches = metrics["matches"]; matched_pred = metrics["matched_pred"]; matched_gt = metrics["matched_gt"]
+
+    lines = ["## 音频事件检测结果\n"]
+    lines.append(f"**精确率**: {precision:.0%}  — 标出的事件中有多少是正确的？")
+    lines.append(f"**召回率**: {recall:.0%}  — 实际事件中找到了多少？")
+    lines.append(f"**F1 分数**: {f1:.0%}  — 综合评分")
+    lines.append(f"**汇总**: {tp} 正确 | {fp} 误报 | {fn} 漏检\n")
+
+    if matches:
+        lines.append("### 正确匹配")
+        for m in matches:
+            pred = predictions[m["pred_idx"]]
+            lines.append(f"- [{pred['start_time']}s–{pred['end_time']}s] '{pred.get('label','?')}' — tIoU={m['tiou']:.2f} ✓")
+
+    for pi, pred in enumerate(predictions):
+        if pi in matched_pred:
+            continue
+        lines.append(f"- [{pred['start_time']}s–{pred['end_time']}s] '{pred.get('label','?')}': 误报（无对应事件）")
+
+    for gj in range(len(ground_truth)):
+        if gj not in matched_gt:
+            gt = ground_truth[gj]
+            lines.append(f"- 漏检: '{gt.get('label','?')}' 在 [{gt['start_time']}s–{gt['end_time']}s] 未被标出")
+
+    lines.append("\n---")
+    if f1 >= 0.8:
+        lines.append("**很不错！** 事件检测准确率高。")
+    elif recall < precision:
+        lines.append("**提示**: 召回率偏低，可能漏了一些事件。试着降低标注门槛。")
+    else:
+        lines.append("**提示**: 精确率偏低，有较多误报。标注时请更谨慎。")
+
+    return "\n".join(lines)
+
+
+def _audio_event_dict(predictions: list[dict], ground_truth: list[dict], tiou_threshold: float = 0.5) -> dict:
+    metrics = _segment_f1_metrics(predictions, ground_truth, tiou_threshold)
+    return {
+        "precision": round(metrics["precision"], 4),
+        "recall": round(metrics["recall"], 4),
+        "f1": round(metrics["f1"], 4),
+        "matched_count": metrics["tp"],
+        "extra_count": len(predictions) - metrics["tp"],
+        "missed_count": len(ground_truth) - metrics["tp"],
+    }
+
+
+# -------------------------------------------------------- audio transcription evaluation
+
+def _audio_transcription_report(predictions: list[dict], ground_truth: list[dict]) -> str:
+    lines = ["## 语音转录评估结果\n"]
+    if not predictions:
+        return "\n".join(lines) + "无提交。"
+    gt_by_id = {gt.get("id", i): gt for i, gt in enumerate(ground_truth)}
+    total_wer = 0.0
+    count = 0
+    for i, pred in enumerate(predictions):
+        item_id = pred.get("id", i)
+        gt = gt_by_id.get(item_id)
+        if not gt:
+            lines.append(f"- 段落 {item_id}: 额外作答（无标准答案）")
+            continue
+        ref = gt.get("text", "")
+        hyp = pred.get("text", "")
+        result = _calculate_wer(ref, hyp)
+        wer = result["wer"]
+        total_wer += wer
+        count += 1
+        lines.append(f"- 段落 {item_id}: WER={wer:.1%} (编辑距离={result['edits']}, 参考词数={result['ref_words']})")
+        if wer < 0.1:
+            lines.append(f"  转录质量优秀 ✓")
+        elif wer < 0.3:
+            lines.append(f"  转录质量一般，注意听清每个词")
+        else:
+            lines.append(f"  错误较多，建议重新仔细听")
+
+    for item_id, gt in gt_by_id.items():
+        if not any(p.get("id", i) == item_id for i, p in enumerate(predictions)):
+            lines.append(f"- 段落 {item_id}: 未作答")
+
+    avg_wer = total_wer / count if count > 0 else 1.0
+    accuracy = max(0.0, 1.0 - avg_wer)
+    lines.append(f"\n**平均 WER**: {avg_wer:.1%} | **转录准确率**: {accuracy:.0%}")
+    lines.append("\n---")
+    if avg_wer < 0.1:
+        lines.append("**优秀！** 转录质量很高。")
+    elif avg_wer < 0.3:
+        lines.append("**不错。** 继续练习提高准确率。")
+    else:
+        lines.append("**需要改进。** 仔细听音频，逐词对照检查。")
+    return "\n".join(lines)
+
+
+def _audio_transcription_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
+    gt_by_id = {gt.get("id", i): gt for i, gt in enumerate(ground_truth)}
+    total_wer = 0.0; count = 0
+    for i, pred in enumerate(predictions):
+        item_id = pred.get("id", i)
+        gt = gt_by_id.get(item_id)
+        if gt:
+            result = _calculate_wer(gt.get("text", ""), pred.get("text", ""))
+            total_wer += result["wer"]
+            count += 1
+    avg_wer = total_wer / count if count > 0 else 1.0
+    return {"wer": round(avg_wer, 4), "accuracy": round(max(0.0, 1.0 - avg_wer), 4), "segments": count}
+
+
+# -------------------------------------------------------- video tracking evaluation
+
+def _video_tracking_report(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> str:
+    total_frames = len(ground_truth)
+    if total_frames == 0:
+        return "无标准答案数据。"
+
+    frames_correct = 0
+    total_precision = 0.0
+    total_recall = 0.0
+    detail_lines: list[str] = []
+
+    for frame_idx, gt_frame in enumerate(ground_truth):
+        gt_boxes = gt_frame.get("boxes", [])
+        frame_id = gt_frame.get("frame", frame_idx)
+        pred_frame = predictions[frame_idx] if frame_idx < len(predictions) else {}
+        pred_boxes = pred_frame.get("boxes", [])
+
+        if not gt_boxes:
+            continue
+
+        frame_metrics = _bbox_metrics(pred_boxes, gt_boxes, iou_threshold)
+        total_precision += frame_metrics["precision"]
+        total_recall += frame_metrics["recall"]
+        f1 = frame_metrics["f1"]
+        if f1 >= 0.5:
+            frames_correct += 1
+
+        detail_lines.append(
+            f"- 帧 {frame_id}: P={frame_metrics['precision']:.0%} R={frame_metrics['recall']:.0%} "
+            f"F1={f1:.0%} ({frame_metrics['tp']}/{len(gt_boxes)} 匹配)"
+        )
+
+    avg_precision = total_precision / total_frames if total_frames > 0 else 0
+    avg_recall = total_recall / total_frames if total_frames > 0 else 0
+    avg_f1 = 2 * avg_precision * avg_recall / (avg_precision + avg_recall) if (avg_precision + avg_recall) > 0 else 0
+    frame_accuracy = frames_correct / total_frames if total_frames > 0 else 0
+
+    lines = ["## 视频跟踪评估结果\n"]
+    lines.append(f"**平均精确率**: {avg_precision:.0%}")
+    lines.append(f"**平均召回率**: {avg_recall:.0%}")
+    lines.append(f"**平均 F1**: {avg_f1:.0%}")
+    lines.append(f"**帧正确率**: {frame_accuracy:.0%} ({frames_correct}/{total_frames} 帧达标)\n")
+    lines.append("### 逐帧详情")
+    lines.extend(detail_lines[:10])
+    if len(detail_lines) > 10:
+        lines.append(f"... 共 {len(detail_lines)} 帧，仅展示前 10 帧")
+
+    lines.append("\n---")
+    if avg_f1 >= 0.8:
+        lines.append("**优秀！** 跟踪标注质量很高。")
+    elif avg_f1 >= 0.5:
+        lines.append("**继续加油。** 注意框的边缘贴合度和逐帧一致性。")
+    else:
+        lines.append("**需要改进。** 逐帧检查框是否完整覆盖目标。")
+    return "\n".join(lines)
+
+
+def _video_tracking_dict(predictions: list[dict], ground_truth: list[dict], iou_threshold: float = 0.5) -> dict:
+    total_frames = len(ground_truth)
+    if total_frames == 0:
+        return {"f1": 0, "frame_accuracy": 0, "total_frames": 0}
+    total_precision = 0.0; total_recall = 0.0; frames_correct = 0
+    for frame_idx, gt_frame in enumerate(ground_truth):
+        gt_boxes = gt_frame.get("boxes", [])
+        pred_frame = predictions[frame_idx] if frame_idx < len(predictions) else {}
+        pred_boxes = pred_frame.get("boxes", [])
+        if not gt_boxes:
+            continue
+        fm = _bbox_metrics(pred_boxes, gt_boxes, iou_threshold)
+        total_precision += fm["precision"]
+        total_recall += fm["recall"]
+        if fm["f1"] >= 0.5:
+            frames_correct += 1
+    avg_p = total_precision / total_frames if total_frames > 0 else 0
+    avg_r = total_recall / total_frames if total_frames > 0 else 0
+    avg_f1 = 2 * avg_p * avg_r / (avg_p + avg_r) if (avg_p + avg_r) > 0 else 0
+    return {"f1": round(avg_f1, 4), "frame_accuracy": round(frames_correct / total_frames, 4) if total_frames > 0 else 0, "total_frames": total_frames}
+
+
+# -------------------------------------------------------- video event evaluation
+
+def _video_event_report(predictions: list[dict], ground_truth: list[dict], tiou_threshold: float = 0.5) -> str:
+    return _audio_event_report(predictions, ground_truth, tiou_threshold).replace("音频事件检测", "视频事件检测")
+
+
+def _video_event_dict(predictions: list[dict], ground_truth: list[dict], tiou_threshold: float = 0.5) -> dict:
+    return _audio_event_dict(predictions, ground_truth, tiou_threshold)
+
+
+# -------------------------------------------------------- NER evaluation (text annotation)
+
+def _ner_metrics(predictions: list[dict], ground_truth: list[dict]) -> dict:
+    """Entity-level exact match F1 for NER."""
+    pred_set = set()
+    gt_set = set()
+    for p in predictions:
+        pred_set.add((p.get("start", 0), p.get("end", 0), p.get("label", "")))
+    for g in ground_truth:
+        gt_set.add((g.get("start", 0), g.get("end", 0), g.get("label", "")))
+    tp = len(pred_set & gt_set)
+    fp = len(pred_set - gt_set)
+    fn = len(gt_set - pred_set)
+    precision = tp / len(pred_set) if pred_set else 0
+    recall = tp / len(gt_set) if gt_set else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    return {"tp": tp, "fp": fp, "fn": fn, "precision": precision, "recall": recall, "f1": f1}
+
+
+def _ner_report(predictions: list[dict], ground_truth: list[dict]) -> str:
+    metrics = _ner_metrics(predictions, ground_truth)
+    tp = metrics["tp"]; fp = metrics["fp"]; fn = metrics["fn"]
+    precision = metrics["precision"]; recall = metrics["recall"]; f1 = metrics["f1"]
+
+    lines = ["## 命名实体识别(NER)评估结果\n"]
+    lines.append(f"**精确率**: {precision:.0%}  — 标出的实体中有多少是正确的？")
+    lines.append(f"**召回率**: {recall:.0%}  — 实际实体中找到了多少？")
+    lines.append(f"**F1 分数**: {f1:.0%}  — 综合评分")
+    lines.append(f"**汇总**: {tp} 正确 | {fp} 误标/错标 | {fn} 漏标\n")
+
+    pred_set = set((p.get("start", 0), p.get("end", 0), p.get("label", "")) for p in predictions)
+    gt_set = set((g.get("start", 0), g.get("end", 0), g.get("label", "")) for g in ground_truth)
+
+    if pred_set & gt_set:
+        lines.append("### 正确匹配的实体")
+        for s, e, label in sorted(pred_set & gt_set):
+            lines.append(f"- [{s}:{e}] `{label}` ✓")
+
+    for s, e, label in sorted(pred_set - gt_set):
+        lines.append(f"- [{s}:{e}] `{label}`: ❌ 误标（不存在此实体）")
+
+    for s, e, label in sorted(gt_set - pred_set):
+        lines.append(f"- [{s}:{e}] `{label}`: ⚠ 漏标（未标注此实体）")
+
+    lines.append("\n---")
+    if f1 >= 0.8:
+        lines.append("**优秀！** 实体识别准确率高。")
+    elif f1 >= 0.6:
+        lines.append("**不错。** 检查漏标或误标的实体。")
+    else:
+        lines.append("**需要改进。** 仔细对比每个实体的起止位置和标签。")
+    return "\n".join(lines)
+
+
+def _ner_dict(predictions: list[dict], ground_truth: list[dict]) -> dict:
+    metrics = _ner_metrics(predictions, ground_truth)
+    return {
+        "precision": round(metrics["precision"], 4),
+        "recall": round(metrics["recall"], 4),
+        "f1": round(metrics["f1"], 4),
+        "matched": metrics["tp"],
+        "extra": metrics["fp"],
+        "missed": metrics["fn"],
+    }
+
+
 class AnnotationCheckTool(BaseTool):
     def get_definition(self) -> ToolDefinition:
         return ToolDefinition(
             name="annotation_check",
             description=(
                 "Evaluate annotation quality by comparing predictions against ground truth. "
-                "For bounding boxes: computes IOU, precision, recall, F1. "
+                "For bounding boxes (bbox): computes IOU, precision, recall, F1. "
                 "For classification: computes per-item accuracy. "
                 "For judgment: true/false answers per item. "
                 "For standard: annotation-standard compliance (required fields / label / coord ranges). "
                 "For error_case: whether erroneous annotations were flagged correctly. "
+                "For audio_event: computes tIoU (temporal IOU), precision, recall, F1 on audio segments. "
+                "For audio_transcription: computes WER (Word Error Rate) for speech-to-text. "
+                "For video_tracking: computes frame-level IOU across video frames. "
+                "For video_event: computes tIoU on video temporal segments. "
+                "For ner: computes entity-level exact-match F1 for text NER annotation. "
                 "Returns a detailed educational report with per-item feedback. "
                 "评测 bbox 后若提供 task_id 会自动推进教学流程 evaluate→feedback。"
             ),
@@ -525,9 +858,9 @@ class AnnotationCheckTool(BaseTool):
                 ToolParameter(
                     name="task_type",
                     type="string",
-                    description="'bbox', 'classification', 'judgment', 'standard', or 'error_case'.",
+                    description="'bbox', 'classification', 'judgment', 'standard', 'error_case', 'audio_event', 'audio_transcription', 'video_tracking', 'video_event', 'ner'.",
                     required=False,
-                    enum=["bbox", "classification", "judgment", "standard", "error_case"],
+                    enum=["bbox", "classification", "judgment", "standard", "error_case", "audio_event", "audio_transcription", "video_tracking", "video_event", "ner"],
                     default="bbox",
                 ),
                 ToolParameter(
@@ -576,6 +909,26 @@ class AnnotationCheckTool(BaseTool):
             content = _error_case_report(predictions, ground_truth)
             chart = None
             metadata = _error_case_dict(predictions, ground_truth)
+        elif task_type == "audio_event":
+            content = _audio_event_report(predictions, ground_truth)
+            chart = None
+            metadata = _audio_event_dict(predictions, ground_truth)
+        elif task_type == "audio_transcription":
+            content = _audio_transcription_report(predictions, ground_truth)
+            chart = None
+            metadata = _audio_transcription_dict(predictions, ground_truth)
+        elif task_type == "video_tracking":
+            content = _video_tracking_report(predictions, ground_truth)
+            chart = None
+            metadata = _video_tracking_dict(predictions, ground_truth)
+        elif task_type == "video_event":
+            content = _video_event_report(predictions, ground_truth)
+            chart = None
+            metadata = _video_event_dict(predictions, ground_truth)
+        elif task_type == "ner":
+            content = _ner_report(predictions, ground_truth)
+            chart = None
+            metadata = _ner_dict(predictions, ground_truth)
         else:
             image_size = (1000, 1000)
             metadata = {}
