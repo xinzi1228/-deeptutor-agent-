@@ -58,6 +58,7 @@ async def run_dedup(
     iterations: int | None = None,
     llm_selection: dict | None = None,
     on_event: OnEvent | None = None,
+    bucket: str | None = None,
 ) -> DedupResult:
     from deeptutor.services.model_selection.runtime import (
         activate_llm_selection,
@@ -78,7 +79,13 @@ async def run_dedup(
             token = None
     try:
         return await _run_dedup_inner(
-            layer, key, iters=iters, language=language, user_label=user_label, on_event=on_event
+            layer,
+            key,
+            iters=iters,
+            language=language,
+            user_label=user_label,
+            on_event=on_event,
+            bucket=bucket,
         )
     finally:
         reset_llm_selection(token)
@@ -92,8 +99,9 @@ async def _run_dedup_inner(
     language: str,
     user_label: str,
     on_event: OnEvent | None,
+    bucket: str | None = None,
 ) -> DedupResult:
-    path = _path_for(layer, key)
+    path = _path_for(layer, key, bucket)
     if not path.exists():
         await emit(on_event, {"stage": "done", "no_doc": True, "edits_applied": 0})
         return DedupResult(
@@ -187,6 +195,7 @@ async def _run_dedup_inner(
             language=language,
             user_label=user_label,
             on_event=on_event,
+            bucket=bucket,
         )
 
     return DedupResult(
@@ -201,9 +210,9 @@ async def _run_dedup_inner(
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 
-def _path_for(layer: str, key: str):
+def _path_for(layer: str, key: str, bucket: str | None = None):
     if layer == "L2":
-        return paths.l2_file(key)  # type: ignore[arg-type]
+        return paths.l2_file(key, bucket)  # type: ignore[arg-type]
     if layer == "L3":
         return paths.l3_file(key)  # type: ignore[arg-type]
     raise ValueError(f"unknown layer {layer!r}")

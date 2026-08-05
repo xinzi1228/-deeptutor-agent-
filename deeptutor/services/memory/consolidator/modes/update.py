@@ -337,6 +337,7 @@ async def _run_update_l2(
             iterations=settings.dedup.iterations,
             llm_selection=llm_selection,
             on_event=on_event,
+            bucket=bucket,
         )
 
     if settings.merge.auto_after_update:
@@ -348,6 +349,7 @@ async def _run_update_l2(
             language=language,
             user_label=user_label,
             on_event=on_event,
+            bucket=bucket,
         )
 
     return UpdateResult(

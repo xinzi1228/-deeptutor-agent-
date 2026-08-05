@@ -66,6 +66,7 @@ async def run_merge(
     language: str = "en",
     user_label: str = "anonymous",
     on_event: OnEvent | None = None,
+    bucket: str | None = None,
 ) -> MergeResult:
     """Re-serialize ``layer/key``; collapse duplicate refs into one footnote each.
 
@@ -77,7 +78,7 @@ async def run_merge(
     # calls, so neither is used inside the body.
     del language, user_label
 
-    path = _path_for(layer, key)
+    path = _path_for(layer, key, bucket)
     if not path.exists():
         await emit(on_event, {"stage": "done", "no_doc": True, "rewrote": False})
         return MergeResult(
@@ -205,9 +206,9 @@ def _migrate_l3_legacy_refs(doc) -> int:
     return migrated
 
 
-def _path_for(layer: str, key: str):
+def _path_for(layer: str, key: str, bucket: str | None = None):
     if layer == "L2":
-        return paths.l2_file(key)  # type: ignore[arg-type]
+        return paths.l2_file(key, bucket)  # type: ignore[arg-type]
     if layer == "L3":
         return paths.l3_file(key)  # type: ignore[arg-type]
     raise ValueError(f"unknown layer {layer!r}")
