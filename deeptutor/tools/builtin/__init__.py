@@ -792,16 +792,27 @@ class ReadMemoryTool(_PromptHintsMixin, BaseTool):
                 "Use to personalise tone, depth, and examples — not on "
                 "every turn, not for purely factual questions."
             ),
-            parameters=[],
+            parameters=[
+                ToolParameter(
+                    name="bucket",
+                    type="string",
+                    description="可选记忆区名，按区读取（如 标注学习）；不传则读全局记忆。",
+                    required=False,
+                ),
+            ],
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         from deeptutor.services.memory import get_memory_store
 
-        text = get_memory_store().read_l3_concat()
+        bucket = str(kwargs.get("bucket") or "").strip()
+        if bucket:
+            text = get_memory_store().read_bucket(bucket)
+        else:
+            text = get_memory_store().read_l3_concat()
         return ToolResult(
             content=text,
-            metadata={"char_count": len(text)},
+            metadata={"char_count": len(text), "bucket": bucket or None},
         )
 
 
