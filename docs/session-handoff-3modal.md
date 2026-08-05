@@ -50,10 +50,17 @@
 - **Mem0**：ADD-only + scope 分区 + includes/excludes + expiration
 - **MemOS/MemTensor**（10.6k★）、edumcp（已 clone）
 
-## 六、恢复提示词
+## 六、三模态标注拓展文档（已产出，直接可用）
+
+| 文档 | 内容 |
+|------|------|
+| `docs/3modal-annotation-plan.md` | **详细规划文档**（现状+设计+改动清单+注意事项+验收，供接力 AI 实施） |
+| `docs/3modal-annotation-research.md` | 调研（CVAT/Doccano 范式 + task_type 跨模态矩阵 + 空白机会点） |
+
+## 七、恢复提示词
 
 > 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下三份议题设计，继续标注星图。
-> 当前有两条线：
-> ① 7 议题 brainstorming：⑤⑥③ 已完成设计，剩余 ①②（记忆分区，已调研待写文档）、④（LS 联动）、⑦（总控）——用户可能先做「三模态标注拓展规划文档」
-> ② 三模态标注拓展（文本/图像/视频）：用户将写规划文档，写完后继续此方向讨论
+> 当前两条线：
+> ① 7 议题 brainstorming：⑤⑥③ 已完成设计，剩余 ①②（记忆分区，已调研待写文档）、④（LS 联动）、⑦（总控）
+> ② **三模态标注拓展（文本/图像/视频）**：规划文档已由用户确认，见 `docs/3modal-annotation-plan.md`（直接可实施，P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`
 > 启动需 `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001`；next build 清代理；测试基线 2985/33。
