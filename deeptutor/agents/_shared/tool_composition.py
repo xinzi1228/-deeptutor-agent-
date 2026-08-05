@@ -201,6 +201,7 @@ def compose_enabled_tools(
         "route_input",
         "verify_output",
         "kb_search",
+        "delegate_to_expert",
         "job_analysis",
         "get_annotation_task",
         "annotation_check",
