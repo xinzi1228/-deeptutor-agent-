@@ -26,6 +26,7 @@ from deeptutor.tools.job_analysis_tool import JobAnalysisTool
 from deeptutor.tools.label_studio_tool import (
     LabelStudioCheckTool,
     LabelStudioCreateProjectTool,
+    LabelStudioImportTool,
 )
 from deeptutor.tools.log_decision_tool import LogDecisionTool
 from deeptutor.tools.media_gen_tool import ImagegenTool, VideogenTool
@@ -1630,6 +1631,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     GetAnnotationTaskTool,
     LabelStudioCreateProjectTool,
     LabelStudioCheckTool,
+    LabelStudioImportTool,
     CompetencyMapTool,
     AbilityRadarTool,
     StruggleDetectTool,
@@ -1740,6 +1742,7 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "graph_query",
     "ls_create_project",
     "ls_check_annotations",
+    "ls_import_tasks",
     "competency_map",
     "ability_radar",
     "struggle_detect",
@@ -1774,6 +1777,7 @@ __all__ = [
     "GetAnnotationTaskTool",
     "LabelStudioCreateProjectTool",
     "LabelStudioCheckTool",
+    "LabelStudioImportTool",
     "CompetencyMapTool",
     "AbilityRadarTool",
     "StruggleDetectTool",
