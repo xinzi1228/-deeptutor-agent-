@@ -101,6 +101,23 @@ class MemoryStore:
             return _NO_MEMORY
         return "\n\n---\n\n".join(parts) + "\n"
 
+    def read_bucket(self, bucket: str) -> str:
+        """Read a memory bucket: its L2 summaries across surfaces + global L3."""
+        parts: list[str] = []
+        bdir = paths.buckets_dir() / bucket
+        if bdir.is_dir():
+            for md in sorted(bdir.glob("*.md")):
+                body = md.read_text(encoding="utf-8").strip()
+                if body:
+                    parts.append(f"## [{md.stem}]\n{body}")
+        for slot in paths.L3_SLOTS:
+            body = self.read_raw("L3", slot).strip()
+            if body:
+                parts.append(body)
+        if not parts:
+            return "（该记忆区暂无内容）\n"
+        return "\n\n---\n\n".join(parts) + "\n"
+
     # ── L2 / L3 write (manual paths) ──────────────────────────────────────
 
     async def overwrite_doc(self, layer: Layer, key: str, md: str) -> None:

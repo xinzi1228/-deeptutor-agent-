@@ -77,6 +77,10 @@ def l2_dir() -> Path:
     return memory_root() / "L2"
 
 
+def buckets_dir() -> Path:
+    return l2_dir()
+
+
 def l2_file(surface: Surface, bucket: str | None = None) -> Path:
     """L2 summary file for a surface, optionally scoped to a memory bucket."""
     if bucket:
