@@ -15,7 +15,6 @@ from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter
 from deeptutor.tools.annotation_check import _bbox_dict, _classify_dict
 from deeptutor.tools.prompting import load_prompt_hints
 
-
 LS_BASE_URL = os.environ.get("LABEL_STUDIO_URL", "http://localhost:8080")
 LS_API_TOKEN = os.environ.get("LABEL_STUDIO_API_TOKEN", "")
 
@@ -46,8 +45,8 @@ def _default_label_config(labels: list[str], task_type: str = "bbox") -> str:
     """Generate a Label Studio XML config for a simple labeling task."""
     if task_type == "bbox":
         label_choices = "".join(
-            f'<Label value="{l}" background="#{hash(l) & 0xFFFFFF:06x}"/>'
-            for l in labels
+            f'<Label value="{label}" background="#{hash(label) & 0xFFFFFF:06x}"/>'
+            for label in labels
         )
         return f"""<View>
   <Image name="image" value="$image"/>
@@ -57,7 +56,7 @@ def _default_label_config(labels: list[str], task_type: str = "bbox") -> str:
 </View>"""
     else:
         label_choices = "".join(
-            f'<Choice value="{l}"/>' for l in labels
+            f'<Choice value="{label}"/>' for label in labels
         )
         return f"""<View>
   <Text name="text" value="$text"/>
@@ -338,3 +337,63 @@ class LabelStudioCheckTool(BaseTool):
         if hints.short_description:
             return hints
         return super().get_prompt_hints(language=language)
+
+
+class LabelStudioImportTool(BaseTool):
+    """Import annotation tasks into an existing Label Studio project."""
+
+    def get_definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="ls_import_tasks",
+            description=(
+                "Import a batch of annotation tasks into an existing Label Studio project. "
+                "Pass project_id and tasks as a JSON list, e.g. "
+                '[{"data": {"image": "/path/a.jpg"}}, {"data": {"image": "/path/b.jpg"}}]. '
+                "Returns the import report (task_count)."
+            ),
+            parameters=[
+                ToolParameter(
+                    name="project_id",
+                    type="integer",
+                    description="Label Studio project ID.",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="tasks",
+                    type="string",
+                    description="JSON array of task objects (each with a `data` key).",
+                    required=True,
+                ),
+            ],
+        )
+
+    async def execute(self, **kwargs: Any) -> ToolResult:
+        if not LS_API_TOKEN:
+            return ToolResult(
+                content=(
+                    "Label Studio API token not configured. "
+                    "Set LABEL_STUDIO_API_TOKEN (Account & Settings → Access Token)."
+                ),
+                success=False,
+            )
+        try:
+            project_id = int(kwargs.get("project_id"))
+        except (TypeError, ValueError):
+            return ToolResult(content="Error: project_id is required (integer).", success=False)
+        tasks_raw = kwargs.get("tasks", "[]")
+        try:
+            tasks = json.loads(tasks_raw) if isinstance(tasks_raw, str) else tasks_raw
+        except json.JSONDecodeError as e:
+            return ToolResult(content=f"Error: tasks JSON 解析失败: {e}", success=False)
+        if not isinstance(tasks, list):
+            return ToolResult(content="Error: tasks 必须是 JSON 数组。", success=False)
+        if not tasks:
+            return ToolResult(content="Error: tasks 为空。", success=False)
+        try:
+            result = await _ls_request("POST", f"/api/projects/{project_id}/import", json=tasks)
+        except Exception as e:
+            return ToolResult(content=f"导入失败: {e}", success=False)
+        return ToolResult(
+            content=f"已导入 {result.get('task_count', 0)} 个任务到项目 {project_id}。",
+            metadata={"imported": result, "project_id": project_id},
+        )
