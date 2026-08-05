@@ -77,8 +77,23 @@ def l2_dir() -> Path:
     return memory_root() / "L2"
 
 
-def l2_file(surface: Surface) -> Path:
+def l2_file(surface: Surface, bucket: str | None = None) -> Path:
+    """L2 summary file for a surface, optionally scoped to a memory bucket."""
+    if bucket:
+        return l2_dir() / bucket / f"{surface}.md"
     return l2_dir() / f"{surface}.md"
+
+
+def list_buckets() -> list[str]:
+    """Existing memory bucket names (subdirectories of L2)."""
+    d = l2_dir()
+    if not d.exists():
+        return []
+    return sorted(
+        entry.name
+        for entry in d.iterdir()
+        if entry.is_dir() and not entry.name.startswith(".")
+    )
 
 
 def l3_dir() -> Path:
