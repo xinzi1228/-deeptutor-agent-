@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 
 import { apiFetch, apiUrl } from "@/lib/api";
 import MemoryArchivedBanner from "@/components/memory/MemoryArchivedBanner";
+import MemoryBuckets from "@/components/memory/MemoryBuckets";
 
 interface DocOverview {
   layer: "L2" | "L3";
@@ -163,6 +164,8 @@ export default function MemoryHub() {
       </div>
 
       <GraphCallout />
+
+      <MemoryBuckets />
 
       <MemoryArchivedBanner latestBackup={latestBackup} variant="compact" />
     </div>

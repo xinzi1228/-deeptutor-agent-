@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
 from pathlib import Path
+import re
 import shutil
 from typing import Literal
 
@@ -29,6 +30,18 @@ logger = logging.getLogger(__name__)
 Layer = Literal["L2", "L3"]
 
 _V1_FILES = ("PROFILE.md", "SUMMARY.md")
+
+BUCKET_NAME_RE = re.compile(r"^[\w\u4e00-\u9fa5\-]{1,32}$")
+
+
+def validate_bucket_name(name: str) -> None:
+    """Reject names that are not safe directory names for a bucket.
+
+    Guards path traversal (``.``, ``/``, ``\\``), whitespace, and
+    over-long names. Raises :class:`ValueError` on invalid input.
+    """
+    if not isinstance(name, str) or not BUCKET_NAME_RE.match(name):
+        raise ValueError(f"invalid bucket name {name!r}")
 
 
 def _normalize_pref_text(text: str) -> str:
@@ -117,6 +130,33 @@ class MemoryStore:
         if not parts:
             return "（该记忆区暂无内容）\n"
         return "\n\n---\n\n".join(parts) + "\n"
+
+    # ── Bucket management ─────────────────────────────────────────────────
+
+    def create_bucket(self, name: str) -> bool:
+        """Create a bucket directory under L2.
+
+        Returns ``True`` if newly created, ``False`` if it already existed.
+        Raises :class:`ValueError` for invalid names (see
+        :func:`validate_bucket_name`).
+        """
+        validate_bucket_name(name)
+        path = paths.buckets_dir() / name
+        existed = path.exists()
+        path.mkdir(parents=True, exist_ok=True)
+        return not existed
+
+    def delete_bucket(self, name: str) -> bool:
+        """Remove a bucket directory (recursively).
+
+        Returns ``True`` if the directory existed before deletion,
+        ``False`` otherwise. Raises :class:`ValueError` for invalid names.
+        """
+        validate_bucket_name(name)
+        path = paths.buckets_dir() / name
+        existed = path.exists()
+        shutil.rmtree(path, ignore_errors=True)
+        return existed
 
     # ── L2 / L3 write (manual paths) ──────────────────────────────────────
 

@@ -47,6 +47,7 @@ from deeptutor.services.memory import (
     get_memory_store,
     paths,
 )
+from deeptutor.services.memory.store import validate_bucket_name
 
 _ENTRY_ID_RE = re.compile(r"^m_[0-9A-HJKMNP-TV-Z]{26}$")
 
@@ -783,3 +784,49 @@ async def clear_snapshot_changes(surface: str):
 
     snap.clear_changes(surf)
     return {"surface": surf, "cleared": True}
+
+
+# ── Buckets (记忆区) ──────────────────────────────────────────────────────
+
+
+class BucketCreateRequest(BaseModel):
+    name: str
+
+
+def _bucket_or_404(name: str) -> None:
+    """Validate ``name`` → 400, then ensure the bucket dir exists → 404."""
+    try:
+        validate_bucket_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not (paths.buckets_dir() / name).exists():
+        raise HTTPException(status_code=404, detail=f"unknown bucket {name!r}")
+
+
+@router.get("/buckets")
+async def list_buckets_endpoint():
+    return {"buckets": [{"name": n} for n in paths.list_buckets()]}
+
+
+@router.post("/buckets")
+async def create_bucket_endpoint(payload: BucketCreateRequest):
+    try:
+        created = get_memory_store().create_bucket(payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not created:
+        raise HTTPException(status_code=409, detail=f"bucket {payload.name!r} already exists")
+    return {"name": payload.name, "created": True}
+
+
+@router.get("/buckets/{name}")
+async def get_bucket(name: str):
+    _bucket_or_404(name)
+    return {"name": name, "content": get_memory_store().read_bucket(name)}
+
+
+@router.delete("/buckets/{name}")
+async def delete_bucket_endpoint(name: str):
+    _bucket_or_404(name)
+    get_memory_store().delete_bucket(name)
+    return {"name": name, "deleted": True}
