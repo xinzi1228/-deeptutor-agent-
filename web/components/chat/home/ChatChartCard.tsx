@@ -7,7 +7,8 @@ type ChartData =
   | { type: "radar"; data: { labels: string[]; values: number[] } }
   | { type: "progress"; data: { completed: number; total: number; modules: { name: string; done: number; total: number }[] } }
   | { type: "graph"; data: { nodes: { id: string; label: string; status: string }[]; edges: { source: string; target: string }[] } }
-  | { type: "quiz_card"; data: { question: string; options: string[]; answer_index: number; explanation?: string | null; knowledge_point?: string | null } };
+  | { type: "quiz_card"; data: { question: string; options: string[]; answer_index: number; explanation?: string | null; knowledge_point?: string | null } }
+  | { type: "ls_task_card"; data: { project_id: number; task_index: number; title: string; task_type: string; instructions?: string | null; url: string } };
 
 export function ChatChartCard({ chart }: { chart: ChartData }) {
   if (chart.type === "scorecard") {
@@ -70,6 +71,10 @@ export function ChatChartCard({ chart }: { chart: ChartData }) {
     return <QuizCard data={chart.data} />;
   }
 
+  if (chart.type === "ls_task_card") {
+    return <LsTaskCard data={chart.data} />;
+  }
+
   return null;
 }
 
@@ -126,6 +131,30 @@ function GraphCard({ nodes, edges }: { nodes: { id: string; label: string; statu
     return () => cy?.destroy();
   }, [nodes, edges]);
   return <div ref={ref} className="my-2 h-40 rounded-xl border border-[var(--border)] bg-[var(--card)]" />;
+}
+
+function LsTaskCard({ data }: { data: { project_id: number; task_index: number; title: string; task_type: string; instructions?: string | null; url: string } }) {
+  return (
+    <div className="my-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-500">
+          {data.task_type}
+        </span>
+      </div>
+      <div className="mb-2 text-sm font-medium text-[var(--foreground)]">{data.title}</div>
+      {data.instructions && (
+        <div className="mb-2 text-xs text-[var(--muted-foreground)]">{data.instructions}</div>
+      )}
+      <a
+        href={data.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block w-full rounded-lg bg-blue-500 px-3 py-1.5 text-center text-xs font-semibold text-white transition-colors hover:bg-blue-600"
+      >
+        打开标注任务
+      </a>
+    </div>
+  );
 }
 
 function QuizCard({ data }: { data: { question: string; options: string[]; answer_index: number; explanation?: string | null; knowledge_point?: string | null } }) {

@@ -8,9 +8,12 @@ ChatChartCard channel renders it as an interactive card (e.g. quiz_card).
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
+
+LS_BASE_URL = os.environ.get("LABEL_STUDIO_URL", "http://localhost:8080")
 
 
 def validate_component(component: Any) -> dict[str, Any] | None:
@@ -37,6 +40,26 @@ def validate_component(component: Any) -> dict[str, Any] | None:
             "explanation": str(data.get("explanation") or "").strip() or None,
             "knowledge_point": str(data.get("knowledge_point") or "").strip() or None,
         }}
+    if ctype == "ls_task_card":
+        project_id = data.get("project_id")
+        task_index = data.get("task_index")
+        title = data.get("title")
+        if isinstance(project_id, bool) or not isinstance(project_id, int):
+            return None
+        if isinstance(task_index, bool) or not isinstance(task_index, int) or task_index < 0:
+            return None
+        if not isinstance(title, str) or not title.strip():
+            return None
+        task_type = str(data.get("task_type") or "bbox").strip() or "bbox"
+        instructions = str(data.get("instructions") or "").strip()
+        return {"type": "ls_task_card", "data": {
+            "project_id": project_id,
+            "task_index": task_index,
+            "title": title.strip(),
+            "task_type": task_type,
+            "instructions": instructions,
+            "url": f"{LS_BASE_URL}/projects/{project_id}/labeling?task={task_index}",
+        }}
     return None  # unknown type
 
 
@@ -52,7 +75,12 @@ class RenderUiTool(BaseTool):
                 "- quiz_card: {\"type\":\"quiz_card\",\"data\":{\"question\":\"...\","
                 "\"options\":[\"A\",\"B\",...],\"answer_index\":0,\"explanation\":\"...\","
                 "\"knowledge_point\":\"...\"}} — renders a clickable quiz with "
-                "instant right/wrong feedback."
+                "instant right/wrong feedback.\n"
+                "- ls_task_card: {\"type\":\"ls_task_card\",\"data\":{\"project_id\":3,"
+                "\"task_index\":0,\"title\":\"遮挡检测练习\",\"task_type\":\"bbox\","
+                "\"instructions\":\"在图片中标出被遮挡的目标\"}} — renders a card "
+                "whose button opens the specific Label Studio labeling task "
+                "(url auto-built as {LS_BASE_URL}/projects/{project_id}/labeling?task={task_index})."
             ),
             parameters=[
                 ToolParameter(
@@ -75,7 +103,8 @@ class RenderUiTool(BaseTool):
             return ToolResult(
                 content=(
                     "组件 JSON 格式不合法。quiz_card 需要 type='quiz_card' 且 data 含 "
-                    "question/options(≥2)/answer_index(合法下标)。"
+                    "question/options(≥2)/answer_index(合法下标)；ls_task_card 需要 "
+                    "type='ls_task_card' 且 data 含 project_id(int)/task_index(int≥0)/title(非空str)。"
                 ),
                 success=False,
             )
