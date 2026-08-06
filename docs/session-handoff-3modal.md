@@ -67,8 +67,8 @@
 | ⑥ verify_output | ✅ `verify_output_tool.py`（输出质检，防编造/角色漂移/缺依据） | 8 | — |
 | ③ kb_search | ✅ `kb_search_tool.py`（知识库 60 篇关键词检索）+ annotation_kb 进 git | 9 | — |
 | ①② 记忆分区 | ✅ Phase 1 读取隔离：`paths.l2_file(bucket)` + `store.read_bucket` + `read_memory(bucket)` | 5 | Phase 2: consolidator 按 bucket 写入（`_shims.py:118` 透传 bucket，LLM 聚合测试成本高）；Phase 3: API CRUD + 前端 |
-| ④ LS 联动 | ✅ Phase 1 `ls_import_tasks`（导入任务到 LS 项目） | 4 | Phase 2: render_ui 卡片跳转；Phase 3: 自建标注台 + 拟人化 Coach（前端大工程） |
-| ⑦ 总控 | ✅ Phase 1 `delegate_to_expert`（专家卡委派，上下文隔离，真实 LLM 验证） | 7 | Phase 2: 分管 agent 独立 AgentLoop + 全量受限工具 |
+| ④ LS 联动 | ✅ Phase 1 `ls_import_tasks`（导入任务到 LS 项目） | 4 | Phase 2 完成（render_ui `ls_task_card` 卡片跳转 LS 具体任务）；Phase 3: 自建标注台 + 拟人化 Coach（前端大工程） |
+| ⑦ 总控 | ✅ Phase 1 `delegate_to_expert`（专家卡委派，上下文隔离） | 7 | Phase 2 完成（独立 AgentLoop + 受限工具白名单） |
 
 **实现计划文档**：`docs/superpowers/plans/2026-08-05-route-input.md`、`-verify-output.md`、`-kb-search.md`、`-memory-bucket-phase1.md`、`-ls-import-tool.md`、`-delegate-expert.md`
 
@@ -79,6 +79,6 @@
 > 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下七份议题设计 + docs/superpowers/plans/ 下六份实现计划，继续标注星图。
 > **Git 约定（用户 2026-08-06 重申）：小改动只 commit 不 push，每完成一个大版本（Phase/议题）再统一 push 一次。**
 > 当前两条线：
-> ① 7 议题：**设计文档全部完成 + Phase 1 实现全部完成 + 记忆分区 Phase 2 完成**。剩余 Phase：记忆分区 Phase 3（API CRUD+前端）/ LS 卡片跳转 / LS 自建标注台+拟人化 / 总控 AgentLoop——用户逐个选择推进。
+> ① 7 议题：**设计文档全部完成 + Phase 1 实现全部完成 + 记忆分区 Phase 2（consolidator bucket 写入）+ 议题④ Phase 2（ls_task_card 卡片跳转）+ 议题⑦ Phase 2（delegate 独立 AgentLoop + 专家受限工具白名单，spec review 硬化 mcp_tools_filter/空结论 guard）均完成**。剩余 Phase：记忆分区 Phase 3（API CRUD+前端）/ LS 自建标注台+拟人化 / 三模态标注协同——用户逐个选择推进。
 > ② **三模态标注拓展（文本/图像/视频）**：规划文档已确认，见 `docs/3modal-annotation-plan.md`（P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`；**另一会话正在实施（远程已有 `91f494c3` 提交）**
 > 启动需 `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001`；next build 清代理；测试基线 2985/33。
