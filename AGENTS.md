@@ -32,6 +32,7 @@ set DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001 && npx next dev --port 3782
 
 ### Git 约定
 - 用户批准**直接提交 main**（不用功能分支），push 到 `origin/main`（`github.com/xinzi1228/-deeptutor-agent-`）。
+- **小改动只 commit 不 push**，每完成一个大版本（如一个 Phase/议题）再统一 push 一次。
 - **`data/` 和 `docs/` 被 gitignore**。教学资产 `data/user/workspace/task_bank.json`、`competency_tree.json` 和交接文档 `docs/*.md` 已 `git add -f` 纳入，**改动后需 `git add -f` 重新提交**。
 
 ---

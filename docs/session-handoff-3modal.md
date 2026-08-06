@@ -1,8 +1,8 @@
 # 会话交接：7 议题 brainstorming 进度 + 三模态标注拓展（2026-08-05 插播）
 
 > 用途：压缩上下文前的状态快照。恢复后据此无缝继续。
-> 状态：当前会话正在做「7 大优化议题」brainstorming（已完成 ⑤⑥③ 三份设计文档），
-> 用户插播新任务「拓展为 文本/图像/视频 三模态标注」，先写规划文档，回来再继续剩余议题。
+> 状态：记忆分区 Phase 2 已完成（写入分区闭环）。**Git 约定：小改动只 commit 不 push，大版本（Phase/议题）完成后统一 push**。
+> 注意：另一 AI 会话正在实施三模态标注（远程 main 已有 `91f494c3` 提交），本会话的 3 个 commit 已 rebase 共存。
 
 ---
 
@@ -77,7 +77,8 @@
 ## 八、恢复提示词
 
 > 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下七份议题设计 + docs/superpowers/plans/ 下六份实现计划，继续标注星图。
+> **Git 约定（用户 2026-08-06 重申）：小改动只 commit 不 push，每完成一个大版本（Phase/议题）再统一 push 一次。**
 > 当前两条线：
-> ① 7 议题：**设计文档全部完成 + Phase 1 实现全部完成**。剩余 Phase：记忆分区 Phase 2（consolidator 写入分区）/ LS 卡片跳转 / LS 自建标注台+拟人化 / 总控 AgentLoop——用户逐个选择推进。
-> ② **三模态标注拓展（文本/图像/视频）**：规划文档已确认，见 `docs/3modal-annotation-plan.md`（P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`
+> ① 7 议题：**设计文档全部完成 + Phase 1 实现全部完成 + 记忆分区 Phase 2 完成**。剩余 Phase：记忆分区 Phase 3（API CRUD+前端）/ LS 卡片跳转 / LS 自建标注台+拟人化 / 总控 AgentLoop——用户逐个选择推进。
+> ② **三模态标注拓展（文本/图像/视频）**：规划文档已确认，见 `docs/3modal-annotation-plan.md`（P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`；**另一会话正在实施（远程已有 `91f494c3` 提交）**
 > 启动需 `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001`；next build 清代理；测试基线 2985/33。
