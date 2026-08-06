@@ -181,7 +181,12 @@ class DelegateExpertTool(BaseTool):
                 allowed_builtin_tools=list(EXPERT_TOOL_WHITELISTS[expert_id]),
                 language="zh",
                 persona_context=system,
-                metadata={"source": "delegate", "expert": expert_id, "_min_loop_rounds": 3},
+                metadata={
+                    "source": "delegate",
+                    "expert": expert_id,
+                    "_min_loop_rounds": 3,
+                    "mcp_tools_filter": [],  # 封闭 deferred/MCP 白名单绕过（专人专事）
+                },
             )
             pipeline = AgenticChatPipeline(
                 language="zh", max_rounds=5, temperature=0.2, max_tokens=2000
@@ -197,6 +202,11 @@ class DelegateExpertTool(BaseTool):
                     response = (event.metadata or {}).get("response")
                     if response:
                         final = str(response)
+            if not final.strip():
+                return ToolResult(
+                    content=f"专家 {expert_id} 未产出结构化结论，请重新委派。",
+                    success=False,
+                )
             content = f"专家 {expert_id} 结论：\n{final}"
             return ToolResult(
                 content=content,

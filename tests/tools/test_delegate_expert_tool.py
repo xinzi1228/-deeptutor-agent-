@@ -281,6 +281,7 @@ async def test_delegate_isolates_context(monkeypatch):
     assert ctx.metadata["source"] == "delegate"
     assert ctx.metadata["expert"] == "grading_expert"
     assert ctx.metadata["_min_loop_rounds"] == 3
+    assert ctx.metadata["mcp_tools_filter"] == []
     assert set(EXPERT_TOOL_WHITELISTS["grading_expert"]) == set(ctx.allowed_builtin_tools)
     banned = {"delegate_to_expert", "ask_user", "write_memory", "web_fetch", "github", "cron"}
     assert not banned.intersection(ctx.allowed_builtin_tools)
