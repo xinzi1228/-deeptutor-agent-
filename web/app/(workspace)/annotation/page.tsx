@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
+import AnnotationCoach from "@/components/annotation/AnnotationCoach";
 
 export default function AnnotationPage() {
   const { t } = useTranslation();
@@ -118,6 +119,8 @@ export default function AnnotationPage() {
           />
         )}
       </div>
+
+      <AnnotationCoach />
     </div>
   );
 }
