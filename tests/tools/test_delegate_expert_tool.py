@@ -1,10 +1,156 @@
+from __future__ import annotations
+
+import json
+from types import SimpleNamespace
+from typing import Any
+
 import pytest
 
+from deeptutor.agents.chat.agentic_pipeline import AgenticChatPipeline
 from deeptutor.tools.delegate_expert_tool import (
     EXPERT_IDS,
     DelegateExpertTool,
     load_expert_card,
 )
+
+
+def _llm_chunk(
+    *,
+    content: str | None = None,
+    tool_calls: list[dict[str, Any]] | None = None,
+    usage: Any = None,
+    finish_reason: str | None = None,
+) -> SimpleNamespace:
+    delta_fields: dict[str, Any] = {"content": content}
+    if tool_calls is not None:
+        delta_fields["tool_calls"] = [
+            SimpleNamespace(
+                index=tc.get("index", i),
+                id=tc.get("id"),
+                function=SimpleNamespace(
+                    name=tc.get("name"),
+                    arguments=tc.get("arguments"),
+                ),
+            )
+            for i, tc in enumerate(tool_calls)
+        ]
+    else:
+        delta_fields["tool_calls"] = None
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                delta=SimpleNamespace(**delta_fields),
+                finish_reason=finish_reason,
+            )
+        ],
+        usage=usage,
+    )
+
+
+async def _async_llm_stream(chunks: list[SimpleNamespace]):
+    for chunk in chunks:
+        yield chunk
+
+
+class _ScriptedChatClient:
+    def __init__(self, scripted: list[list[SimpleNamespace]]) -> None:
+        self._script = list(scripted)
+        self.call_count = 0
+        self.calls: list[dict[str, Any]] = []
+
+        class _Completions:
+            def __init__(self, parent: _ScriptedChatClient) -> None:
+                self.parent = parent
+
+            async def create(self, **kwargs):
+                self.parent.call_count += 1
+                self.parent.calls.append(
+                    {**kwargs, "messages": list(kwargs.get("messages") or [])}
+                )
+                if not self.parent._script:
+                    raise RuntimeError("Scripted client exhausted")
+                return _async_llm_stream(self.parent._script.pop(0))
+
+        class _Chat:
+            def __init__(self, parent: _ScriptedChatClient) -> None:
+                self.completions = _Completions(parent)
+
+        self.chat = _Chat(self)
+
+
+class _Registry:
+    def __init__(self) -> None:
+        self.executed: list[dict[str, Any]] = []
+
+    def deferred_tools(self):
+        return []
+
+    def build_prompt_text(self, _enabled, **_kwargs):
+        return "- `kb_search` - Search the KB"
+
+    def build_openai_schemas(self, _enabled):
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "kb_search",
+                    "description": "Search",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "annotation_check",
+                    "description": "Check annotation",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"task_id": {"type": "string"}},
+                        "required": ["task_id"],
+                    },
+                },
+            },
+        ]
+
+    async def execute(self, name: str, **kwargs):
+        self.executed.append({"name": name, "kwargs": kwargs})
+        return SimpleNamespace(
+            content="tool answer",
+            sources=[],
+            metadata={"tool": name},
+            success=True,
+            terminate_turn=False,
+            pause_for_user=None,
+        )
+
+
+@pytest.fixture(autouse=True)
+def _fake_pipeline_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "deeptutor.agents.chat.agentic_pipeline.get_llm_config",
+        lambda: SimpleNamespace(
+            binding="openai",
+            model="gpt-test",
+            api_key="k",
+            base_url="u",
+            api_version=None,
+            extra_headers={},
+            reasoning_effort=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "deeptutor.agents.chat.agentic_pipeline.get_tool_registry",
+        lambda: _Registry(),
+    )
+
+    def _no_real_client(self):
+        raise RuntimeError("tests must not call a real LLM client")
+
+    monkeypatch.setattr(AgenticChatPipeline, "_build_openai_client", _no_real_client)
 
 
 def test_expert_ids_six():
@@ -74,3 +220,105 @@ async def test_execute_llm_error_fails(monkeypatch):
     tool = DelegateExpertTool()
     result = await tool.execute(expert_id="grading_expert", brief="x")
     assert result.success is False
+
+
+@pytest.mark.asyncio
+async def test_delegate_runs_pipeline(monkeypatch):
+    client = _ScriptedChatClient(
+        [
+            [
+                _llm_chunk(content="我来核对一下标注。"),
+                _llm_chunk(
+                    tool_calls=[
+                        {
+                            "id": "call-1",
+                            "name": "annotation_check",
+                            "arguments": json.dumps({"task_id": "t-1"}),
+                        }
+                    ]
+                ),
+            ],
+            [_llm_chunk(content="F1=0.83，建议 advance_with_caution。")],
+        ]
+    )
+    monkeypatch.setattr(AgenticChatPipeline, "_build_openai_client", lambda self: client)
+    monkeypatch.setattr(
+        AgenticChatPipeline,
+        "_compose_enabled_tools",
+        lambda self, ctx: ["annotation_check"],
+    )
+
+    tool = DelegateExpertTool()
+    result = await tool.execute(
+        expert_id="grading_expert",
+        brief="评测标注",
+        task_data='{"f1": 0.83}',
+    )
+
+    assert result.success is True
+    assert "F1=0.83" in result.content
+    assert "grading_expert" in result.content
+    assert client.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_delegate_isolates_context(monkeypatch):
+    from deeptutor.tools.delegate_expert_tool import EXPERT_TOOL_WHITELISTS
+
+    captured: dict[str, Any] = {}
+
+    async def fake_run(self, context, stream):
+        captured["ctx"] = context
+
+    monkeypatch.setattr(AgenticChatPipeline, "run", fake_run)
+
+    tool = DelegateExpertTool()
+    await tool.execute(expert_id="grading_expert", brief="评测标注", task_data='{"f1": 0.83}')
+
+    ctx = captured["ctx"]
+    assert ctx.conversation_history == []
+    assert ctx.enabled_tools == []
+    assert ctx.metadata["source"] == "delegate"
+    assert ctx.metadata["expert"] == "grading_expert"
+    assert ctx.metadata["_min_loop_rounds"] == 3
+    assert set(EXPERT_TOOL_WHITELISTS["grading_expert"]) == set(ctx.allowed_builtin_tools)
+    banned = {"delegate_to_expert", "ask_user", "write_memory", "web_fetch", "github", "cron"}
+    assert not banned.intersection(ctx.allowed_builtin_tools)
+    assert "批改专家" in ctx.persona_context
+    assert "你现在只处理这一次委派任务" in ctx.persona_context
+    assert "评测标注" in ctx.user_message
+
+
+def test_whitelist_per_expert():
+    from deeptutor.agents._shared.tool_composition import ALWAYS_ON_TOOLS
+    from deeptutor.tools.delegate_expert_tool import EXPERT_TOOL_WHITELISTS
+
+    banned = {"delegate_to_expert", "ask_user", "write_memory", "web_fetch", "github", "cron"}
+    always_on = set(ALWAYS_ON_TOOLS)
+    assert len(ALWAYS_ON_TOOLS) == 25
+    assert set(EXPERT_TOOL_WHITELISTS) == set(EXPERT_IDS)
+    for expert_id, whitelist in EXPERT_TOOL_WHITELISTS.items():
+        assert set(whitelist).issubset(always_on), f"{expert_id} 超出 always_on"
+        assert not banned.intersection(whitelist), f"{expert_id} 含禁用工具"
+
+
+@pytest.mark.asyncio
+async def test_fallback_to_complete(monkeypatch):
+    import deeptutor.services.llm as llm_mod
+
+    async def fake_complete(prompt, system_prompt=None, **kwargs):
+        return "fallback 结论。"
+
+    monkeypatch.setattr(llm_mod, "complete", fake_complete)
+
+    def _boom(self, *args, **kwargs):
+        raise RuntimeError("pipeline init failed")
+
+    monkeypatch.setattr(AgenticChatPipeline, "__init__", _boom)
+
+    tool = DelegateExpertTool()
+    result = await tool.execute(expert_id="grading_expert", brief="评测标注")
+
+    assert result.success is True
+    assert "fallback 结论" in result.content
+    assert result.metadata["delegate"]["expert"] == "grading_expert"

@@ -60,6 +60,38 @@ _CONDITIONAL_MOUNT_FLAGS: dict[str, str] = {
 # co-selected: retrieval over them, and enumeration of what they hold.
 _KB_COEXISTING_TOOLS: tuple[str, ...] = ("rag", "kb_files")
 
+# Always-on built-in tools auto-mounted on every non-exclusive chat turn.
+# Single source of truth shared by :func:`compose_enabled_tools` (the mount
+# loop) and partner surfaces that need to reason about the always-on set (e.g.
+# ``delegate_to_expert``'s per-expert whitelist must stay a subset).
+ALWAYS_ON_TOOLS: tuple[str, ...] = (
+    "write_memory",
+    "web_fetch",
+    "github",
+    "ask_user",
+    "cron",
+    "competency_map",
+    "ability_radar",
+    "struggle_detect",
+    "teaching_flow",
+    "render_ui",
+    "route_input",
+    "verify_output",
+    "kb_search",
+    "delegate_to_expert",
+    "job_analysis",
+    "get_annotation_task",
+    "annotation_check",
+    "write_learning_record",
+    "generate_iou_demo",
+    "log_decision",
+    "evaluate_teaching_plan",
+    "verify_foresight",
+    "improve_teaching_flow",
+    "finalize_diagnosis",
+    "graph_query",
+)
+
 
 def default_optional_tools(excluded: Iterable[str] = ()) -> list[str]:
     """Return the user-toggleable tool list (chat's default set).
@@ -187,33 +219,7 @@ def compose_enabled_tools(
         if getattr(mount_flags, flag) and _builtin_allowed(tool_name):
             composed.append(tool_name)
     composed.extend(str(name) for name in capability_owned if str(name).strip())
-    for always_on in (
-        "write_memory",
-        "web_fetch",
-        "github",
-        "ask_user",
-        "cron",
-        "competency_map",
-        "ability_radar",
-        "struggle_detect",
-        "teaching_flow",
-        "render_ui",
-        "route_input",
-        "verify_output",
-        "kb_search",
-        "delegate_to_expert",
-        "job_analysis",
-        "get_annotation_task",
-        "annotation_check",
-        "write_learning_record",
-        "generate_iou_demo",
-        "log_decision",
-        "evaluate_teaching_plan",
-        "verify_foresight",
-        "improve_teaching_flow",
-        "finalize_diagnosis",
-        "graph_query",
-    ):
+    for always_on in ALWAYS_ON_TOOLS:
         if _builtin_allowed(always_on):
             composed.append(always_on)
     return _finalize(composed, forced, suppressed)
@@ -277,6 +283,7 @@ def user_has_notebooks() -> bool:
 
 __all__ = [
     "AUTO_MOUNTED_TOOLS",
+    "ALWAYS_ON_TOOLS",
     "ToolMountFlags",
     "compose_enabled_tools",
     "default_optional_tools",
