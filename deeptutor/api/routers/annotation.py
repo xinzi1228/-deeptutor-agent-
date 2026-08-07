@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -87,3 +88,17 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
         report = _REPORTERS[task_type](predictions, ground_truth)
 
     return {"task_type": task_type, "metrics": metrics, "report": report}
+
+
+@router.get("/ground-truth/{task_id}")
+async def ground_truth(task_id: str) -> dict[str, Any]:
+    """Look up a task's ground truth by task id (from task_bank.json)."""
+    from deeptutor.services.path_service import get_path_service
+
+    bank_path = get_path_service().get_workspace_dir() / "task_bank.json"
+    if not bank_path.exists():
+        raise HTTPException(status_code=404, detail="task_bank 不存在")
+    bank = json.loads(bank_path.read_text(encoding="utf-8"))
+    if task_id in bank:
+        return {"task_id": task_id, "ground_truth": bank[task_id].get("ground_truth", [])}
+    raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")

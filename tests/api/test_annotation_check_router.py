@@ -145,3 +145,25 @@ def test_check_other_task_types(client: TestClient, task_type: str, predictions:
     data = res.json()
     assert data["task_type"] == task_type
     assert metric_key in data["metrics"]
+
+
+def test_get_ground_truth_by_task_id(client: TestClient) -> None:
+    import json
+    from deeptutor.services.path_service import get_path_service
+
+    bank_path = get_path_service().get_workspace_dir() / "task_bank.json"
+    if not bank_path.exists():
+        pytest.skip("task_bank.json not present")
+
+    bank = json.loads(bank_path.read_text(encoding="utf-8"))
+    task_id = next(iter(bank))  # 顶层字典键即任务 id（如 "task1"）
+
+    res = client.get(f"{API}/ground-truth/{task_id}")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["task_id"] == task_id
+    assert isinstance(data["ground_truth"], list)
+    assert len(data["ground_truth"]) > 0
+
+    res_missing = client.get(f"{API}/ground-truth/does-not-exist")
+    assert res_missing.status_code == 404
