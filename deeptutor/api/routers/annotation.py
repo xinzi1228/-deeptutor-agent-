@@ -23,20 +23,35 @@ _SCORERS = {
     "ner": annotation_check._ner_dict,
 }
 
+_REPORTERS = {
+    "bbox": lambda p, g: annotation_check._bbox_report(p, g)[0],
+    "classification": annotation_check._classify_report,
+    "judgment": annotation_check._judgment_report,
+    "standard": annotation_check._standard_report,
+    "error_case": annotation_check._error_case_report,
+    "audio_event": annotation_check._audio_event_report,
+    "audio_transcription": annotation_check._audio_transcription_report,
+    "video_tracking": annotation_check._video_tracking_report,
+    "video_event": annotation_check._video_event_report,
+    "ner": annotation_check._ner_report,
+}
+
 
 def _load_json_list(raw: Any, field: str) -> list[dict]:
     import json
 
-    if isinstance(raw, list):
-        return raw
     if isinstance(raw, str):
         try:
-            parsed = json.loads(raw)
+            raw = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=400, detail=f"{field} 不是合法 JSON: {exc}") from exc
-        if isinstance(parsed, list):
-            return parsed
-    raise HTTPException(status_code=400, detail=f"{field} 必须是 JSON 数组")
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=400, detail=f"{field} 必须是 JSON 数组")
+    if not all(isinstance(item, dict) for item in raw):
+        raise HTTPException(
+            status_code=400, detail=f"{field} 的每一项必须是 JSON 对象"
+        )
+    return raw
 
 
 @router.post("/check")
@@ -57,18 +72,18 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
 
     metrics = _SCORERS[task_type](predictions, ground_truth)
 
-    report = ""
+    report = _REPORTERS[task_type](predictions, ground_truth)
     if task_type == "bbox":
-        report, _ = annotation_check._bbox_report(predictions, ground_truth)
-    elif task_type == "classification":
-        report = annotation_check._classify_report(predictions, ground_truth)
-    elif task_type == "ner":
-        report = annotation_check._ner_report(predictions, ground_truth)
-    elif task_type == "audio_event":
-        report = annotation_check._audio_event_report(predictions, ground_truth)
-    elif task_type == "video_event":
-        report = annotation_check._video_event_report(predictions, ground_truth)
-    elif task_type == "video_tracking":
-        report = annotation_check._video_tracking_report(predictions, ground_truth)
+        image_size = (1000, 1000)
+        raw_size = str(body.get("image_size") or "").strip()
+        if raw_size:
+            try:
+                img_w, img_h = raw_size.split("x")
+                image_size = (int(img_w.strip()), int(img_h.strip()))
+            except (ValueError, AttributeError):
+                pass
+        report, _ = annotation_check._bbox_report(
+            predictions, ground_truth, image_size=image_size
+        )
 
     return {"task_type": task_type, "metrics": metrics, "report": report}

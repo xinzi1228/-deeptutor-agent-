@@ -94,3 +94,34 @@ def test_check_invalid_json(client: TestClient) -> None:
         json={"task_type": "bbox", "predictions": "not-json", "ground_truth": "[]"},
     )
     assert res.status_code == 400
+
+
+def test_check_judgment_report_present(client: TestClient) -> None:
+    res = client.post(
+        f"{API}/check",
+        json={
+            "task_type": "judgment",
+            "predictions": [{"id": 1, "label": "true"}],
+            "ground_truth": [{"id": 1, "answer": True}],
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "report" in data
+    assert "判断" in data["report"] or "accuracy" in data["metrics"]
+
+
+def test_check_non_dict_predictions_400(client: TestClient) -> None:
+    res = client.post(
+        f"{API}/check",
+        json={"task_type": "bbox", "predictions": [1, 2, 3], "ground_truth": []},
+    )
+    assert res.status_code == 400
+
+
+def test_check_missing_predictions_400(client: TestClient) -> None:
+    res = client.post(
+        f"{API}/check",
+        json={"task_type": "bbox", "ground_truth": []},
+    )
+    assert res.status_code == 400
