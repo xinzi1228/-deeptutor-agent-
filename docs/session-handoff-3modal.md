@@ -80,7 +80,7 @@
 > **Git 约定（用户 2026-08-06 重申）：小改动只 commit 不 push，每完成一个大版本（Phase/议题）再统一 push 一次。当前本地约 25 个 commit 未推送，等用户指示再 push（push 前先 fetch + rebase 远程）。**
 > **优化轮次汇总**：
 > ① 第二轮（Bloom/Agent_Memory_Techniques，`2026-08-06-optimize-round2-design.md` O1-O11）：O1 记忆路由 fallback / O5 专家写权限收敛 / O7 progress_card / O10 渐进加载 / O3 stale 遗忘标记 已实施；O2/O4/O6/O8/O9/O11 未做（P2）。
-> ② 第三轮（DeerFlow，`2026-08-07-deerflow-borrow-design.md` E1-E8）：**E1-E8 全部完成**（subagent-driven + 两阶段 review + fix）：E1 循环检测 / E6 工具错误中文 / E2 ask_user 澄清类型化 / E4 记忆 confidence+token 预算 / E7 dangling tool call 修补 / E8 会话临时信息清洗 / E5 长会话折叠+落盘义务重注入 / E3 delegate 超时+单轮并发截断。剩 E3 L 部分（并行+进度流）。计划：`plans/2026-08-07-deerflow-e{1..8}.md`。
+> ② 第三轮（DeerFlow，`2026-08-07-deerflow-borrow-design.md` E1-E8）：**E1-E8 全部完成**（subagent-driven + 两阶段 review + fix）：E1 循环检测 / E6 工具错误中文 / E2 ask_user 澄清类型化 / E4 记忆 confidence+token 预算 / E7 dangling tool call 修补 / E8 会话临时信息清洗 / E5 长会话折叠+落盘义务重注入 / E3 delegate 超时+单轮并发截断。**E3 L 部分也已完成**（`plans/2026-08-07-deerflow-e3-l.md`，4 任务全过双 review）：delegate 接入 retrieve 进度通道（`_retrieve_trace_metadata` subagent_delegate）+ 工具经 event_sink 发「专家 X 分析中/完成」进度 + dispatch 并行行为锁定测试 + 前端委派中文标题「委派专家」。**第三轮 100% 收尾**。计划：`plans/2026-08-07-deerflow-e{1..8}.md` + `e3-l.md`。
 > 当前两条线：
 > ① 7 议题：⑤⑥③ 彻底完成；①② Phase 1-3 全完成；④ Phase 1-2 + 3a 完成；⑦ Phase 1-2 完成。剩余：④ 3b（评分 HTTP 端点，需先确认 iframe 归属）/ 3c（能力路径+成绩回传）；竞赛交付材料（9/1）。规划见 `plans/2026-08-05-ls-annotations-workbench.md`。
 > ② **三模态标注拓展**：`docs/3modal-annotation-plan.md` + `research.md`；另一会话实施中（远程已有提交）。
