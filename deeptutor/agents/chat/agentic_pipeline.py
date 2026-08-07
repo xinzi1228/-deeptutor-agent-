@@ -378,7 +378,12 @@ class AgenticChatPipeline:
             role = item.get("role")
             content = item.get("content")
             if role in {"user", "assistant"} and isinstance(content, (str, list)):
-                messages.append({"role": role, "content": content})
+                entry: dict[str, Any] = {"role": role, "content": content}
+                if role == "assistant":
+                    tool_calls = item.get("tool_calls")
+                    if isinstance(tool_calls, list) and tool_calls:
+                        entry["tool_calls"] = tool_calls
+                messages.append(entry)
             elif role == "system" and isinstance(content, str) and content.strip():
                 # ContextBuilder emits the compressed-history summary as a
                 # leading system message; deliver it right after the system
@@ -390,7 +395,61 @@ class AgenticChatPipeline:
                 )
                 messages.append({"role": "system", "content": f"{header}\n{content}"})
         messages.append({"role": "user", "content": user_content})
+        messages = self._patch_dangling_tool_calls(messages)
         return self._prepare_messages_with_attachments(messages, context)
+
+    def _patch_dangling_tool_calls(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Insert synthetic tool results for assistant tool_calls missing a result.
+
+        A user "stop" can interrupt the loop mid-flight: the turn ends with an
+        assistant message announcing tool calls but no ``role=tool`` result,
+        and the next turn's ``conversation_history`` carries that half-message.
+        Most LLM bindings reject a stream where an assistant ``tool_calls`` has
+        no following tool result, so we backfill a synthetic placeholder right
+        after the assistant message. Items that are not dicts (or assistant
+        messages without a usable ``tool_calls`` list) are passed through
+        untouched.
+        """
+        covered: set[str] = set()
+        for msg in messages:
+            if not isinstance(msg, dict) or msg.get("role") != "tool":
+                continue
+            tool_call_id = msg.get("tool_call_id")
+            if isinstance(tool_call_id, str):
+                covered.add(tool_call_id)
+
+        patched: list[dict[str, Any]] = []
+        for msg in messages:
+            patched.append(msg)
+            if not isinstance(msg, dict) or msg.get("role") != "assistant":
+                continue
+            tool_calls = msg.get("tool_calls")
+            if not isinstance(tool_calls, list) or not tool_calls:
+                continue
+            for tc in tool_calls:
+                if not isinstance(tc, dict):
+                    continue
+                tc_id = tc.get("id")
+                if not isinstance(tc_id, str) or tc_id in covered:
+                    continue
+                name = tc.get("name")
+                if not isinstance(name, str):
+                    function = tc.get("function")
+                    name = function.get("name") if isinstance(function, dict) else None
+                if not isinstance(name, str):
+                    name = "?"
+                patched.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc_id,
+                        "name": name,
+                        "content": "（该工具调用被中断，未返回结果）",
+                    }
+                )
+        return patched
 
     def _finish_exhausted_instruction(self) -> str:
         return self._prompt_assembler.finish_exhausted_instruction()
