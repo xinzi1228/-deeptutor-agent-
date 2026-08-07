@@ -355,3 +355,45 @@ async def test_delegate_times_out_falls_back(monkeypatch):
     assert result.success is True
     assert "timeout 后走 fallback 的结论" in result.content
     assert result.metadata["delegate"]["expert"] == "grading_expert"
+
+
+@pytest.mark.asyncio
+async def test_delegate_emits_progress_via_event_sink(monkeypatch):
+    calls: list[tuple[str, str]] = []
+
+    async def fake_event_sink(event_type: str, message: str = "", **kwargs):
+        calls.append((event_type, message))
+
+    async def fake_run(self, context, stream):
+        await asyncio.sleep(0.01)
+        await stream.result({"response": "F1=0.83，建议 advance_with_caution。"})
+
+    monkeypatch.setattr(AgenticChatPipeline, "run", fake_run)
+
+    tool = DelegateExpertTool()
+    result = await tool.execute(
+        expert_id="grading_expert",
+        brief="评测标注",
+        task_data='{"f1": 0.83}',
+        event_sink=fake_event_sink,
+    )
+
+    assert result.success is True
+    assert len(calls) >= 2, f"expected >=2 progress calls, got {calls}"
+    running_msgs = [m for _, m in calls if "分析中" in m or "运行" in m]
+    done_msgs = [m for _, m in calls if "完成" in m]
+    assert running_msgs, f"missing running progress: {calls}"
+    assert done_msgs, f"missing done progress: {calls}"
+    assert any("grading_expert" in m for _, m in calls)
+
+
+@pytest.mark.asyncio
+async def test_delegate_no_event_sink_still_works(monkeypatch):
+    async def fake_run(self, context, stream):
+        await asyncio.sleep(0.01)
+        await stream.result({"response": "F1=0.83，建议 advance_with_caution。"})
+
+    monkeypatch.setattr(AgenticChatPipeline, "run", fake_run)
+    tool = DelegateExpertTool()
+    result = await tool.execute(expert_id="grading_expert", brief="评测标注")
+    assert result.success is True

@@ -169,6 +169,16 @@ class DelegateExpertTool(BaseTool):
 
         system, user = _build_messages(expert_id, card, brief, task_data)
 
+        event_sink = kwargs.get("event_sink")
+
+        async def _report(stage_text: str) -> None:
+            if event_sink is None:
+                return
+            try:
+                await event_sink("tool_log", f"专家 {expert_id} {stage_text}…")
+            except Exception:
+                logger.debug("delegate progress event_sink failed", exc_info=True)
+
         # Main path: isolated AgentLoop with a restricted per-expert tool
         # whitelist. Lazy imports avoid a circular import at module load.
         try:
@@ -194,6 +204,7 @@ class DelegateExpertTool(BaseTool):
                     "mcp_tools_filter": [],  # 封闭 deferred/MCP 白名单绕过（专人专事）
                 },
             )
+            await _report("分析中")
             pipeline = AgenticChatPipeline(
                 language="zh", max_rounds=5, temperature=0.2, max_tokens=2000
             )
@@ -215,6 +226,7 @@ class DelegateExpertTool(BaseTool):
                     content=f"专家 {expert_id} 未产出结构化结论，请重新委派。",
                     success=False,
                 )
+            await _report("分析完成")
             content = f"专家 {expert_id} 结论：\n{final}"
             return ToolResult(
                 content=content,
@@ -231,6 +243,7 @@ class DelegateExpertTool(BaseTool):
                     DELEGATE_TIMEOUT_SECONDS,
                     expert_id,
                 )
+            await _report("分析完成（降级）")
             from deeptutor.services.llm import complete
 
             try:
