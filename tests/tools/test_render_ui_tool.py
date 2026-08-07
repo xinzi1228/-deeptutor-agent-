@@ -96,3 +96,77 @@ async def test_ls_task_card_empty_title():
     }
     result = await RenderUiTool().execute(component=json.dumps(component, ensure_ascii=False))
     assert not result.success
+
+
+@pytest.mark.asyncio
+async def test_progress_card_valid():
+    from deeptutor.tools.render_ui_tool import RenderUiTool
+
+    component = {
+        "type": "progress_card",
+        "data": {
+            "completed": 3,
+            "total": 5,
+            "modules": [{"name": "遮挡检测", "done": 1, "total": 2}],
+        },
+    }
+    result = await RenderUiTool().execute(component=json.dumps(component, ensure_ascii=False))
+    assert result.success
+    chart = result.metadata["chart"]
+    assert chart["type"] == "progress"
+    assert chart["data"]["completed"] == 3
+    assert chart["data"]["total"] == 5
+    assert chart["data"]["modules"][0]["name"] == "遮挡检测"
+    assert chart["data"]["modules"][0]["done"] == 1
+
+
+@pytest.mark.asyncio
+async def test_progress_card_missing_total():
+    from deeptutor.tools.render_ui_tool import RenderUiTool
+
+    component = {"type": "progress_card", "data": {"completed": 3}}
+    result = await RenderUiTool().execute(component=json.dumps(component, ensure_ascii=False))
+    assert not result.success
+
+    component = {"type": "progress_card", "data": {"completed": 3, "total": 0}}
+    result = await RenderUiTool().execute(component=json.dumps(component, ensure_ascii=False))
+    assert not result.success
+
+
+@pytest.mark.asyncio
+async def test_progress_card_completed_exceeds_total():
+    from deeptutor.tools.render_ui_tool import RenderUiTool
+
+    component = {
+        "type": "progress_card",
+        "data": {"completed": 6, "total": 5, "modules": []},
+    }
+    result = await RenderUiTool().execute(component=json.dumps(component, ensure_ascii=False))
+    assert not result.success
+
+
+@pytest.mark.asyncio
+async def test_progress_card_bad_module():
+    from deeptutor.tools.render_ui_tool import RenderUiTool
+
+    component = {
+        "type": "progress_card",
+        "data": {
+            "completed": 3,
+            "total": 5,
+            "modules": [{"done": 1, "total": 2}],
+        },
+    }
+    result = await RenderUiTool().execute(component=json.dumps(component, ensure_ascii=False))
+    assert not result.success
+
+    component = {
+        "type": "progress_card",
+        "data": {
+            "completed": 3,
+            "total": 5,
+            "modules": [{"name": "遮挡检测", "done": 3, "total": 2}],
+        },
+    }
+    result = await RenderUiTool().execute(component=json.dumps(component, ensure_ascii=False))
+    assert not result.success

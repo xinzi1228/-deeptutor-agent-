@@ -60,6 +60,43 @@ def validate_component(component: Any) -> dict[str, Any] | None:
             "instructions": instructions,
             "url": f"{LS_BASE_URL}/projects/{project_id}/labeling?task={task_index}",
         }}
+    if ctype == "progress_card":
+        completed = data.get("completed")
+        total = data.get("total")
+        if isinstance(completed, bool) or not isinstance(completed, int) or completed < 0:
+            return None
+        if isinstance(total, bool) or not isinstance(total, int) or total <= 0:
+            return None
+        if completed > total:
+            return None
+        modules_raw = data.get("modules")
+        if not isinstance(modules_raw, list):
+            return None
+        modules = []
+        for module in modules_raw:
+            if not isinstance(module, dict):
+                return None
+            name = module.get("name")
+            done = module.get("done")
+            module_total = module.get("total")
+            if not isinstance(name, str) or not name.strip():
+                return None
+            if isinstance(done, bool) or not isinstance(done, int) or done < 0:
+                return None
+            if isinstance(module_total, bool) or not isinstance(module_total, int) or module_total <= 0:
+                return None
+            if done > module_total:
+                return None
+            modules.append({
+                "name": name.strip(),
+                "done": done,
+                "total": module_total,
+            })
+        return {"type": "progress", "data": {
+            "completed": completed,
+            "total": total,
+            "modules": modules,
+        }}
     return None  # unknown type
 
 
@@ -80,7 +117,11 @@ class RenderUiTool(BaseTool):
                 "\"task_index\":0,\"title\":\"遮挡检测练习\",\"task_type\":\"bbox\","
                 "\"instructions\":\"在图片中标出被遮挡的目标\"}} — renders a card "
                 "whose button opens the specific Label Studio labeling task "
-                "(url auto-built as {LS_BASE_URL}/projects/{project_id}/labeling?task={task_index})."
+                "(url auto-built as {LS_BASE_URL}/projects/{project_id}/labeling?task={task_index}).\n"
+                "- progress_card: {\"type\":\"progress_card\",\"data\":{\"completed\":3,"
+                "\"total\":5,\"modules\":[{\"name\":\"遮挡检测\",\"done\":1,\"total\":2}]}} "
+                "— renders a capability-goal progress card (reuses the built-in "
+                "progress renderer)."
             ),
             parameters=[
                 ToolParameter(
@@ -104,7 +145,9 @@ class RenderUiTool(BaseTool):
                 content=(
                     "组件 JSON 格式不合法。quiz_card 需要 type='quiz_card' 且 data 含 "
                     "question/options(≥2)/answer_index(合法下标)；ls_task_card 需要 "
-                    "type='ls_task_card' 且 data 含 project_id(int)/task_index(int≥0)/title(非空str)。"
+                    "type='ls_task_card' 且 data 含 project_id(int)/task_index(int≥0)/title(非空str)；"
+                    "progress_card 需要 type='progress_card' 且 data 含 completed(int≥0)/total(int>0)/"
+                    "modules(list, 每项 name 非空 str、done/total 为合法 int)。"
                 ),
                 success=False,
             )
