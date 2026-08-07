@@ -34,6 +34,17 @@ _V1_FILES = ("PROFILE.md", "SUMMARY.md")
 
 BUCKET_NAME_RE = re.compile(r"^[\w\u4e00-\u9fa5\-]{1,32}$")
 
+# E8: session-scoped noise stripped before learning records are persisted, so a
+# later session never resumes from stale URLs / annotation files / task ids.
+_SCRUB_PATTERNS: tuple[re.Pattern, ...] = (
+    re.compile(r"https?://\S+"),
+    re.compile(r"/[\w/]*annotation_tool[\w.]*"),
+    re.compile(r"/images/[\w./-]+"),
+    re.compile(r"workspace/[\w./-]+"),
+    re.compile(r"[\w./-]+\.(png|jpg|jpeg|html|jsonl)"),
+    re.compile(r"task_id[:：]?\s*[\w-]+"),
+)
+
 # E4: read 端 token 预算。约 2 chars/token（中文近似），估算 ``ceil(len(text)/2)``。
 MEMORY_TOKEN_BUDGET = 2000
 
@@ -41,6 +52,24 @@ MEMORY_TOKEN_BUDGET = 2000
 def _est_tokens(text: str) -> int:
     """Rough token estimate for the read-end budget (2 chars/token)."""
     return math.ceil(len(text) / 2)
+
+
+def _scrub_session_noise(text: str) -> str:
+    """Remove session-scoped references (URLs, temp paths, task ids) from text.
+
+    Only the temp fragments are dropped; surrounding capability content is
+    kept. Leftover whitespace and stray spacing around CJK punctuation are
+    collapsed so no blank gaps remain. If scrubbing would leave the text
+    empty, the original is returned so content is never swallowed.
+    """
+    scrubbed = text
+    for pattern in _SCRUB_PATTERNS:
+        scrubbed = pattern.sub("", scrubbed)
+    scrubbed = re.sub(r"\s+", " ", scrubbed).strip()
+    scrubbed = re.sub(r"\s*([，。、；：])\s*", r"\1", scrubbed)
+    if not scrubbed:
+        return text
+    return scrubbed
 
 
 def _confidence_key(entry) -> tuple[bool, float]:
@@ -565,6 +594,7 @@ class MemoryStore:
                 else Document(title=_default_title("L3", "recent"))
             )
             section = "Learning Records"
+            text = _scrub_session_noise(text)
             report = ops_apply(doc, [AddOp(section=section, text=text, refs=[ref])])
             if report.accepted:
                 path.parent.mkdir(parents=True, exist_ok=True)
