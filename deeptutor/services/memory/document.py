@@ -47,11 +47,15 @@ _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$")
 # Markers are optional (an entry may cite no refs); commas + whitespace
 # between markers are tolerated so the rendered superscripts read
 # ``¹, ³`` instead of the visually-merged ``¹³``.
+# A trailing ``<!-- stale -->`` marker (emitted after the id anchor) is
+# tolerated so stale entries round-trip.
 _NEW_BULLET_RE = re.compile(
-    rf"^\s*-\s+(?P<text>.*?)(?P<markers>(?:\s*,?\s*\[\^[^\]]+\])*)\s*<!--\s*(?P<id>{_ENTRY_ID_RE})\s*-->\s*$"
+    rf"^\s*-\s+(?P<text>.*?)(?P<markers>(?:\s*,?\s*\[\^[^\]]+\])*)\s*<!--\s*(?P<id>{_ENTRY_ID_RE})\s*-->(?P<stale>\s*<!--\s*stale\s*-->)?\s*$"
 )
 # Legacy bullet: "- text[^m_xxx]"
-_OLD_BULLET_RE = re.compile(rf"^\s*-\s+(?P<text>.*?)\[\^(?P<id>{_ENTRY_ID_RE})\]\s*$")
+_OLD_BULLET_RE = re.compile(
+    rf"^\s*-\s+(?P<text>.*?)\[\^(?P<id>{_ENTRY_ID_RE})\](?P<stale>\s*<!--\s*stale\s*-->)?\s*$"
+)
 
 # Legacy footnote def: "[^m_xxx]: ref1, ref2"
 _OLD_FOOTNOTE_RE = re.compile(rf"^\[\^(?P<id>{_ENTRY_ID_RE})\]:\s*(?P<refs>.*?)\s*$")
@@ -67,6 +71,7 @@ class Entry:
     section: str
     text: str
     refs: list[str] = field(default_factory=list)
+    stale: bool = False
 
 
 @dataclass
@@ -77,12 +82,32 @@ class Document:
     def all_entries(self) -> list[Entry]:
         return [e for _, entries in self.sections for e in entries]
 
+    def visible_entries(self) -> list[Entry]:
+        """Entries that are not marked stale (stale entries stay on disk)."""
+        return [e for e in self.all_entries() if not e.stale]
+
     def find(self, entry_id: str) -> Entry | None:
         for _, entries in self.sections:
             for entry in entries:
                 if entry.id == entry_id:
                     return entry
         return None
+
+    def mark_stale(self, entry_id: str) -> bool:
+        """Mark an entry stale. Returns True if the entry was found."""
+        entry = self.find(entry_id)
+        if entry is None:
+            return False
+        entry.stale = True
+        return True
+
+    def unmark_stale(self, entry_id: str) -> bool:
+        """Clear the stale flag. Returns True if the entry was found."""
+        entry = self.find(entry_id)
+        if entry is None:
+            return False
+        entry.stale = False
+        return True
 
     def section_entries(self, name: str) -> list[Entry]:
         """Return the entry list for ``name``, creating the section if absent."""
@@ -160,7 +185,13 @@ def parse(md: str) -> Document:
                 if ref is not None and ref not in entry_refs:
                     entry_refs.append(ref)
             current_entries.append(
-                Entry(id=entry_id, section=current_section, text=text, refs=entry_refs)
+                Entry(
+                    id=entry_id,
+                    section=current_section,
+                    text=text,
+                    refs=entry_refs,
+                    stale="<!-- stale -->" in raw,
+                )
             )
             continue
 
@@ -175,6 +206,7 @@ def parse(md: str) -> Document:
                     section=current_section,
                     text=text,
                     refs=list(refs_by_entry.get(entry_id, [])),
+                    stale="<!-- stale -->" in raw,
                 )
             )
             continue
@@ -216,10 +248,11 @@ def serialize(doc: Document) -> str:
             # different sources.
             markers = ", ".join(f"[^{ref_to_label[r]}]" for r in entry.refs if r in ref_to_label)
             text = entry.text.rstrip()
+            tail = " <!-- stale -->" if entry.stale else ""
             if markers:
-                lines.append(f"- {text} {markers} <!--{entry.id}-->")
+                lines.append(f"- {text} {markers} <!--{entry.id}-->{tail}")
             else:
-                lines.append(f"- {text} <!--{entry.id}-->")
+                lines.append(f"- {text} <!--{entry.id}-->{tail}")
         lines.append("")
 
     if ref_order:

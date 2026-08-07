@@ -235,3 +235,47 @@ def test_serialize_omits_marker_when_entry_has_no_refs() -> None:
     assert "- t <!--m_01HZK1ABCDEFGHJKMNPQRSTVWX-->" in rendered
     # No footnote definitions block at all when nothing has refs.
     assert "---" not in rendered
+
+
+def test_stale_roundtrip() -> None:
+    doc = Document(title="X")
+    section: list[Entry] = []
+    doc.sections.append(("S", section))
+    section.append(Entry(id="m_01HZK1ABCDEFGHJKMNPQRSTVWX", section="S", text="kept", refs=[]))
+    section.append(
+        Entry(
+            id="m_01HZK2ABCDEFGHJKMNPQRSTVWX",
+            section="S",
+            text="outdated",
+            refs=[],
+            stale=True,
+        )
+    )
+    rendered = serialize(doc)
+    reparsed = parse(rendered)
+    by_id = {e.id: e for e in reparsed.all_entries()}
+    assert by_id["m_01HZK1ABCDEFGHJKMNPQRSTVWX"].stale is False
+    assert by_id["m_01HZK2ABCDEFGHJKMNPQRSTVWX"].stale is True
+    assert "<!--m_01HZK2ABCDEFGHJKMNPQRSTVWX--> <!-- stale -->" in rendered
+
+
+def test_visible_entries_filters_stale() -> None:
+    doc = parse(_NEW_SAMPLE)
+    target = "m_01HZK5ABCDEFGHJKMNPQRSTVWX"
+    assert doc.mark_stale(target) is True
+    visible = [e.id for e in doc.visible_entries()]
+    assert target not in visible
+    # all_entries still includes it — stale is a flag, not physical delete.
+    assert target in [e.id for e in doc.all_entries()]
+
+
+def test_mark_unmark() -> None:
+    doc = parse(_NEW_SAMPLE)
+    target = "m_01HZK6ABCDEFGHJKMNPQRSTVWX"
+    assert doc.mark_stale(target) is True
+    assert target not in [e.id for e in doc.visible_entries()]
+    assert doc.unmark_stale(target) is True
+    assert target in [e.id for e in doc.visible_entries()]
+    unknown = "m_01HZKNONEXISTENTQRSTUVWX"
+    assert doc.mark_stale(unknown) is False
+    assert doc.unmark_stale(unknown) is False
