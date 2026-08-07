@@ -41,7 +41,6 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
         "get_annotation_task",
         "kb_search",
         "graph_query",
-        "write_learning_record",
         "render_ui",
     ),
     "task_guide": (
@@ -49,14 +48,12 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
         "kb_search",
         "annotation_check",
         "render_ui",
-        "write_learning_record",
     ),
     "grading_expert": (
         "annotation_check",
         "get_annotation_task",
         "kb_search",
         "graph_query",
-        "write_learning_record",
         "log_decision",
         "render_ui",
     ),
@@ -77,7 +74,6 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
         "render_ui",
     ),
     "session_steward": (
-        "write_learning_record",
         "log_decision",
         "get_annotation_task",
         "graph_query",
@@ -121,7 +117,7 @@ class DelegateExpertTool(BaseTool):
                 "AgentLoop (≤5 rounds) with a restricted tool whitelist (专人专事) and "
                 "does NOT inherit the conversation history. Provide a SELF-CONTAINED "
                 "brief + task_data. The expert returns its conclusion for the master "
-                "to synthesize."
+                "to synthesize. 专家不直接写学习记录，结论由总控统一落盘。"
             ),
             parameters=[
                 ToolParameter(

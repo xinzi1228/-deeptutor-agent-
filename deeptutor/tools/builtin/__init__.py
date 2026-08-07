@@ -792,13 +792,20 @@ class ReadMemoryTool(_PromptHintsMixin, BaseTool):
                 "Read the user's persistent memory: recent learning summary, "
                 "user profile, knowledge scope, and explicit preferences. "
                 "Use to personalise tone, depth, and examples — not on "
-                "every turn, not for purely factual questions."
+                "every turn, not for purely factual questions. 按区读取时 "
+                "当前记忆区无内容会自动回退全局记忆（fallback=False 强制区隔离）。"
             ),
             parameters=[
                 ToolParameter(
                     name="bucket",
                     type="string",
                     description="可选记忆区名，按区读取（如 标注学习）；不传则读全局记忆。",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="fallback",
+                    type="boolean",
+                    description="当前记忆区无内容时自动回退全局记忆（fallback=False 强制区隔离）。",
                     required=False,
                 ),
             ],
@@ -808,8 +815,9 @@ class ReadMemoryTool(_PromptHintsMixin, BaseTool):
         from deeptutor.services.memory import get_memory_store
 
         bucket = str(kwargs.get("bucket") or "").strip()
+        fallback = bool(kwargs.get("fallback", True))
         if bucket:
-            text = get_memory_store().read_bucket(bucket)
+            text = get_memory_store().read_bucket(bucket, fallback=fallback)
         else:
             text = get_memory_store().read_l3_concat()
         return ToolResult(

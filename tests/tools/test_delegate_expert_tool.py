@@ -301,6 +301,13 @@ def test_whitelist_per_expert():
     for expert_id, whitelist in EXPERT_TOOL_WHITELISTS.items():
         assert set(whitelist).issubset(always_on), f"{expert_id} 超出 always_on"
         assert not banned.intersection(whitelist), f"{expert_id} 含禁用工具"
+        assert "write_learning_record" not in whitelist, (
+            f"{expert_id} 不应直接写学习记录（学习记录只由总控落盘）"
+        )
+    log_decision_experts = {
+        e for e, wl in EXPERT_TOOL_WHITELISTS.items() if "log_decision" in wl
+    }
+    assert log_decision_experts == {"grading_expert", "report_analyst", "session_steward"}
 
 
 @pytest.mark.asyncio

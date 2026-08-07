@@ -114,22 +114,42 @@ class MemoryStore:
             return _NO_MEMORY
         return "\n\n---\n\n".join(parts) + "\n"
 
-    def read_bucket(self, bucket: str) -> str:
-        """Read a memory bucket: its L2 summaries across surfaces + global L3."""
+    def read_bucket(self, bucket: str, *, fallback: bool = True) -> str:
+        """Read a memory bucket: its L2 summaries across surfaces + global L3.
+
+        When the bucket's L2 directory holds no ``.md`` files (empty bucket)
+        and ``fallback`` is true, additionally read the global L2 root
+        (``L2/*.md``, root-level only — never other buckets) and prepend a
+        source note. ``fallback=False`` keeps strict bucket isolation: an
+        empty bucket returns the empty placeholder and never touches the
+        global root.
+        """
         parts: list[str] = []
+        bucket_files: list[Path] = []
         bdir = paths.buckets_dir() / bucket
         if bdir.is_dir():
-            for md in sorted(bdir.glob("*.md")):
+            bucket_files = sorted(bdir.glob("*.md"))
+            for md in bucket_files:
                 body = md.read_text(encoding="utf-8").strip()
                 if body:
                     parts.append(f"## [{md.stem}]\n{body}")
+        fallback_note = ""
+        if not bucket_files and fallback:
+            gdir = paths.l2_dir()
+            if gdir.is_dir():
+                for md in sorted(gdir.glob("*.md")):
+                    body = md.read_text(encoding="utf-8").strip()
+                    if body:
+                        parts.append(f"## [{md.stem}]\n{body}")
+            if parts:
+                fallback_note = "（当前记忆区暂无内容，已回退到全局记忆）\n\n"
         for slot in paths.L3_SLOTS:
             body = self.read_raw("L3", slot).strip()
             if body:
                 parts.append(body)
         if not parts:
             return "（该记忆区暂无内容）\n"
-        return "\n\n---\n\n".join(parts) + "\n"
+        return fallback_note + "\n\n---\n\n".join(parts) + "\n"
 
     # ── Bucket management ─────────────────────────────────────────────────
 
