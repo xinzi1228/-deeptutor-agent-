@@ -98,6 +98,10 @@ KB_SEED_CHARS_PER_KB = 4000
 # tool calls ends the loop early — that is the normal exit.
 DEFAULT_MAX_ROUNDS = 8
 CONTEXT_WINDOW_GUARD_RATIO = 0.9
+_TOOL_ERROR_TEMPLATE = (
+    "工具 {tool} 执行失败：{err}。请检查参数是否正确，或改用其他工具；"
+    "若无法继续，基于已有结果直接输出阶段性结论。"
+)
 _DispatchOutcome = DispatchOutcome
 
 
@@ -787,9 +791,8 @@ class AgenticChatPipeline:
                 "notices.start_retrieval", default="Starting retrieval"
             ),
             retrieve_label=self._t("labels.retrieve", default="Retrieve"),
-            unknown_error_message_factory=lambda tn, err: (
-                f"工具 {tn} 执行失败：{err}。请检查参数是否正确，或改用其他工具；"
-                "若无法继续，基于已有结果直接输出阶段性结论。"
+            unknown_error_message_factory=lambda tn, err: _TOOL_ERROR_TEMPLATE.format(
+                tool=tn, err=err
             ),
         )
 
@@ -828,9 +831,8 @@ class AgenticChatPipeline:
                 "notices.start_retrieval", default="Starting retrieval"
             ),
             too_many_tool_calls_message=too_many,
-            unknown_error_message_factory=lambda tn, err: (
-                f"工具 {tn} 执行失败：{err}。请检查参数是否正确，或改用其他工具；"
-                "若无法继续，基于已有结果直接输出阶段性结论。"
+            unknown_error_message_factory=lambda tn, err: _TOOL_ERROR_TEMPLATE.format(
+                tool=tn, err=err
             ),
             trace_id_prefix="chat-loop",
         )

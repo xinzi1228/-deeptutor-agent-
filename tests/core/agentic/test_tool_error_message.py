@@ -47,6 +47,18 @@ async def test_tool_error_returns_chinese_message_with_reason() -> None:
 
 
 @pytest.mark.asyncio
+async def test_empty_error_reason_falls_back_to_exception_type_name() -> None:
+    class _SilentError(Exception):
+        pass
+
+    result = await _run_tool(_RaisingRegistry(_SilentError()))
+
+    assert result["success"] is False
+    assert "_SilentError" in result["result_text"]
+    assert "执行失败：。" not in result["result_text"]
+
+
+@pytest.mark.asyncio
 async def test_long_error_reason_truncated_to_300_chars_with_ellipsis() -> None:
     result = await _run_tool(_RaisingRegistry(RuntimeError("y" * 400)))
 

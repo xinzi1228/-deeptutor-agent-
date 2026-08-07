@@ -413,7 +413,7 @@ async def execute_tool_call(
                     error=str(exc),
                 ),
             )
-        reason = str(exc)
+        reason = str(exc) or type(exc).__name__
         truncated = reason[:300] + ("…" if len(reason) > 300 else "")
         unknown_msg = (
             unknown_error_message_factory(tool_name, truncated)
