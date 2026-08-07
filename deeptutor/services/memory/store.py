@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 import re
 import shutil
-from typing import Literal
+from typing import Callable, Literal
 
 from deeptutor.services.memory import consolidator, paths, trace
 from deeptutor.services.memory.consolidator import ConsolidateResult, OnEvent
@@ -118,8 +118,9 @@ class MemoryStore:
         """Structured, cheap overview of a memory bucket for progressive loading.
 
         Returns ``{"bucket", "source", "surfaces", "l3_slots"}`` where each
-        surface entry is ``{"surface", "entries", "preview"}`` (entry count
-        via the document parser, preview = first bullet line ≤ 80 chars).
+        surface entry is ``{"surface", "entries", "preview"}`` (visible
+        (non-stale) entry count, preview = first visible bullet line
+        ≤ 80 chars, ``""`` when nothing is visible).
         ``source`` is ``"bucket"`` when the bucket's L2 directory holds
         ``.md`` files, ``"fallback"`` when it is empty and ``fallback`` is
         true (reading the global L2 root, root-level only), and ``"empty"``
@@ -149,14 +150,12 @@ class MemoryStore:
         }
 
     def _surface_overview(self, md: Path) -> dict:
-        """Entry count + first-line preview for one L2 surface file."""
+        """Visible (non-stale) entry count + first visible bullet preview for
+        one L2 surface file."""
         text = md.read_text(encoding="utf-8")
         doc = parse(text)
         entries = doc.visible_entries()
-        if entries:
-            preview = entries[0].text.strip()[:80]
-        else:
-            preview = next((ln.strip()[:80] for ln in text.splitlines() if ln.strip()), "")
+        preview = entries[0].text.strip()[:80] if entries else ""
         return {"surface": md.stem, "entries": len(entries), "preview": preview}
 
     def _render_surface(self, md: Path) -> str:
@@ -261,14 +260,7 @@ class MemoryStore:
 
     async def delete_entry(self, layer: Layer, key: str, entry_id: str) -> bool:
         path = self._path(layer, key)
-        if not path.exists():
-            return False
-        async with self._lock_for(path):
-            doc = parse(path.read_text(encoding="utf-8"))
-            if not doc.remove(entry_id):
-                return False
-            await asyncio.to_thread(_atomic_write, path, serialize(doc))
-            return True
+        return await self._mutate_entry(path, entry_id, Document.remove)
 
     async def mark_stale(
         self, surface: str, entry_id: str, *, bucket: str | None = None
@@ -277,21 +269,15 @@ class MemoryStore:
 
         Only L2 surfaces accept stale marks — L3 slots (preferences
         included) raise :class:`ValueError`. Returns ``True`` iff the entry
-        existed and was marked.
+        exists (idempotent: marking an already-stale entry is a no-op write
+        that still returns ``True``).
         """
         if surface in paths.L3_SLOTS:
             raise ValueError(f"L3 slot {surface!r} cannot be marked stale")
         if surface not in paths.SURFACES:
             raise ValueError(f"unknown surface {surface!r}")
         path = paths.l2_file(surface, bucket)  # type: ignore[arg-type]
-        if not path.exists():
-            return False
-        async with self._lock_for(path):
-            doc = parse(path.read_text(encoding="utf-8"))
-            if not doc.mark_stale(entry_id):
-                return False
-            await asyncio.to_thread(_atomic_write, path, serialize(doc))
-            return True
+        return await self._mutate_entry(path, entry_id, Document.mark_stale)
 
     async def unmark_stale(
         self, surface: str, entry_id: str, *, bucket: str | None = None
@@ -299,22 +285,16 @@ class MemoryStore:
         """Clear an L2 entry's stale flag (restores it to read paths).
 
         Same safeguard as :meth:`mark_stale`: L3 slots raise
-        :class:`ValueError`. Returns ``True`` iff the entry existed and was
-        unmarked.
+        :class:`ValueError`. Returns ``True`` iff the entry exists
+        (idempotent: unmarking an already-visible entry is a no-op write
+        that still returns ``True``).
         """
         if surface in paths.L3_SLOTS:
             raise ValueError(f"L3 slot {surface!r} cannot be unmarked")
         if surface not in paths.SURFACES:
             raise ValueError(f"unknown surface {surface!r}")
         path = paths.l2_file(surface, bucket)  # type: ignore[arg-type]
-        if not path.exists():
-            return False
-        async with self._lock_for(path):
-            doc = parse(path.read_text(encoding="utf-8"))
-            if not doc.unmark_stale(entry_id):
-                return False
-            await asyncio.to_thread(_atomic_write, path, serialize(doc))
-            return True
+        return await self._mutate_entry(path, entry_id, Document.unmark_stale)
 
     # ── L2 / L3 write (consolidator paths) ────────────────────────────────
 
@@ -543,6 +523,32 @@ class MemoryStore:
             lock = asyncio.Lock()
             self._write_locks[key] = lock
         return lock
+
+    async def _mutate_entry(
+        self,
+        path: Path,
+        entry_id: str,
+        mutate: Callable[[Document, str], bool],
+    ) -> bool:
+        """Lock, parse, mutate one entry, and rewrite atomically iff it changed.
+
+        ``mutate(doc, entry_id)`` is expected to return ``True`` when the
+        entry was found (e.g. :meth:`Document.mark_stale`). The file is only
+        rewritten when the mutation actually altered the document — a
+        redundant mark/unmark on an entry already in the target state is a
+        no-op write. Returns ``True`` iff the entry was found.
+        """
+        if not path.exists():
+            return False
+        async with self._lock_for(path):
+            before = path.read_text(encoding="utf-8")
+            doc = parse(before)
+            if not mutate(doc, entry_id):
+                return False
+            after = serialize(doc)
+            if after != before:
+                await asyncio.to_thread(_atomic_write, path, after)
+            return True
 
 
 # ── v1 → v2 startup migration ─────────────────────────────────────────────

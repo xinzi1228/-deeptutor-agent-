@@ -43,6 +43,13 @@ _ENTRY_ID_RE = r"m_[0-9A-HJKMNP-TV-Z]{26}"
 _TITLE_RE = re.compile(r"^#\s+(.+?)\s*$")
 _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$")
 
+# Stale marker appended to a bullet after the id anchor so stale entries
+# round-trip. ``serialize`` emits this exact constant; the parser matches
+# it (tolerating extra whitespace) via ``_STALE_RE``.
+_STALE_MARKER = "<!-- stale -->"
+_STALE_TAG = _STALE_MARKER.split()[1]  # "stale"
+_STALE_RE = rf"\s*<!--\s*{_STALE_TAG}\s*-->"
+
 # New bullet:  "- text [^1], [^3] <!--m_xxx-->"
 # Markers are optional (an entry may cite no refs); commas + whitespace
 # between markers are tolerated so the rendered superscripts read
@@ -50,11 +57,11 @@ _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$")
 # A trailing ``<!-- stale -->`` marker (emitted after the id anchor) is
 # tolerated so stale entries round-trip.
 _NEW_BULLET_RE = re.compile(
-    rf"^\s*-\s+(?P<text>.*?)(?P<markers>(?:\s*,?\s*\[\^[^\]]+\])*)\s*<!--\s*(?P<id>{_ENTRY_ID_RE})\s*-->(?P<stale>\s*<!--\s*stale\s*-->)?\s*$"
+    rf"^\s*-\s+(?P<text>.*?)(?P<markers>(?:\s*,?\s*\[\^[^\]]+\])*)\s*<!--\s*(?P<id>{_ENTRY_ID_RE})\s*-->(?P<stale>{_STALE_RE})?\s*$"
 )
 # Legacy bullet: "- text[^m_xxx]"
 _OLD_BULLET_RE = re.compile(
-    rf"^\s*-\s+(?P<text>.*?)\[\^(?P<id>{_ENTRY_ID_RE})\](?P<stale>\s*<!--\s*stale\s*-->)?\s*$"
+    rf"^\s*-\s+(?P<text>.*?)\[\^(?P<id>{_ENTRY_ID_RE})\](?P<stale>{_STALE_RE})?\s*$"
 )
 
 # Legacy footnote def: "[^m_xxx]: ref1, ref2"
@@ -190,7 +197,7 @@ def parse(md: str) -> Document:
                     section=current_section,
                     text=text,
                     refs=entry_refs,
-                    stale="<!-- stale -->" in raw,
+                    stale=bool(m_new_b.group("stale")),
                 )
             )
             continue
@@ -206,7 +213,7 @@ def parse(md: str) -> Document:
                     section=current_section,
                     text=text,
                     refs=list(refs_by_entry.get(entry_id, [])),
-                    stale="<!-- stale -->" in raw,
+                    stale=bool(m_old_b.group("stale")),
                 )
             )
             continue
@@ -248,7 +255,7 @@ def serialize(doc: Document) -> str:
             # different sources.
             markers = ", ".join(f"[^{ref_to_label[r]}]" for r in entry.refs if r in ref_to_label)
             text = entry.text.rstrip()
-            tail = " <!-- stale -->" if entry.stale else ""
+            tail = f" {_STALE_MARKER}" if entry.stale else ""
             if markers:
                 lines.append(f"- {text} {markers} <!--{entry.id}-->{tail}")
             else:
