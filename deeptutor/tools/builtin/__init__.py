@@ -795,6 +795,7 @@ class ReadMemoryTool(_PromptHintsMixin, BaseTool):
                 "every turn, not for purely factual questions. 按区读取时 "
                 "当前记忆区无内容会自动回退全局记忆（fallback=False 强制区隔离）。"
                 "overview_only=True 只返回各区条目数与首行预览，先概览再决定是否精读全文，节省上下文。"
+                "标记为过时（stale）的条目已自动隐藏，不物理删除。"
             ),
             parameters=[
                 ToolParameter(
