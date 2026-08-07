@@ -8,10 +8,10 @@ from typing import Any
 import pytest
 
 from deeptutor.agents.chat.agent_loop import (
-    AgentLoop,
-    InlineThinkFilter,
     _SUMMARY_KEEP_ROUNDS,
     _SUMMARY_TRIGGER_MESSAGES,
+    AgentLoop,
+    InlineThinkFilter,
 )
 from deeptutor.agents.chat.agentic_pipeline import AgenticChatPipeline
 from deeptutor.capabilities.explore_context import explorer as explorer_mod
@@ -1141,7 +1141,8 @@ class TestSummarizeOldRounds:
 
         boundary = self._loop()._summarize_old_rounds(messages, keep_rounds=10)
 
-        assert boundary == 2
+        # New boundary = index just after the injected placeholder.
+        assert boundary == len(messages)
         contents = [str(m.get("content") or "") for m in messages]
         assert any("[对话摘要]" in c for c in contents)
         narration = {
@@ -1157,6 +1158,38 @@ class TestSummarizeOldRounds:
         assert "narration round 20" in narration
         # system + summary + 10 kept rounds.
         assert len(messages) == 1 + 1 + 10 * len(_fake_round(1))
+
+    def test_summarize_respects_checkpoint_boundary(self) -> None:
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": "sys"},
+            {"role": "system", "content": "[Context checkpoint]\nprior fold"},
+        ]
+        for r in range(1, 21):
+            messages.extend(_fake_round(r))
+
+        boundary = self._loop()._summarize_old_rounds(
+            messages,
+            keep_rounds=10,
+            checkpoint_boundary=2,
+        )
+
+        # The preserved prefix (system prompt + prior checkpoint) survives and
+        # the fold is appended after it, so a later _fold_context_checkpoint
+        # composes on top without truncating the kept rounds.
+        assert boundary == len(messages)
+        assert len(messages) == 2 + 1 + 10 * len(_fake_round(1))
+        assert messages[0]["role"] == "system"
+        assert messages[0]["content"] == "sys"
+        assert messages[1]["content"] == "[Context checkpoint]\nprior fold"
+        assert messages[2]["role"] == "system"
+        assert "[对话摘要]" in messages[2]["content"]
+        narration = {
+            str(m.get("content") or "")
+            for m in messages
+            if m.get("role") == "assistant"
+        }
+        assert "narration round 1" not in narration
+        assert "narration round 11" in narration
 
     def test_summarize_keeps_ai_tool_pairs_intact(self) -> None:
         messages = self._messages(rounds=20)

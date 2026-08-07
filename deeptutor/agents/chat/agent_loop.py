@@ -452,6 +452,7 @@ class AgentLoop:
                 checkpoint_boundary = self._summarize_old_rounds(
                     messages,
                     keep_rounds=_SUMMARY_KEEP_ROUNDS,
+                    checkpoint_boundary=checkpoint_boundary,
                 )
 
             if dispatch.terminate:
@@ -490,6 +491,7 @@ class AgentLoop:
         messages: list[dict[str, Any]],
         *,
         keep_rounds: int,
+        checkpoint_boundary: int = 1,
     ) -> int:
         """Fold rounds older than the most recent ``keep_rounds`` into one
         system placeholder, re-injecting the write_learning_record obligation.
@@ -498,8 +500,11 @@ class AgentLoop:
         message followed by its ``role=tool`` results, so the fold boundary is
         walked from the END backward to land on the assistant message that
         starts the oldest kept round — an AI/Tool pair is never split. The
-        leading system prompt (index 0) is always kept. Returns the new
-        checkpoint boundary (index just after the injected placeholder).
+        ``checkpoint_boundary`` prefix (system prompt, plus any prior
+        ``[Context checkpoint]`` fold) is always kept so a later
+        ``_fold_context_checkpoint`` composes on top without truncating the
+        kept rounds. Returns the new checkpoint boundary (index just after the
+        injected placeholder).
         """
         if len(messages) < 2:
             return len(messages)
@@ -511,15 +516,16 @@ class AgentLoop:
                 if seen_rounds == keep_rounds:
                     kept_start = index
                     break
-        # Compressible prefix = messages[1:kept_start] (kept region starts at
-        # an assistant message). Too small to be worth folding → no-op.
-        if kept_start - 1 < _SUMMARY_MIN_COMPRESSIBLE:
+        # Compressible prefix = messages[checkpoint_boundary:kept_start] (kept
+        # region starts at an assistant message). Too small to be worth folding
+        # → no-op.
+        if kept_start - checkpoint_boundary < _SUMMARY_MIN_COMPRESSIBLE:
             return len(messages)
         compressed_rounds = sum(
-            1 for m in messages[1:kept_start] if m.get("role") == "assistant"
+            1 for m in messages[checkpoint_boundary:kept_start] if m.get("role") == "assistant"
         )
         messages[:] = (
-            [messages[0]]
+            messages[:checkpoint_boundary]
             + [
                 {
                     "role": "system",
@@ -528,7 +534,7 @@ class AgentLoop:
             ]
             + messages[kept_start:]
         )
-        return 2
+        return len(messages)
 
     async def _forced_finish(
         self,
