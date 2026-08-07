@@ -1121,6 +1121,17 @@ class AgenticChatPipeline:
                 call_kind="subagent_consult",
                 query=str(tool_args.get("question", "") or ""),
             )
+        # delegate_to_expert runs an isolated expert AgentLoop that can take
+        # many rounds: wiring retrieve_meta gives it an event_sink so the tool
+        # can stream "专家 X 分析中…" progress to the client (and keeps the
+        # idle-timeout watchdog fed during a long expert run).
+        if tool_name == "delegate_to_expert":
+            return derive_trace_metadata(
+                tool_meta,
+                label=self._t("labels.tool_call", default="Tool call"),
+                call_kind="subagent_delegate",
+                query=str(tool_args.get("expert_id", "") or ""),
+            )
         return None
 
     # ---- KB seed ---------------------------------------------------------

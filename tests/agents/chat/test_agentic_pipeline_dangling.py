@@ -106,3 +106,25 @@ def test_no_tool_calls_untouched() -> None:
     patched = pipeline._patch_dangling_tool_calls(messages)
 
     assert patched == messages
+
+
+def test_retrieve_trace_metadata_delegate_expert() -> None:
+    pipeline = _pipeline()
+    ctx = UnifiedContext(session_id="s1", user_message="评测")
+    meta = pipeline._retrieve_trace_metadata(
+        {"trace_id": "x"},
+        context=ctx,
+        tool_name="delegate_to_expert",
+        tool_args={"expert_id": "grading_expert", "brief": "评测"},
+    )
+    assert meta is not None
+    assert meta.get("call_kind") == "subagent_delegate"
+    assert "grading_expert" in str(meta.get("query") or "")
+
+    plain = pipeline._retrieve_trace_metadata(
+        {"trace_id": "x"},
+        context=ctx,
+        tool_name="annotation_check",
+        tool_args={},
+    )
+    assert plain is None
