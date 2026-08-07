@@ -76,10 +76,12 @@
 
 ## 八、恢复提示词
 
-> 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下七份议题设计 + docs/superpowers/plans/ 下六份实现计划，继续标注星图。
-> **Git 约定（用户 2026-08-06 重申）：小改动只 commit 不 push，每完成一个大版本（Phase/议题）再统一 push 一次。**
-> **第三轮优化（2026-08-07，借鉴 DeerFlow Super Agent Harness）**：设计 `docs/superpowers/specs/2026-08-07-deerflow-borrow-design.md`（E1-E8）。**E1-E8 全部完成**（均 subagent-driven + 两阶段 review）：E1 循环检测护栏 / E6 工具错误中文消息 / E2 ask_user 澄清类型化 / E4 记忆 confidence+token 预算 / E7 dangling tool call 修补 / E8 会话临时信息清洗 / E5 长会话上下文折叠+落盘义务重注入 / E3 delegate 超时降级+单轮并发截断。E3 L 部分（并行+进度事件）留 P2。计划：`docs/superpowers/plans/2026-08-07-deerflow-e{1..8}.md`。
+> 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下 8 份设计 + docs/superpowers/plans/ 下 15+ 份实现计划，继续标注星图。
+> **Git 约定（用户 2026-08-06 重申）：小改动只 commit 不 push，每完成一个大版本（Phase/议题）再统一 push 一次。当前本地约 25 个 commit 未推送，等用户指示再 push（push 前先 fetch + rebase 远程）。**
+> **优化轮次汇总**：
+> ① 第二轮（Bloom/Agent_Memory_Techniques，`2026-08-06-optimize-round2-design.md` O1-O11）：O1 记忆路由 fallback / O5 专家写权限收敛 / O7 progress_card / O10 渐进加载 / O3 stale 遗忘标记 已实施；O2/O4/O6/O8/O9/O11 未做（P2）。
+> ② 第三轮（DeerFlow，`2026-08-07-deerflow-borrow-design.md` E1-E8）：**E1-E8 全部完成**（subagent-driven + 两阶段 review + fix）：E1 循环检测 / E6 工具错误中文 / E2 ask_user 澄清类型化 / E4 记忆 confidence+token 预算 / E7 dangling tool call 修补 / E8 会话临时信息清洗 / E5 长会话折叠+落盘义务重注入 / E3 delegate 超时+单轮并发截断。剩 E3 L 部分（并行+进度流）。计划：`plans/2026-08-07-deerflow-e{1..8}.md`。
 > 当前两条线：
-> ① 7 议题：**设计文档全部完成 + 各 Phase 完成情况**：⑤⑥③ 彻底完成；①② Phase 1-3 全完成（读隔离→写分区→bucket CRUD）；④ Phase 1-2 + 3a 完成（导入→卡片跳转→拟人化 Coach 组件）；⑦ Phase 1-2 完成（独立 AgentLoop + 受限白名单）。剩余 Phase：④ 3b（评分 HTTP 端点 + 实时反馈，需先确认 iframe 归属）/ 3c（能力路径 + 成绩回传）；竞赛交付材料（9/1）。**Phase 3 规划见 `docs/superpowers/plans/2026-08-05-ls-annotations-workbench.md`**——用户逐个选择推进。
-> ② **三模态标注拓展（文本/图像/视频）**：规划文档已确认，见 `docs/3modal-annotation-plan.md`（P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`；**另一会话正在实施（远程已有 `91f494c3` 提交）**
-> 启动需 `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001`；next build 清代理；测试基线 2985/33。
+> ① 7 议题：⑤⑥③ 彻底完成；①② Phase 1-3 全完成；④ Phase 1-2 + 3a 完成；⑦ Phase 1-2 完成。剩余：④ 3b（评分 HTTP 端点，需先确认 iframe 归属）/ 3c（能力路径+成绩回传）；竞赛交付材料（9/1）。规划见 `plans/2026-08-05-ls-annotations-workbench.md`。
+> ② **三模态标注拓展**：`docs/3modal-annotation-plan.md` + `research.md`；另一会话实施中（远程已有提交）。
+> 启动：`start_all.bat`（后端 8001 + 前端 3782 + LS 8080 均在跑）；前端需 `DEEPTUTOR_API_BASE_URL=http://127.0.0.1:8001`；next build 前清 `HTTP_PROXY/HTTPS_PROXY`；PowerShell 设 `PYTHONIOENCODING=utf-8`。测试基线 2985/33（GBK/可选依赖）。
