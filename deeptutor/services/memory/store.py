@@ -36,8 +36,11 @@ BUCKET_NAME_RE = re.compile(r"^[\w\u4e00-\u9fa5\-]{1,32}$")
 
 # E8: session-scoped noise stripped before learning records are persisted, so a
 # later session never resumes from stale URLs / annotation files / task ids.
+# The URL pattern must stop at CJK ideographs and CJK punctuation (not ``\S``):
+# ``\S`` swallows CJK, so ``https://example.com完成遮挡检测`` would otherwise
+# lose the Chinese capability content that follows the URL with no whitespace.
 _SCRUB_PATTERNS: tuple[re.Pattern, ...] = (
-    re.compile(r"https?://\S+"),
+    re.compile(r"https?://[^\s\u4e00-\u9fa5，。、；：（）()]+"),
     re.compile(r"/[\w/]*annotation_tool[\w.]*"),
     re.compile(r"/images/[\w./-]+"),
     re.compile(r"workspace/[\w./-]+"),
@@ -594,6 +597,9 @@ class MemoryStore:
                 else Document(title=_default_title("L3", "recent"))
             )
             section = "Learning Records"
+            # E8 scope boundary: the scrub applies only to this L3 recent.md
+            # mirror; the canonical JSONL learning store keeps its structured
+            # fields (e.g. task_id) as-is by design.
             text = _scrub_session_noise(text)
             report = ops_apply(doc, [AddOp(section=section, text=text, refs=[ref])])
             if report.accepted:

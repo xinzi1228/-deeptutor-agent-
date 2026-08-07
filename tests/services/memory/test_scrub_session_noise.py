@@ -40,6 +40,14 @@ def test_scrub_keeps_pure_capability_conclusion() -> None:
     assert _scrub_session_noise(text) == text
 
 
+def test_scrub_url_stops_at_cjk_preserving_following_content() -> None:
+    text = "参见 https://example.com/data完成遮挡检测，F1 提升到 0.83"
+    out = _scrub_session_noise(text)
+    assert "https://example.com/data" not in out
+    assert "完成遮挡检测" in out
+    assert "F1 提升到 0.83" in out
+
+
 def test_scrub_leaves_no_double_punctuation_or_space_gaps() -> None:
     text = "参考 annotation_tool.html，完成遮挡检测，注意 /images/task1.png 中"
     out = _scrub_session_noise(text)
