@@ -38,8 +38,6 @@ _REPORTERS = {
 
 
 def _load_json_list(raw: Any, field: str) -> list[dict]:
-    import json
-
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)
