@@ -307,6 +307,7 @@ app.mount(
 from deeptutor.api.routers import (
     achievements,
     agent_config,
+    annotation,
     attachments,
     auth,
     book,
@@ -428,6 +429,12 @@ app.include_router(
 )
 app.include_router(
     profile.router, prefix="/api/v1/profile", tags=["profile"], dependencies=_auth
+)
+app.include_router(
+    annotation.router,
+    prefix="/api/v1/annotation",
+    tags=["annotation"],
+    dependencies=_auth,
 )
 app.include_router(tools_router.router, prefix="/api/v1/tools", tags=["tools"], dependencies=_auth)
 app.include_router(system.router, prefix="/api/v1/system", tags=["system"], dependencies=_auth)
