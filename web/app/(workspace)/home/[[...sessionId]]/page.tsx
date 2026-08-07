@@ -702,6 +702,10 @@ export default function ChatPage() {
     metrics: Record<string, number | undefined>;
     report?: string;
   } | null>(null);
+  // 切换会话时清除上一会话的评分卡，避免旧结果泄漏到新会话
+  useEffect(() => {
+    setAnnotationResult(null);
+  }, [state.sessionId]);
   useEffect(() => {
     if (annotationAutoSendRef.current) return;
     if (!state.sessionId) return;
