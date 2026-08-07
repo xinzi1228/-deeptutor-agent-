@@ -38,6 +38,7 @@ import SessionLoadingView from "@/components/chat/home/SessionLoadingView";
 import FilePreviewDrawer from "@/components/chat/preview/FilePreviewDrawer";
 import { buildSessionActivity } from "@/components/chat/home/SessionActivityPanel";
 import Tooltip from "@/components/common/Tooltip";
+import AnnotationResultCard from "@/components/annotation/AnnotationResultCard";
 import SessionViewerPanel, {
   type SessionViewerPanelHandle,
 } from "@/components/chat/home/SessionViewerPanel";
@@ -697,20 +698,72 @@ export default function ChatPage() {
 
   // Detect pending annotation results from the annotation tool page
   const annotationAutoSendRef = useRef(false);
+  const [annotationResult, setAnnotationResult] = useState<{
+    metrics: Record<string, number | undefined>;
+    report?: string;
+  } | null>(null);
   useEffect(() => {
     if (annotationAutoSendRef.current) return;
     if (!state.sessionId) return;
     if (state.isStreaming) return;
-    try {
-      const pendingMsg = localStorage.getItem("annotation_pending_message");
-      const pendingTime = Number(localStorage.getItem("annotation_pending_time") || "0");
-      if (pendingMsg && Date.now() - pendingTime < 30000) {
-        annotationAutoSendRef.current = true;
-        localStorage.removeItem("annotation_pending_message");
-        localStorage.removeItem("annotation_pending_time");
-        sendMessage(pendingMsg);
-      }
-    } catch {}
+    (async () => {
+      try {
+        const pendingMsg = localStorage.getItem("annotation_pending_message");
+        const pendingTime = Number(localStorage.getItem("annotation_pending_time") || "0");
+        if (pendingMsg && Date.now() - pendingTime < 30000) {
+          annotationAutoSendRef.current = true;
+          localStorage.removeItem("annotation_pending_message");
+          localStorage.removeItem("annotation_pending_time");
+          // 评分卡：读最近结果 → 调评分端点 → 渲染
+          const rawResult = localStorage.getItem("annotation_last_result");
+          localStorage.removeItem("annotation_last_result");
+          if (rawResult) {
+            let enriched = pendingMsg;
+            try {
+              const result = JSON.parse(rawResult) as {
+                taskId?: string;
+                boxes?: unknown;
+                f1?: number;
+              };
+              if (result.taskId && Array.isArray(result.boxes) && result.boxes.length > 0) {
+                const gtRes = await fetch(
+                  `/api/v1/annotation/ground-truth/${encodeURIComponent(result.taskId)}`,
+                  { cache: "no-store" },
+                );
+                if (gtRes.ok) {
+                  const gtData = (await gtRes.json()) as { ground_truth?: unknown[] };
+                  const checkRes = await fetch("/api/v1/annotation/check", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      task_type: "bbox",
+                      predictions: result.boxes,
+                      ground_truth: gtData.ground_truth ?? [],
+                    }),
+                  });
+                  if (checkRes.ok) {
+                    const checkData = (await checkRes.json()) as {
+                      metrics: Record<string, number | undefined>;
+                      report?: string;
+                    };
+                    setAnnotationResult({
+                      metrics: checkData.metrics,
+                      report: checkData.report,
+                    });
+                    enriched = `${pendingMsg}\n\n（后端自动评分附在下方评分卡中，请结合评分给出针对性反馈）`;
+                  }
+                }
+              }
+            } catch {
+              // 评分卡失败不影响原 auto-send
+            }
+            void sendMessage(enriched);
+          } else {
+            void sendMessage(pendingMsg);
+          }
+        }
+      } catch {}
+    })();
   }, [state.sessionId, state.isStreaming, sendMessage]);
 
   // When URL param changes (sidebar navigation), load the corresponding session
@@ -1555,6 +1608,12 @@ export default function ChatPage() {
                 }
               >
                 <div className="mx-auto w-full max-w-[960px] space-y-9 px-6">
+                  {annotationResult ? (
+                    <AnnotationResultCard
+                      metrics={annotationResult.metrics}
+                      report={annotationResult.report}
+                    />
+                  ) : null}
                   <ChatMessageList
                     messages={state.messages}
                     isStreaming={state.isStreaming}
