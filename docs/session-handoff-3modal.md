@@ -78,7 +78,7 @@
 
 > 读 docs/session-handoff-3modal.md + docs/superpowers/specs/ 下七份议题设计 + docs/superpowers/plans/ 下六份实现计划，继续标注星图。
 > **Git 约定（用户 2026-08-06 重申）：小改动只 commit 不 push，每完成一个大版本（Phase/议题）再统一 push 一次。**
-> **第二轮优化（2026-08-06）**：设计见 `docs/superpowers/specs/2026-08-06-optimize-round2-design.md`（O1-O11 借鉴 Bloom/Agent_Memory_Techniques）。P0 已实施：O1 记忆路由 fallback + O5 delegate 专家移除 write_learning_record。P1 已实施 O7（render_ui `progress_card` 能力目标进度卡 + PERSONA 全勾评估闭环，MVP）。P1 待做：O10 渐进加载 / O3 遗忘标记。
+> **第二轮优化（2026-08-06）**：设计见 `docs/superpowers/specs/2026-08-06-optimize-round2-design.md`（O1-O11 借鉴 Bloom/Agent_Memory_Techniques）。P0 已实施：O1 记忆路由 fallback + O5 delegate 专家移除 write_learning_record。P1 已实施 O7（progress_card 进度卡）+ O10（bucket_overview 概览 + ReadMemoryTool overview_only）。P1 剩：O3 遗忘标记。
 > 当前两条线：
 > ① 7 议题：**设计文档全部完成 + 各 Phase 完成情况**：⑤⑥③ 彻底完成；①② Phase 1-3 全完成（读隔离→写分区→bucket CRUD）；④ Phase 1-2 + 3a 完成（导入→卡片跳转→拟人化 Coach 组件）；⑦ Phase 1-2 完成（独立 AgentLoop + 受限白名单）。剩余 Phase：④ 3b（评分 HTTP 端点 + 实时反馈，需先确认 iframe 归属）/ 3c（能力路径 + 成绩回传）；竞赛交付材料（9/1）。**Phase 3 规划见 `docs/superpowers/plans/2026-08-05-ls-annotations-workbench.md`**——用户逐个选择推进。
 > ② **三模态标注拓展（文本/图像/视频）**：规划文档已确认，见 `docs/3modal-annotation-plan.md`（P0 兼容保障 → P1 文本 → P2 视频）；调研见 `docs/3modal-annotation-research.md`；**另一会话正在实施（远程已有 `91f494c3` 提交）**
