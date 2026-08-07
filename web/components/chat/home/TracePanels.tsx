@@ -318,6 +318,13 @@ function describeToolCall(
         chip: null,
         mono: false,
       };
+    case "delegate_to_expert":
+      return {
+        Icon: ToolMark,
+        verb: t("Delegating to expert"),
+        chip: str(a.expert_id) || null,
+        mono: false,
+      };
     case "github":
       return {
         Icon: ToolMark,
