@@ -380,7 +380,7 @@ function normaliseAskUserPayload(raw: unknown): AskUserPayload | null {
             : null,
         clarification_type:
           typeof q.clarification_type === "string" &&
-          q.clarification_type in CLARIFICATION_TYPE_LABELS
+          Object.hasOwn(CLARIFICATION_TYPE_LABELS, q.clarification_type)
             ? (q.clarification_type as string)
             : null,
       });
@@ -471,7 +471,10 @@ const ClarificationTypeBadge = memo(function ClarificationTypeBadge({
 }: {
   type?: string | null;
 }) {
-  const label = type ? CLARIFICATION_TYPE_LABELS[type] : undefined;
+  const label =
+    type && Object.hasOwn(CLARIFICATION_TYPE_LABELS, type)
+      ? CLARIFICATION_TYPE_LABELS[type]
+      : undefined;
   if (!label) return null;
   return (
     <span className="ml-1.5 inline-flex shrink-0 translate-y-[-1px] items-center rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--foreground)_4%,transparent)] px-1.5 py-px text-[10px] font-medium leading-none text-[var(--muted-foreground)]">

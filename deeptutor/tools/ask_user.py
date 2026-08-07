@@ -117,7 +117,7 @@ def build_ask_user_payload(
     question: Any = None,
     options: Any = None,
     # Applied to questions that don't state their own ``clarification_type``.
-    _default_clarification_type: str = "approach_choice",
+    _default_clarification_type: str | None = None,
 ) -> tuple[AskUserPayload | None, str | None]:
     """Validate + normalise the LLM-provided arguments.
 
@@ -167,7 +167,7 @@ def _coerce_questions(questions: Any, question: Any, options: Any) -> list[Any] 
 
 
 def _build_question(
-    raw: Any, idx: int, used_ids: set[str], default_clarification_type: str
+    raw: Any, idx: int, used_ids: set[str], default_clarification_type: str | None
 ) -> AskUserQuestion | str:
     if not isinstance(raw, dict):
         return f"Question #{idx + 1} must be an object."
@@ -230,16 +230,18 @@ def _build_question(
         if placeholder and len(placeholder) > MAX_PLACEHOLDER_CHARS:
             placeholder = placeholder[:MAX_PLACEHOLDER_CHARS].rstrip() + "…"
 
-    # Lenient: a known type is kept verbatim, anything else (missing or
-    # invalid) normalises without erroring — missing falls back to the
-    # default so the frontend always has a badge to render.
+    # Lenient: a known type is kept verbatim, anything else (missing,
+    # empty or invalid) normalises without erroring. Empty/whitespace
+    # becomes None just like ``header``/``placeholder``, and an absent
+    # type falls back to the default (None by default) so a model that
+    # never emits the field renders no badge.
     clarification_type: str | None = None
     ct_raw = raw.get("clarification_type")
     if ct_raw is None:
         clarification_type = default_clarification_type
     else:
-        ct = _coerce_string(ct_raw).strip()
-        if ct in CLARIFICATION_TYPES:
+        ct = _coerce_string(ct_raw).strip() or None
+        if ct and ct in CLARIFICATION_TYPES:
             clarification_type = ct
 
     qid = _coerce_string(raw.get("id")).strip()

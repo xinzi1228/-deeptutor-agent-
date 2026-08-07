@@ -319,7 +319,7 @@ def test_to_dict_shape_is_v3_for_frontend() -> None:
                 "options": [{"label": "a", "description": "why a"}],
                 "allow_free_text": True,
                 "placeholder": None,
-                "clarification_type": "approach_choice",
+                "clarification_type": None,
             },
             {
                 "id": "depth",
@@ -329,7 +329,7 @@ def test_to_dict_shape_is_v3_for_frontend() -> None:
                 "options": [],
                 "allow_free_text": True,
                 "placeholder": None,
-                "clarification_type": "approach_choice",
+                "clarification_type": None,
             },
         ],
     }
@@ -369,11 +369,20 @@ def test_clarification_type_invalid_becomes_none() -> None:
     assert payload.questions[0].clarification_type is None
 
 
-def test_clarification_type_absent_defaults_to_approach_choice() -> None:
+def test_clarification_type_absent_is_none() -> None:
     payload, err = build_ask_user_payload(questions=[{"prompt": "x"}])
     assert err is None
     assert payload is not None
-    assert payload.questions[0].clarification_type == "approach_choice"
+    assert payload.questions[0].clarification_type is None
+
+
+def test_clarification_type_whitespace_becomes_none() -> None:
+    payload, err = build_ask_user_payload(
+        questions=[{"prompt": "x", "clarification_type": "   "}]
+    )
+    assert err is None
+    assert payload is not None
+    assert payload.questions[0].clarification_type is None
 
 
 def test_clarification_type_in_payload_dict() -> None:
