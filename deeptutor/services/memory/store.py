@@ -12,6 +12,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
+import math
 from pathlib import Path
 import re
 import shutil
@@ -32,6 +33,19 @@ Layer = Literal["L2", "L3"]
 _V1_FILES = ("PROFILE.md", "SUMMARY.md")
 
 BUCKET_NAME_RE = re.compile(r"^[\w\u4e00-\u9fa5\-]{1,32}$")
+
+# E4: read 端 token 预算。约 2 chars/token（中文近似），估算 ``ceil(len(text)/2)``。
+MEMORY_TOKEN_BUDGET = 2000
+
+
+def _est_tokens(text: str) -> int:
+    """Rough token estimate for the read-end budget (2 chars/token)."""
+    return math.ceil(len(text) / 2)
+
+
+def _confidence_key(entry) -> tuple[bool, float]:
+    """Stable sort key: confidence descending, ``None``/absent last."""
+    return (entry.confidence is None, -(entry.confidence or 0.0))
 
 
 def validate_bucket_name(name: str) -> None:
@@ -104,15 +118,55 @@ class MemoryStore:
         return path.read_text(encoding="utf-8")
 
     def read_l3_concat(self) -> str:
-        """Concatenate all four L3 docs for the ``read_memory`` tool."""
+        """Concatenate all four L3 docs for the ``read_memory`` tool.
+
+        L3 slots with parseable per-entry structure are rendered
+        confidence-sorted (descending, ``None`` last) within each section
+        and truncated to ``MEMORY_TOKEN_BUDGET``. Plain-paragraph slots
+        (no parseable entries) are kept verbatim under the same global
+        token budget. When the budget was exceeded a truncation note is
+        appended at the tail.
+        """
         parts: list[str] = []
+        budget = MEMORY_TOKEN_BUDGET
+        total = 0
+        kept = 0
+        truncated = False
         for slot in paths.L3_SLOTS:
-            body = self.read_raw("L3", slot).strip()
-            if body:
-                parts.append(body)
+            raw = self.read_raw("L3", slot).strip()
+            if not raw:
+                continue
+            doc = parse(raw)
+            visible = doc.visible_entries()
+            if not visible:
+                if doc.all_entries():
+                    continue  # all stale — nothing visible
+                toks = _est_tokens(raw)
+                total += 1
+                if toks > budget:
+                    truncated = True
+                    continue
+                parts.append(raw)
+                kept += 1
+                budget -= toks
+                continue
+            prefix = [f"# {doc.title}"] if doc.title else []
+            text, t, k, used = self._render_doc_budgeted(doc, budget, prefix)
+            total += t
+            kept += k
+            budget -= used
+            if text:
+                parts.append(text)
+            if k < t:
+                truncated = True
         if not parts:
+            if truncated:
+                return f"（已截断，共 {total} 条记忆展示前 {kept} 条）\n"
             return _NO_MEMORY
-        return "\n\n---\n\n".join(parts) + "\n"
+        out = "\n\n---\n\n".join(parts) + "\n"
+        if truncated:
+            out += f"（已截断，共 {total} 条记忆展示前 {kept} 条）\n"
+        return out
 
     def bucket_overview(self, bucket: str, *, fallback: bool = True) -> dict:
         """Structured, cheap overview of a memory bucket for progressive loading.
@@ -158,36 +212,83 @@ class MemoryStore:
         preview = entries[0].text.strip()[:80] if entries else ""
         return {"surface": md.stem, "entries": len(entries), "preview": preview}
 
-    def _render_surface(self, md: Path) -> str:
+    def _render_doc_budgeted(
+        self, doc: Document, budget_left: int, prefix_lines: list[str]
+    ) -> tuple[str, int, int, int]:
+        """Render ``doc``'s visible (non-stale) entries grouped by section.
+
+        Within each section, entries are sorted by confidence descending
+        (``None``/absent last, stable). Only entries whose estimated token
+        count (``ceil(len(text)/2)``) still fits in ``budget_left`` are
+        kept — this is a *per-surface* sort followed by a *global* budget
+        applied across surfaces by the caller. Sections with no kept entry
+        are omitted entirely.
+
+        Returns ``(text, total_visible, kept, tokens_used)``.
+        """
+        lines = list(prefix_lines)
+        total = 0
+        kept = 0
+        used = 0
+        for section, entries in doc.sections:
+            section_visible = [e for e in entries if not e.stale]
+            if not section_visible:
+                continue
+            total += len(section_visible)
+            section_visible = sorted(section_visible, key=_confidence_key)
+            kept_lines: list[str] = []
+            for e in section_visible:
+                toks = _est_tokens(e.text)
+                if used + toks > budget_left:
+                    break
+                kept_lines.append(f"- {e.text}")
+                used += toks
+                kept += 1
+            if kept_lines:
+                lines.append(f"## {section}")
+                lines.extend(kept_lines)
+        if kept == 0:
+            return "", total, 0, 0
+        return "\n".join(lines), total, kept, used
+
+    def _render_surface(self, md: Path, budget_left: int) -> tuple[str, int, int, int]:
         """Render one L2 surface md: visible entries grouped by section.
 
         Document-format files render as ``## [{stem}]`` followed by
         ``## <section>`` headers and ``- <text>`` bullets for visible
-        (non-stale) entries only. Files with no parseable entries (legacy
-        raw text) fall back to their raw body so pre-document content
-        still surfaces. Returns ``""`` when the file contributes nothing
-        (empty body, or every entry marked stale).
+        (non-stale) entries only — confidence-sorted per surface and
+        budget-truncated. Files with no parseable entries (legacy raw
+        text) fall back to their raw body so pre-document content still
+        surfaces; the raw body counts as one opaque entry against the
+        budget. Returns ``(text, total_visible, kept, tokens_used)``;
+        ``text`` is ``""`` when the file contributes nothing.
         """
         text = md.read_text(encoding="utf-8")
         doc = parse(text)
         visible = doc.visible_entries()
         if not visible:
             if doc.all_entries():
-                return ""  # all entries stale — nothing visible to render
+                return "", 0, 0, 0  # all entries stale — nothing visible to render
             body = text.strip()
             if not body:
-                return ""
-            return f"## [{md.stem}]\n{body}"
-        lines = [f"## [{md.stem}]"]
-        for section, entries in doc.sections:
-            section_visible = [e for e in entries if not e.stale]
-            if section_visible:
-                lines.append(f"## {section}")
-                lines.extend(f"- {e.text}" for e in section_visible)
-        return "\n".join(lines)
+                return "", 0, 0, 0
+            toks = _est_tokens(body)
+            if toks > budget_left:
+                return "", 0, 1, 0
+            return f"## [{md.stem}]\n{body}", 1, 1, toks
+        text, total, kept, used = self._render_doc_budgeted(doc, budget_left, [f"## [{md.stem}]"])
+        return text, total, kept, used
 
     def read_bucket(self, bucket: str, *, fallback: bool = True) -> str:
         """Read a memory bucket: its L2 summaries across surfaces + global L3.
+
+        L2 surfaces are rendered confidence-sorted (descending, ``None``
+        last) *per surface*, then a *global* token budget
+        (``MEMORY_TOKEN_BUDGET``) is applied across surfaces in file order;
+        once the budget is exhausted remaining entries are dropped and a
+        truncation note is appended. L3 slots (preferences etc.) are
+        appended as-is — the global shared layer is not
+        confidence-sorted/truncated.
 
         When the bucket's L2 directory holds no ``.md`` files (empty bucket)
         and ``fallback`` is true, additionally read the global L2 root
@@ -197,12 +298,18 @@ class MemoryStore:
         global root.
         """
         parts: list[str] = []
+        budget = MEMORY_TOKEN_BUDGET
+        total = 0
+        kept = 0
         bucket_files: list[Path] = []
         bdir = paths.buckets_dir() / bucket
         if bdir.is_dir():
             bucket_files = sorted(bdir.glob("*.md"))
             for md in bucket_files:
-                body = self._render_surface(md)
+                body, t, k, used = self._render_surface(md, budget)
+                total += t
+                kept += k
+                budget -= used
                 if body:
                     parts.append(body)
         fallback_note = ""
@@ -210,7 +317,10 @@ class MemoryStore:
             gdir = paths.l2_dir()
             if gdir.is_dir():
                 for md in sorted(gdir.glob("*.md")):
-                    body = self._render_surface(md)
+                    body, t, k, used = self._render_surface(md, budget)
+                    total += t
+                    kept += k
+                    budget -= used
                     if body:
                         parts.append(body)
             if parts:
@@ -220,7 +330,11 @@ class MemoryStore:
             if body:
                 parts.append(body)
         if not parts:
+            if kept < total:
+                return f"（已截断，共 {total} 条记忆展示前 {kept} 条）\n"
             return "（该记忆区暂无内容）\n"
+        if kept < total:
+            parts.append(f"（已截断，共 {total} 条记忆展示前 {kept} 条）")
         return fallback_note + "\n\n---\n\n".join(parts) + "\n"
 
     # ── Bucket management ─────────────────────────────────────────────────
