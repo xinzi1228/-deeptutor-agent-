@@ -2505,6 +2505,8 @@
   "ago": "前",
   "animation": "动画",
   "annotation.basicMode": "基础模式",
+  "annotation.currentTask": "当前任务在能力树位置",
+  "annotation.flowStep": "教学流程",
   "annotation.openInNewTab": "新窗口打开",
   "annotation.proMode": "专业模式",
   "annotation.subtitle": "内嵌 Label Studio 数据标注工作区",

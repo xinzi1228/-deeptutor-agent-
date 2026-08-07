@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
 import AnnotationCoach from "@/components/annotation/AnnotationCoach";
+import AnnotationProgress from "@/components/annotation/AnnotationProgress";
 
 export default function AnnotationPage() {
   const { t } = useTranslation();
@@ -81,6 +82,8 @@ export default function AnnotationPage() {
           </button>
         </div>
       </header>
+
+      <AnnotationProgress />
 
       <div className="flex-1">
         {mode === "image" ? (

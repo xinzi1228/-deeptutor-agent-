@@ -2505,6 +2505,8 @@
   "ago": "ago",
   "animation": "animation",
   "annotation.basicMode": "Basic Mode",
+  "annotation.currentTask": "Current task position",
+  "annotation.flowStep": "Flow step",
   "annotation.openInNewTab": "Open in new tab",
   "annotation.proMode": "Pro Mode",
   "annotation.subtitle": "Label Studio embedded workspace for data annotation",
