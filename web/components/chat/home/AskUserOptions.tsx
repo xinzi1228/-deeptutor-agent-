@@ -35,7 +35,22 @@ export interface AskUserQuestion {
   options: AskUserOption[];
   allow_free_text: boolean;
   placeholder: string | null;
+  /** Why this clarification is being asked (see ``CLARIFICATION_TYPES``). */
+  clarification_type?: string | null;
 }
+
+/**
+ * Chinese label per ``clarification_type`` (mirrors
+ * ``deeptutor.tools.ask_user.CLARIFICATION_TYPES``). Unknown/missing
+ * types render no badge.
+ */
+const CLARIFICATION_TYPE_LABELS: Record<string, string> = {
+  missing_info: "缺信息",
+  ambiguous_requirement: "需求模糊",
+  approach_choice: "方法选择",
+  risk_confirmation: "风险确认",
+  suggestion: "建议",
+};
 
 export interface AskUserPayload {
   intro: string | null;
@@ -363,6 +378,11 @@ function normaliseAskUserPayload(raw: unknown): AskUserPayload | null {
           typeof q.placeholder === "string" && q.placeholder.trim()
             ? (q.placeholder as string).trim()
             : null,
+        clarification_type:
+          typeof q.clarification_type === "string" &&
+          q.clarification_type in CLARIFICATION_TYPE_LABELS
+            ? (q.clarification_type as string)
+            : null,
       });
     }
     if (questions.length === 0) return null;
@@ -441,6 +461,25 @@ export const AskUserOptions = memo(function AskUserOptions({
   return <InteractiveAskUserCard payload={data.payload} onSubmit={onSubmit} />;
 });
 AskUserOptions.displayName = "AskUserOptions";
+
+/**
+ * Small Chinese badge showing why this clarification is being asked.
+ * Renders nothing when the type is absent/unknown (backward compatible).
+ */
+const ClarificationTypeBadge = memo(function ClarificationTypeBadge({
+  type,
+}: {
+  type?: string | null;
+}) {
+  const label = type ? CLARIFICATION_TYPE_LABELS[type] : undefined;
+  if (!label) return null;
+  return (
+    <span className="ml-1.5 inline-flex shrink-0 translate-y-[-1px] items-center rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--foreground)_4%,transparent)] px-1.5 py-px text-[10px] font-medium leading-none text-[var(--muted-foreground)]">
+      {label}
+    </span>
+  );
+});
+ClarificationTypeBadge.displayName = "ClarificationTypeBadge";
 
 // ---------- interactive mode ----------
 
@@ -718,6 +757,7 @@ const QuestionBody = memo(function QuestionBody({
     <>
       <div className="mt-3 text-[14px] font-medium leading-snug text-[var(--foreground)]">
         {question.prompt}
+        <ClarificationTypeBadge type={question.clarification_type} />
         {question.multi_select ? (
           <span className="ml-1.5 text-[11px] font-normal text-[var(--muted-foreground)]">
             {t("Select all that apply.")}
@@ -900,6 +940,7 @@ const ResolvedAskUserCard = memo(function ResolvedAskUserCard({
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="text-[12px] font-medium leading-snug text-[var(--foreground)]">
                     {q.prompt}
+                    <ClarificationTypeBadge type={q.clarification_type} />
                   </div>
                   <div className="text-[11px] leading-snug text-[var(--muted-foreground)]/70">
                     {value ? (

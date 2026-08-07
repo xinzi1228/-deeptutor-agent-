@@ -38,6 +38,17 @@ MAX_PLACEHOLDER_CHARS = 120
 # being clever here risks eating legitimate options).
 _REDUNDANT_OTHER_LABELS = frozenset({"other", "其他", "其它"})
 
+# Reason a clarification question is being asked, so the student sees
+# *why* the agent needs more input. Mirrored on the frontend
+# (``AskUserOptions.tsx``) as a small Chinese badge.
+CLARIFICATION_TYPES: tuple[str, ...] = (
+    "missing_info",
+    "ambiguous_requirement",
+    "approach_choice",
+    "risk_confirmation",
+    "suggestion",
+)
+
 
 @dataclass(frozen=True)
 class AskUserOption:
@@ -61,6 +72,7 @@ class AskUserQuestion:
     multi_select: bool = False
     allow_free_text: bool = True
     placeholder: str | None = None
+    clarification_type: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,6 +83,7 @@ class AskUserQuestion:
             "options": [o.to_dict() for o in self.options],
             "allow_free_text": self.allow_free_text,
             "placeholder": self.placeholder,
+            "clarification_type": self.clarification_type,
         }
 
 
@@ -103,6 +116,8 @@ def build_ask_user_payload(
     # Legacy single-question shape — auto-normalised into ``questions``.
     question: Any = None,
     options: Any = None,
+    # Applied to questions that don't state their own ``clarification_type``.
+    _default_clarification_type: str = "approach_choice",
 ) -> tuple[AskUserPayload | None, str | None]:
     """Validate + normalise the LLM-provided arguments.
 
@@ -123,7 +138,9 @@ def build_ask_user_payload(
     normalised: list[AskUserQuestion] = []
     used_ids: set[str] = set()
     for idx, raw in enumerate(raw_questions):
-        q_or_err = _build_question(raw, idx, used_ids)
+        q_or_err = _build_question(
+            raw, idx, used_ids, _default_clarification_type
+        )
         if isinstance(q_or_err, str):
             return None, q_or_err
         normalised.append(q_or_err)
@@ -149,7 +166,9 @@ def _coerce_questions(questions: Any, question: Any, options: Any) -> list[Any] 
     return []
 
 
-def _build_question(raw: Any, idx: int, used_ids: set[str]) -> AskUserQuestion | str:
+def _build_question(
+    raw: Any, idx: int, used_ids: set[str], default_clarification_type: str
+) -> AskUserQuestion | str:
     if not isinstance(raw, dict):
         return f"Question #{idx + 1} must be an object."
 
@@ -211,6 +230,18 @@ def _build_question(raw: Any, idx: int, used_ids: set[str]) -> AskUserQuestion |
         if placeholder and len(placeholder) > MAX_PLACEHOLDER_CHARS:
             placeholder = placeholder[:MAX_PLACEHOLDER_CHARS].rstrip() + "…"
 
+    # Lenient: a known type is kept verbatim, anything else (missing or
+    # invalid) normalises without erroring — missing falls back to the
+    # default so the frontend always has a badge to render.
+    clarification_type: str | None = None
+    ct_raw = raw.get("clarification_type")
+    if ct_raw is None:
+        clarification_type = default_clarification_type
+    else:
+        ct = _coerce_string(ct_raw).strip()
+        if ct in CLARIFICATION_TYPES:
+            clarification_type = ct
+
     qid = _coerce_string(raw.get("id")).strip()
     if not qid:
         qid = f"q{idx + 1}"
@@ -229,6 +260,7 @@ def _build_question(raw: Any, idx: int, used_ids: set[str]) -> AskUserQuestion |
         multi_select=multi_select,
         allow_free_text=allow_free_text,
         placeholder=placeholder,
+        clarification_type=clarification_type,
     )
 
 
@@ -261,6 +293,7 @@ __all__ = [
     "AskUserOption",
     "AskUserPayload",
     "AskUserQuestion",
+    "CLARIFICATION_TYPES",
     "MAX_HEADER_CHARS",
     "MAX_INTRO_CHARS",
     "MAX_OPTION_CHARS",

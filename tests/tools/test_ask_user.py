@@ -319,6 +319,7 @@ def test_to_dict_shape_is_v3_for_frontend() -> None:
                 "options": [{"label": "a", "description": "why a"}],
                 "allow_free_text": True,
                 "placeholder": None,
+                "clarification_type": "approach_choice",
             },
             {
                 "id": "depth",
@@ -328,6 +329,7 @@ def test_to_dict_shape_is_v3_for_frontend() -> None:
                 "options": [],
                 "allow_free_text": True,
                 "placeholder": None,
+                "clarification_type": "approach_choice",
             },
         ],
     }
@@ -344,3 +346,42 @@ def test_to_dict_legacy_path_also_emits_v3() -> None:
         {"label": "a", "description": None},
         {"label": "b", "description": None},
     ]
+
+
+# ---------------------- clarification_type (E2) ----------------------
+
+
+def test_clarification_type_valid_survives() -> None:
+    payload, err = build_ask_user_payload(
+        questions=[{"prompt": "x", "clarification_type": "ambiguous_requirement"}]
+    )
+    assert err is None
+    assert payload is not None
+    assert payload.questions[0].clarification_type == "ambiguous_requirement"
+
+
+def test_clarification_type_invalid_becomes_none() -> None:
+    payload, err = build_ask_user_payload(
+        questions=[{"prompt": "x", "clarification_type": "not-a-real-type"}]
+    )
+    assert err is None
+    assert payload is not None
+    assert payload.questions[0].clarification_type is None
+
+
+def test_clarification_type_absent_defaults_to_approach_choice() -> None:
+    payload, err = build_ask_user_payload(questions=[{"prompt": "x"}])
+    assert err is None
+    assert payload is not None
+    assert payload.questions[0].clarification_type == "approach_choice"
+
+
+def test_clarification_type_in_payload_dict() -> None:
+    payload, _ = build_ask_user_payload(
+        questions=[{"prompt": "x", "clarification_type": "risk_confirmation"}]
+    )
+    assert payload is not None
+    assert (
+        payload.to_dict()["questions"][0]["clarification_type"]
+        == "risk_confirmation"
+    )
