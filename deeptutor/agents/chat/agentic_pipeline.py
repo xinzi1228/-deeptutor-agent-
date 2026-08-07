@@ -395,12 +395,21 @@ class AgenticChatPipeline:
                 )
                 messages.append({"role": "system", "content": f"{header}\n{content}"})
         messages.append({"role": "user", "content": user_content})
-        messages = self._patch_dangling_tool_calls(messages)
+        covered_ids = {
+            item.get("tool_call_id")
+            for item in context.conversation_history
+            if isinstance(item, dict)
+            and item.get("role") == "tool"
+            and isinstance(item.get("tool_call_id"), str)
+        }
+        messages = self._patch_dangling_tool_calls(messages, covered_ids=covered_ids)
         return self._prepare_messages_with_attachments(messages, context)
 
     def _patch_dangling_tool_calls(
         self,
         messages: list[dict[str, Any]],
+        *,
+        covered_ids: set[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Insert synthetic tool results for assistant tool_calls missing a result.
 
@@ -412,8 +421,15 @@ class AgenticChatPipeline:
         after the assistant message. Items that are not dicts (or assistant
         messages without a usable ``tool_calls`` list) are passed through
         untouched.
+
+        ``covered_ids`` seeds the set of tool_call_ids that already have a
+        result: callers like ``_build_loop_messages`` copy only user/assistant
+        history items into ``messages`` (dropping ``role=tool``), so they vouch
+        for completed pairs from the raw history. Ids found by scanning
+        ``messages`` for ``role=tool`` items are added on top, which keeps
+        direct callers that pass the full list working unchanged.
         """
-        covered: set[str] = set()
+        covered = set(covered_ids or ())
         for msg in messages:
             if not isinstance(msg, dict) or msg.get("role") != "tool":
                 continue

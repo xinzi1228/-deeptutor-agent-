@@ -54,6 +54,34 @@ def test_dangling_tool_call_patched() -> None:
     assert "被中断" in str(synthetic["content"])
 
 
+def test_complete_pair_covered_via_raw_history() -> None:
+    """A full [assistant(tool_calls), tool] pair in raw history stays untouched.
+
+    ``_build_loop_messages`` only carries ``user``/``assistant`` history items
+    into the loop list, so the patch must learn covered ids from the raw
+    history — otherwise a completed tool result would be mislabelled as
+    interrupted.
+    """
+    pipeline = _pipeline()
+    context = UnifiedContext(
+        session_id="s1",
+        user_message="next question",
+        conversation_history=[
+            {"role": "user", "content": "do it"},
+            _assistant_with_call("call_1"),
+            {"role": "tool", "tool_call_id": "call_1", "name": "web_fetch", "content": "ok"},
+        ],
+    )
+
+    messages = pipeline._build_loop_messages(
+        context=context,
+        enabled_tools=[],
+    )
+
+    assert any(m.get("tool_calls") for m in messages)
+    assert all("被中断" not in str(m.get("content", "")) for m in messages)
+
+
 def test_complete_tool_calls_untouched() -> None:
     pipeline = _pipeline()
     messages = [
