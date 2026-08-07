@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MapPin } from "lucide-react";
+import { apiFetch, apiUrl } from "@/lib/api";
 
 interface FlowState {
   has_flow: boolean;
@@ -34,8 +35,8 @@ export default function AnnotationProgress() {
     const load = async () => {
       try {
         const [flowRes, skillRes] = await Promise.all([
-          fetch("/api/v1/profile/teaching-flow"),
-          fetch("/api/v1/profile/skill-tree"),
+          apiFetch(apiUrl("/api/v1/profile/teaching-flow"), { cache: "no-store" }),
+          apiFetch(apiUrl("/api/v1/profile/skill-tree"), { cache: "no-store" }),
         ]);
         if (cancelled) return;
         if (flowRes.ok) setFlow((await flowRes.json()) as FlowState);
