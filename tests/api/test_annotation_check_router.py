@@ -125,3 +125,23 @@ def test_check_missing_predictions_400(client: TestClient) -> None:
         json={"task_type": "bbox", "ground_truth": []},
     )
     assert res.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "task_type, predictions, ground_truth, metric_key",
+    [
+        ("judgment", [{"id": 1, "label": "true"}], [{"id": 1, "answer": True}], "accuracy"),
+        ("standard", [{"x": 1, "y": 2, "w": 3, "h": 4, "label": "cat"}], [{"required_fields": ["x", "y", "w", "h", "label"], "labels": ["cat"]}], "compliance_rate"),
+        ("error_case", [{"id": 1, "flagged": True}], [{"id": 1, "is_error": True}], "accuracy"),
+        ("audio_event", [{"label": "knock", "start_time": 0.0, "end_time": 1.0}], [{"label": "knock", "start_time": 0.0, "end_time": 1.0}], "f1"),
+        ("audio_transcription", [{"id": 1, "text": "hello world"}], [{"id": 1, "text": "hello world"}], "accuracy"),
+        ("video_tracking", [{"frame": 0, "boxes": [{"x": 0, "y": 0, "w": 5, "h": 5, "label": "a"}]}], [{"frame": 0, "boxes": [{"x": 0, "y": 0, "w": 5, "h": 5, "label": "a"}]}], "f1"),
+        ("video_event", [{"label": "run", "start_time": 0.0, "end_time": 2.0}], [{"label": "run", "start_time": 0.0, "end_time": 2.0}], "f1"),
+    ],
+)
+def test_check_other_task_types(client: TestClient, task_type: str, predictions: list[dict], ground_truth: list[dict], metric_key: str) -> None:
+    res = client.post(f"{API}/check", json={"task_type": task_type, "predictions": predictions, "ground_truth": ground_truth})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["task_type"] == task_type
+    assert metric_key in data["metrics"]
