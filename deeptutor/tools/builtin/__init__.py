@@ -794,6 +794,7 @@ class ReadMemoryTool(_PromptHintsMixin, BaseTool):
                 "Use to personalise tone, depth, and examples — not on "
                 "every turn, not for purely factual questions. 按区读取时 "
                 "当前记忆区无内容会自动回退全局记忆（fallback=False 强制区隔离）。"
+                "overview_only=True 只返回各区条目数与首行预览，先概览再决定是否精读全文，节省上下文。"
             ),
             parameters=[
                 ToolParameter(
@@ -808,6 +809,12 @@ class ReadMemoryTool(_PromptHintsMixin, BaseTool):
                     description="当前记忆区无内容时自动回退全局记忆（fallback=False 强制区隔离）。",
                     required=False,
                 ),
+                ToolParameter(
+                    name="overview_only",
+                    type="boolean",
+                    description="只返回概览（各区条目数 + 首行预览 + L3 槽位），不读全文，节省上下文。",
+                    required=False,
+                ),
             ],
         )
 
@@ -816,6 +823,21 @@ class ReadMemoryTool(_PromptHintsMixin, BaseTool):
 
         bucket = str(kwargs.get("bucket") or "").strip()
         fallback = bool(kwargs.get("fallback", True))
+        overview_only = bool(kwargs.get("overview_only", False))
+        if overview_only and bucket:
+            ov = get_memory_store().bucket_overview(bucket, fallback=fallback)
+            if ov["source"] == "empty":
+                text = f"记忆区「{bucket}」暂无内容（source=empty）\n"
+            else:
+                lines = [f"记忆区「{bucket}」概览（来源：{ov['source']}）"]
+                for s in ov["surfaces"]:
+                    lines.append(f"- [{s['surface']}] {s['entries']} 条 — {s['preview']}")
+                lines.append(f"L3 全局槽：{ov['l3_slots']} 个有内容")
+                text = "\n".join(lines) + "\n"
+            return ToolResult(
+                content=text,
+                metadata={"overview": True, "source": ov["source"], "bucket": bucket},
+            )
         if bucket:
             text = get_memory_store().read_bucket(bucket, fallback=fallback)
         else:

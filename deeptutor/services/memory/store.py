@@ -114,6 +114,51 @@ class MemoryStore:
             return _NO_MEMORY
         return "\n\n---\n\n".join(parts) + "\n"
 
+    def bucket_overview(self, bucket: str, *, fallback: bool = True) -> dict:
+        """Structured, cheap overview of a memory bucket for progressive loading.
+
+        Returns ``{"bucket", "source", "surfaces", "l3_slots"}`` where each
+        surface entry is ``{"surface", "entries", "preview"}`` (entry count
+        via the document parser, preview = first bullet line ≤ 80 chars).
+        ``source`` is ``"bucket"`` when the bucket's L2 directory holds
+        ``.md`` files, ``"fallback"`` when it is empty and ``fallback`` is
+        true (reading the global L2 root, root-level only), and ``"empty"``
+        when nothing is readable anywhere. ``l3_slots`` counts the global L3
+        slots with non-empty content.
+        """
+        surfaces: list[dict] = []
+        bdir = paths.buckets_dir() / bucket
+        if bdir.is_dir():
+            bucket_files = sorted(bdir.glob("*.md"))
+            if bucket_files:
+                surfaces = [self._surface_overview(md) for md in bucket_files]
+        source = "bucket" if surfaces else "empty"
+        if not surfaces and fallback:
+            gdir = paths.l2_dir()
+            if gdir.is_dir():
+                global_files = sorted(gdir.glob("*.md"))
+                if global_files:
+                    surfaces = [self._surface_overview(md) for md in global_files]
+                    source = "fallback"
+        l3_slots = sum(1 for slot in paths.L3_SLOTS if self.read_raw("L3", slot).strip())
+        return {
+            "bucket": bucket,
+            "source": source,
+            "surfaces": surfaces,
+            "l3_slots": l3_slots,
+        }
+
+    def _surface_overview(self, md: Path) -> dict:
+        """Entry count + first-line preview for one L2 surface file."""
+        text = md.read_text(encoding="utf-8")
+        doc = parse(text)
+        entries = doc.all_entries()
+        if entries:
+            preview = entries[0].text.strip()[:80]
+        else:
+            preview = next((ln.strip()[:80] for ln in text.splitlines() if ln.strip()), "")
+        return {"surface": md.stem, "entries": len(entries), "preview": preview}
+
     def read_bucket(self, bucket: str, *, fallback: bool = True) -> str:
         """Read a memory bucket: its L2 summaries across surfaces + global L3.
 

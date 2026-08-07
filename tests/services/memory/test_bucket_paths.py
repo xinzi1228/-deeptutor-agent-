@@ -93,3 +93,81 @@ def test_strict_fallback_false(monkeypatch, tmp_path):
     text = store.read_bucket("标注学习", fallback=False)
     assert "该记忆区暂无内容" in text
     assert "全局记忆内容" not in text
+
+
+# ── bucket_overview ─────────────────────────────────────────────────────
+
+
+def _seed_surface(path, texts):
+    """Write an L2 surface doc with ``texts`` as bullets (document format)."""
+    from deeptutor.services.memory.document import Document, Entry, serialize
+    from deeptutor.services.memory.ids import new_entry_id
+
+    doc = Document(
+        title=f"{path.stem} memory",
+        sections=[
+            (
+                "Topics",
+                [
+                    Entry(id=new_entry_id(), section="Topics", text=t, refs=["chat:01"])
+                    for t in texts
+                ],
+            )
+        ],
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(serialize(doc), encoding="utf-8")
+
+
+def test_overview_bucket_source(monkeypatch, tmp_path):
+    from deeptutor.services.memory.store import get_memory_store
+
+    _seed_surface(
+        tmp_path / "L2" / "标注学习" / "chat.md",
+        ["遮挡目标处理已掌握", "置信度阈值设置原则"],
+    )
+
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    ov = get_memory_store().bucket_overview("标注学习")
+    assert ov["source"] == "bucket"
+    chat = next(s for s in ov["surfaces"] if s["surface"] == "chat")
+    assert chat["entries"] >= 2
+    assert chat["preview"].strip()
+
+
+def test_overview_fallback_source(monkeypatch, tmp_path):
+    from deeptutor.services.memory.store import get_memory_store
+
+    (tmp_path / "L2" / "标注学习").mkdir(parents=True)
+    _seed_surface(tmp_path / "L2" / "chat.md", ["全局记忆条目"])
+
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    ov = get_memory_store().bucket_overview("标注学习")
+    assert ov["source"] == "fallback"
+    assert any(s["surface"] == "chat" for s in ov["surfaces"])
+
+
+def test_overview_empty_source(monkeypatch, tmp_path):
+    from deeptutor.services.memory.store import get_memory_store
+
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    ov = get_memory_store().bucket_overview("不存在的区")
+    assert ov["source"] == "empty"
+    assert ov["surfaces"] == []
+
+
+@pytest.mark.asyncio
+async def test_read_memory_overview_only(monkeypatch, tmp_path):
+    from deeptutor.tools.builtin import ReadMemoryTool
+
+    _seed_surface(
+        tmp_path / "L2" / "标注学习" / "chat.md",
+        ["遮挡目标处理已掌握", "置信度阈值设置原则"],
+    )
+
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    result = await ReadMemoryTool().execute(bucket="标注学习", overview_only=True)
+    assert result.metadata["overview"] is True
+    assert result.metadata["bucket"] == "标注学习"
+    assert "[chat]" in result.content
+    assert "2 条" in result.content
