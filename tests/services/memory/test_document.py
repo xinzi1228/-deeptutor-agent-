@@ -330,6 +330,22 @@ def test_confidence_parse_failure_is_none() -> None:
     assert e.confidence is None
 
 
+def test_confidence_comment_in_bullet_text_not_parsed() -> None:
+    """A literal ``<!--confidence=0.99-->`` inside bullet *text* (not in the
+    tail after the id anchor) must NOT set the entry's confidence."""
+    md = """\
+# X
+
+## S
+- 使用阈值 <!--confidence=0.99--> 是常见做法 <!--m_01HZK1ABCDEFGHJKMNPQRSTVWX-->
+
+"""
+    e = parse(md).all_entries()[0]
+    assert e.confidence is None
+    assert e.source is None
+    assert "使用阈值 <!--confidence=0.99--> 是常见做法" in e.text
+
+
 def test_stale_with_confidence_round_trip() -> None:
     doc = Document(title="X")
     section: list[Entry] = []

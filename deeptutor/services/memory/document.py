@@ -202,11 +202,12 @@ def parse(md: str) -> Document:
                 ref = ref_by_label.get(marker)
                 if ref is not None and ref not in entry_refs:
                     entry_refs.append(ref)
+            tail = m_new_b.group("tail") or ""
             try:
-                confidence = float(m.group(1)) if (m := _CONF_RE.search(line)) else None
+                confidence = float(m.group(1)) if (m := _CONF_RE.search(tail)) else None
             except ValueError:
                 confidence = None
-            source = (m.group(1).strip() or None) if (m := _SRC_RE.search(line)) else None
+            source = (m.group(1).strip() or None) if (m := _SRC_RE.search(tail)) else None
             current_entries.append(
                 Entry(
                     id=entry_id,
@@ -225,11 +226,12 @@ def parse(md: str) -> Document:
         if m_old_b and current_entries is not None and current_section is not None:
             entry_id = m_old_b.group("id")
             text = m_old_b.group("text").strip()
+            tail = m_old_b.group("tail") or ""
             try:
-                confidence = float(m.group(1)) if (m := _CONF_RE.search(line)) else None
+                confidence = float(m.group(1)) if (m := _CONF_RE.search(tail)) else None
             except ValueError:
                 confidence = None
-            source = (m.group(1).strip() or None) if (m := _SRC_RE.search(line)) else None
+            source = (m.group(1).strip() or None) if (m := _SRC_RE.search(tail)) else None
             current_entries.append(
                 Entry(
                     id=entry_id,

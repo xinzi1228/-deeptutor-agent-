@@ -208,7 +208,7 @@ class MemoryStore:
         one L2 surface file."""
         text = md.read_text(encoding="utf-8")
         doc = parse(text)
-        entries = doc.visible_entries()
+        entries = sorted(doc.visible_entries(), key=_confidence_key)
         preview = entries[0].text.strip()[:80] if entries else ""
         return {"surface": md.stem, "entries": len(entries), "preview": preview}
 
@@ -274,7 +274,7 @@ class MemoryStore:
                 return "", 0, 0, 0
             toks = _est_tokens(body)
             if toks > budget_left:
-                return "", 0, 1, 0
+                return "", 1, 0, 0
             return f"## [{md.stem}]\n{body}", 1, 1, toks
         text, total, kept, used = self._render_doc_budgeted(doc, budget_left, [f"## [{md.stem}]"])
         return text, total, kept, used

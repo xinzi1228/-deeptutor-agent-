@@ -135,6 +135,48 @@ def test_overview_bucket_source(monkeypatch, tmp_path):
     assert chat["preview"].strip()
 
 
+def test_overview_preview_uses_top_confidence_entry(monkeypatch, tmp_path):
+    from deeptutor.services.memory.document import Document, Entry, serialize
+    from deeptutor.services.memory.ids import new_entry_id
+    from deeptutor.services.memory.store import get_memory_store
+
+    doc = Document(
+        title="chat memory",
+        sections=[
+            (
+                "Topics",
+                [
+                    Entry(
+                        id=new_entry_id(),
+                        section="Topics",
+                        text="低置信条目",
+                        refs=["chat:01"],
+                        confidence=0.3,
+                    ),
+                    Entry(
+                        id=new_entry_id(),
+                        section="Topics",
+                        text="高置信条目",
+                        refs=["chat:01"],
+                        confidence=0.9,
+                    ),
+                ],
+            )
+        ],
+    )
+    chat = tmp_path / "L2" / "标注学习" / "chat.md"
+    chat.parent.mkdir(parents=True, exist_ok=True)
+    chat.write_text(serialize(doc), encoding="utf-8")
+
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    chat = next(
+        s
+        for s in get_memory_store().bucket_overview("标注学习")["surfaces"]
+        if s["surface"] == "chat"
+    )
+    assert chat["preview"].startswith("高置信条目")
+
+
 def test_overview_fallback_source(monkeypatch, tmp_path):
     from deeptutor.services.memory.store import get_memory_store
 

@@ -109,6 +109,23 @@ def test_read_bucket_large_budget_returns_all(mem_root: Path) -> None:
     assert "已截断" not in text
 
 
+def test_read_bucket_oversized_legacy_surface_shows_truncation_note(
+    mem_root: Path, monkeypatch
+) -> None:
+    """Legacy raw body that overflows the budget counts as one *unkept* entry,
+    so the truncation note fires instead of the empty placeholder."""
+    import deeptutor.services.memory.store as store_mod
+    from deeptutor.services.memory.store import get_memory_store
+
+    bdir = mem_root / "L2" / "标注学习"
+    bdir.mkdir(parents=True, exist_ok=True)
+    (bdir / "chat.md").write_text("很长的纯文本记忆内容" * 50, encoding="utf-8")
+    monkeypatch.setattr(store_mod, "MEMORY_TOKEN_BUDGET", 20)
+    text = get_memory_store().read_bucket("标注学习")
+    assert "已截断" in text
+    assert "暂无内容" not in text
+
+
 def test_read_bucket_no_confidence_kept_in_order(mem_root: Path) -> None:
     from deeptutor.services.memory.store import get_memory_store
 
