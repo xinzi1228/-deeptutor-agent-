@@ -11,10 +11,20 @@ always remains usable.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from pathlib import Path
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
+
+logger = logging.getLogger(__name__)
+
+# Upper bound for one delegated expert pipeline run. If the expert's isolated
+# AgentLoop does not finish within this window, the tool degrades to a single
+# isolated LLM turn (the ``complete()`` fallback) so the master is never left
+# waiting forever on a stuck expert.
+DELEGATE_TIMEOUT_SECONDS = 60
 
 EXPERTS_DIR = (
     Path(__file__).resolve().parents[1]
@@ -189,7 +199,9 @@ class DelegateExpertTool(BaseTool):
             )
             bus = StreamBus()
             try:
-                await pipeline.run(ctx, bus)
+                await asyncio.wait_for(
+                    pipeline.run(ctx, bus), timeout=DELEGATE_TIMEOUT_SECONDS
+                )
             finally:
                 await bus.close()
             final = ""
@@ -210,6 +222,15 @@ class DelegateExpertTool(BaseTool):
             )
         except Exception as exc:
             # Fallback: single isolated complete() call so the tool always works.
+            # A delegate timeout (asyncio.TimeoutError) also lands here: the
+            # expert's isolated AgentLoop is stuck, so degrade to one LLM turn.
+            if isinstance(exc, asyncio.TimeoutError):
+                logger.warning(
+                    "delegate_to_expert timed out after %.1fs (expert=%s); "
+                    "falling back to a single complete() turn",
+                    DELEGATE_TIMEOUT_SECONDS,
+                    expert_id,
+                )
             from deeptutor.services.llm import complete
 
             try:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from types import SimpleNamespace
 from typing import Any
@@ -329,4 +330,28 @@ async def test_fallback_to_complete(monkeypatch):
 
     assert result.success is True
     assert "fallback 结论" in result.content
+    assert result.metadata["delegate"]["expert"] == "grading_expert"
+
+
+@pytest.mark.asyncio
+async def test_delegate_times_out_falls_back(monkeypatch):
+    import deeptutor.services.llm as llm_mod
+
+    async def slow_run(self, context, stream):
+        await asyncio.sleep(0.2)
+
+    async def fake_complete(prompt, system_prompt=None, **kwargs):
+        return "timeout 后走 fallback 的结论。"
+
+    monkeypatch.setattr(llm_mod, "complete", fake_complete)
+    monkeypatch.setattr(AgenticChatPipeline, "run", slow_run)
+    monkeypatch.setattr(
+        "deeptutor.tools.delegate_expert_tool.DELEGATE_TIMEOUT_SECONDS", 0.05
+    )
+
+    tool = DelegateExpertTool()
+    result = await tool.execute(expert_id="grading_expert", brief="评测标注")
+
+    assert result.success is True
+    assert "timeout 后走 fallback 的结论" in result.content
     assert result.metadata["delegate"]["expert"] == "grading_expert"

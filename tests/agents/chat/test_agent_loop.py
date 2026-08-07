@@ -876,6 +876,14 @@ def _annotation_tool_call(task_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def _delegate_tool_call(expert_id: str) -> dict[str, Any]:
+    return {
+        "id": f"call-delegate-{expert_id}",
+        "name": "delegate_to_expert",
+        "arguments": json.dumps({"expert_id": expert_id, "brief": f"task {expert_id}"}),
+    }
+
+
 def _loop_system_texts(client: _ScriptedChatClient) -> list[str]:
     return [
         str(m.get("content") or "")
@@ -983,6 +991,92 @@ async def test_loop_no_warning_for_distinct_calls(monkeypatch: pytest.MonkeyPatc
     assert not any("重复调用" in t or "已强制中断" in t for t in system_texts)
     result = _result(events)
     assert result.metadata["response"] == "Done."
+    assert result.metadata["completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_loop_truncates_excess_delegate_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """More than _MAX_DELEGATE_PER_ROUND delegate_to_expert calls in one round:
+    the excess delegates are dropped (not appended/dispatched), non-delegate
+    calls are unaffected, and a Chinese system notice explains the truncation."""
+    registry = _Registry()
+    client = _ScriptedChatClient(
+        [
+            [
+                _llm_chunk(content="Delegating."),
+                _llm_chunk(
+                    tool_calls=[
+                        _delegate_tool_call("task_guide"),
+                        _delegate_tool_call("grading_expert"),
+                        _delegate_tool_call("report_analyst"),
+                    ]
+                ),
+            ],
+            [_llm_chunk(content="All delegated.")],
+        ]
+    )
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = registry
+    monkeypatch.setattr(
+        pipeline, "_compose_enabled_tools", lambda _context: ["delegate_to_expert"]
+    )
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(
+            session_id="s1", user_message="Delegate", enabled_tools=["delegate_to_expert"]
+        ),
+    )
+
+    executed_delegates = [e for e in registry.executed if e["name"] == "delegate_to_expert"]
+    assert len(executed_delegates) == 2
+    system_texts = _loop_system_texts(client)
+    assert any("已截断本轮多余的专家委派" in t for t in system_texts)
+    result = _result(events)
+    assert result.metadata["response"] == "All delegated."
+    assert result.metadata["completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_loop_keeps_two_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exactly _MAX_DELEGATE_PER_ROUND delegate calls are all dispatched — no
+    truncation, no system notice."""
+    registry = _Registry()
+    client = _ScriptedChatClient(
+        [
+            [
+                _llm_chunk(content="Delegating."),
+                _llm_chunk(
+                    tool_calls=[
+                        _delegate_tool_call("task_guide"),
+                        _delegate_tool_call("grading_expert"),
+                    ]
+                ),
+            ],
+            [_llm_chunk(content="All delegated.")],
+        ]
+    )
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = registry
+    monkeypatch.setattr(
+        pipeline, "_compose_enabled_tools", lambda _context: ["delegate_to_expert"]
+    )
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(
+            session_id="s1", user_message="Delegate", enabled_tools=["delegate_to_expert"]
+        ),
+    )
+
+    executed_delegates = [e for e in registry.executed if e["name"] == "delegate_to_expert"]
+    assert len(executed_delegates) == 2
+    system_texts = _loop_system_texts(client)
+    assert not any("已截断本轮多余的专家委派" in t for t in system_texts)
+    result = _result(events)
+    assert result.metadata["response"] == "All delegated."
     assert result.metadata["completed"] is True
 
 

@@ -70,6 +70,12 @@ _LOOP_REPEAT_WARN = 3
 _LOOP_REPEAT_DROP = 5
 _LOOP_REPEAT_WINDOW = 20
 
+# Per-round concurrency guardrail: at most this many delegate_to_expert calls
+# may run in one round. The master is nudged to serialize or merge instead of
+# fanning out into the expert pool in parallel. Composes with the E1 guardrail
+# (which drops whole repeated rounds); this one trims a single round's fan-out.
+_MAX_DELEGATE_PER_ROUND = 2
+
 # Long-session context folding: once a single turn's message list grows past
 # the trigger, rounds older than the most recent ``_SUMMARY_KEEP_ROUNDS`` are
 # folded into one system placeholder. No LLM summary call (MVP): the fold is
@@ -416,9 +422,46 @@ class AgentLoop:
             if drop_tool_calls:
                 continue
 
-            messages.append(assistant_message_with_tool_calls(result.text, result.tool_calls))
+            # Per-round concurrency guardrail: cap how many delegate_to_expert
+            # calls run in a single round. Excess delegate calls are dropped
+            # from this round (not appended to the assistant message, not
+            # dispatched); non-delegate calls are untouched and keep their
+            # original relative order. A Chinese system notice tells the model
+            # to serialize or merge instead of fanning out in parallel.
+            kept_tool_calls = result.tool_calls
+            delegate_count = sum(
+                1 for tc in result.tool_calls if tc.get("name") == "delegate_to_expert"
+            )
+            if delegate_count > _MAX_DELEGATE_PER_ROUND:
+                seen_delegates = 0
+                kept_tool_calls = []
+                for tc in result.tool_calls:
+                    if tc.get("name") == "delegate_to_expert":
+                        if seen_delegates < _MAX_DELEGATE_PER_ROUND:
+                            kept_tool_calls.append(tc)
+                        seen_delegates += 1
+                    else:
+                        kept_tool_calls.append(tc)
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            f"已截断本轮多余的专家委派（单轮最多 {_MAX_DELEGATE_PER_ROUND} 次）。"
+                            "请串行委派或合并任务。"
+                        ),
+                    }
+                )
+                logger.warning(
+                    "agent loop guardrail: truncated %d delegate_to_expert calls "
+                    "to %d per round (session=%s)",
+                    delegate_count,
+                    _MAX_DELEGATE_PER_ROUND,
+                    self.context.session_id,
+                )
+
+            messages.append(assistant_message_with_tool_calls(result.text, kept_tool_calls))
             dispatch = await self.pipeline._dispatch_tool_calls(
-                tool_calls=result.tool_calls,
+                tool_calls=kept_tool_calls,
                 context=self.context,
                 stream=self.stream,
                 iteration_index=state.tool_steps,
