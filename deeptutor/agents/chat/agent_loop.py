@@ -70,6 +70,22 @@ _LOOP_REPEAT_WARN = 3
 _LOOP_REPEAT_DROP = 5
 _LOOP_REPEAT_WINDOW = 20
 
+# Long-session context folding: once a single turn's message list grows past
+# the trigger, rounds older than the most recent ``_SUMMARY_KEEP_ROUNDS`` are
+# folded into one system placeholder. No LLM summary call (MVP): the fold is
+# structural, and the placeholder re-injects the write_learning_record
+# obligation so milestones squeezed out of context still get persisted.
+_SUMMARY_TRIGGER_MESSAGES = 80
+_SUMMARY_KEEP_ROUNDS = 10
+# Floor below which the compressible prefix is too small to be worth folding.
+_SUMMARY_MIN_COMPRESSIBLE = 30
+_SUMMARY_TEMPLATE = (
+    "[对话摘要]\n"
+    "较早的 {n} 轮教学对话已压缩以节省上下文。"
+    "若此前有教学里程碑（任务评分、反馈、诊断结论）尚未调用 write_learning_record "
+    "落盘，请立即补录，否则视为已记录。"
+)
+
 
 def _call_fingerprint(tool_call: dict[str, Any]) -> str:
     """Stable hash of a tool call's name + normalized arguments.
@@ -432,6 +448,12 @@ class AgentLoop:
                 checkpoint_boundary=checkpoint_boundary,
             )
 
+            if len(messages) > _SUMMARY_TRIGGER_MESSAGES:
+                checkpoint_boundary = self._summarize_old_rounds(
+                    messages,
+                    keep_rounds=_SUMMARY_KEEP_ROUNDS,
+                )
+
             if dispatch.terminate:
                 payload = dispatch.terminate_payload or {}
                 await self.pipeline._emit_terminator_final_response(self.stream, payload)
@@ -462,6 +484,51 @@ class AgentLoop:
         )
         messages[:] = prefix
         return len(messages)
+
+    def _summarize_old_rounds(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        keep_rounds: int,
+    ) -> int:
+        """Fold rounds older than the most recent ``keep_rounds`` into one
+        system placeholder, re-injecting the write_learning_record obligation.
+
+        Round structure is preserved end to end: each round is one assistant
+        message followed by its ``role=tool`` results, so the fold boundary is
+        walked from the END backward to land on the assistant message that
+        starts the oldest kept round — an AI/Tool pair is never split. The
+        leading system prompt (index 0) is always kept. Returns the new
+        checkpoint boundary (index just after the injected placeholder).
+        """
+        if len(messages) < 2:
+            return len(messages)
+        kept_start = 0
+        seen_rounds = 0
+        for index in range(len(messages) - 1, -1, -1):
+            if messages[index].get("role") == "assistant":
+                seen_rounds += 1
+                if seen_rounds == keep_rounds:
+                    kept_start = index
+                    break
+        # Compressible prefix = messages[1:kept_start] (kept region starts at
+        # an assistant message). Too small to be worth folding → no-op.
+        if kept_start - 1 < _SUMMARY_MIN_COMPRESSIBLE:
+            return len(messages)
+        compressed_rounds = sum(
+            1 for m in messages[1:kept_start] if m.get("role") == "assistant"
+        )
+        messages[:] = (
+            [messages[0]]
+            + [
+                {
+                    "role": "system",
+                    "content": _SUMMARY_TEMPLATE.format(n=compressed_rounds),
+                }
+            ]
+            + messages[kept_start:]
+        )
+        return 2
 
     async def _forced_finish(
         self,

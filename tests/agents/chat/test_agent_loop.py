@@ -7,7 +7,12 @@ from typing import Any
 
 import pytest
 
-from deeptutor.agents.chat.agent_loop import InlineThinkFilter
+from deeptutor.agents.chat.agent_loop import (
+    AgentLoop,
+    InlineThinkFilter,
+    _SUMMARY_KEEP_ROUNDS,
+    _SUMMARY_TRIGGER_MESSAGES,
+)
 from deeptutor.agents.chat.agentic_pipeline import AgenticChatPipeline
 from deeptutor.capabilities.explore_context import explorer as explorer_mod
 from deeptutor.capabilities.mastery import MASTERY_TOOL_NAMES
@@ -1089,3 +1094,144 @@ def test_build_llm_tool_schemas_kb_name_enum_matches_attached() -> None:
     )
 
     assert schemas[0]["function"]["parameters"]["additionalProperties"] is False
+
+
+def _fake_round(round_no: int, tool_count: int = 4) -> list[dict[str, Any]]:
+    """A whole AI/Tool pair: one assistant message with a tool call followed
+    by its ``role=tool`` results (mirrors how ``_run_loop`` appends rounds)."""
+    messages: list[dict[str, Any]] = [
+        {
+            "role": "assistant",
+            "content": f"narration round {round_no}",
+            "tool_calls": [
+                {
+                    "id": f"call-{round_no}",
+                    "type": "function",
+                    "function": {"name": "web_search", "arguments": "{}"},
+                }
+            ],
+        }
+    ]
+    messages.extend(
+        {
+            "role": "tool",
+            "tool_call_id": f"call-{round_no}",
+            "content": f"result {round_no}-{i}",
+        }
+        for i in range(tool_count)
+    )
+    return messages
+
+
+class TestSummarizeOldRounds:
+    @staticmethod
+    def _loop() -> AgentLoop:
+        return AgentLoop.__new__(AgentLoop)
+
+    @staticmethod
+    def _messages(rounds: int = 20) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = [{"role": "system", "content": "sys"}]
+        for r in range(1, rounds + 1):
+            messages.extend(_fake_round(r))
+        return messages
+
+    def test_summarize_old_rounds_compresses(self) -> None:
+        messages = self._messages(rounds=20)
+        assert len(messages) > 90
+
+        boundary = self._loop()._summarize_old_rounds(messages, keep_rounds=10)
+
+        assert boundary == 2
+        contents = [str(m.get("content") or "") for m in messages]
+        assert any("[对话摘要]" in c for c in contents)
+        narration = {
+            str(m.get("content") or "")
+            for m in messages
+            if m.get("role") == "assistant"
+        }
+        # Early rounds are compressed away...
+        assert "narration round 1" not in narration
+        assert "narration round 2" not in narration
+        # ...while the most recent rounds survive verbatim.
+        assert "narration round 11" in narration
+        assert "narration round 20" in narration
+        # system + summary + 10 kept rounds.
+        assert len(messages) == 1 + 1 + 10 * len(_fake_round(1))
+
+    def test_summarize_keeps_ai_tool_pairs_intact(self) -> None:
+        messages = self._messages(rounds=20)
+        self._loop()._summarize_old_rounds(messages, keep_rounds=10)
+
+        # The kept region starts on an assistant message whose tool result is
+        # its immediate successor — no half-split AI/Tool pair on the boundary.
+        assert messages[0]["role"] == "system"
+        assert messages[1]["role"] == "system"
+        assert "[对话摘要]" in messages[1]["content"]
+        assert messages[2]["role"] == "assistant"
+        assert messages[2].get("tool_calls")
+        assert messages[3]["role"] == "tool"
+        assert messages[3]["tool_call_id"] == messages[2]["tool_calls"][0]["id"]
+        for i in range(2, len(messages)):
+            if messages[i]["role"] == "assistant":
+                assert i + 1 < len(messages)
+                assert messages[i + 1]["role"] == "tool"
+
+    def test_summarize_below_threshold_noop(self) -> None:
+        messages = self._messages(rounds=3)
+        original = list(messages)
+
+        boundary = self._loop()._summarize_old_rounds(messages, keep_rounds=10)
+
+        assert messages == original
+        assert boundary == len(original)
+
+    def test_summarize_injects_record_obligation(self) -> None:
+        messages = self._messages(rounds=20)
+        self._loop()._summarize_old_rounds(messages, keep_rounds=10)
+
+        contents = [str(m.get("content") or "") for m in messages]
+        assert any("write_learning_record" in c for c in contents)
+
+
+@pytest.mark.asyncio
+async def test_run_loop_folds_long_session_without_breaking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A long single turn (>_SUMMARY_TRIGGER_MESSAGES messages) folds the old
+    rounds mid-loop and still finishes normally; the next LLM call sees the
+    folded context with the record-obligation reminder re-injected."""
+    tool_rounds = 40
+    scripted: list[list[SimpleNamespace]] = [
+        [
+            _llm_chunk(content=f"Round {r}."),
+            _llm_chunk(tool_calls=_annotation_tool_call(f"t{r}")),
+        ]
+        for r in range(1, tool_rounds + 1)
+    ]
+    scripted.append([_llm_chunk(content="All done.")])
+    registry = _Registry()
+    client = _ScriptedChatClient(scripted)
+    pipeline = AgenticChatPipeline(language="zh")
+    pipeline.registry = registry
+    pipeline._max_rounds = tool_rounds + 5
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _context: ["annotation_check"])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(
+            session_id="s1", user_message="Teach me", enabled_tools=["annotation_check"]
+        ),
+    )
+
+    assert client.call_count == tool_rounds + 1
+    final_call = client.calls[-1]["messages"]
+    system_texts = [str(m.get("content") or "") for m in final_call if m.get("role") == "system"]
+    assert any("[对话摘要]" in t for t in system_texts)
+    assert any("write_learning_record" in t for t in system_texts)
+    joined = json.dumps(final_call, ensure_ascii=False)
+    assert "Round 1." not in joined
+    assert "Round 40." in joined
+    result = _result(events)
+    assert result.metadata["response"] == "All done."
+    assert result.metadata["completed"] is True
