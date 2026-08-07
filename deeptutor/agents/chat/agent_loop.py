@@ -281,6 +281,7 @@ class AgentLoop:
         # >=3 hits and force-dropped at >=5 instead of spinning forever.
         recent_calls: deque[str] = deque(maxlen=_LOOP_REPEAT_WINDOW)
         warned: set[str] = set()
+        dropped: set[str] = set()
         for _round in range(max(1, self.pipeline.effective_max_rounds(self.context))):
             try:
                 result = await self._call_llm(
@@ -359,15 +360,17 @@ class AgentLoop:
                 tool_name = tc.get("name")
                 if count >= _LOOP_REPEAT_DROP:
                     drop_tool_calls = True
-                    messages.append(
-                        {
-                            "role": "system",
-                            "content": (
-                                "已强制中断重复的工具调用（同一调用已出现 5 次）。"
-                                "停止重复，直接基于已有结果输出结论。"
-                            ),
-                        }
-                    )
+                    if fp not in dropped:
+                        dropped.add(fp)
+                        messages.append(
+                            {
+                                "role": "system",
+                                "content": (
+                                    f"已强制中断重复的工具调用（同一调用已出现 {_LOOP_REPEAT_DROP} 次）。"
+                                    "停止重复，直接基于已有结果输出结论。"
+                                ),
+                            }
+                        )
                     logger.warning(
                         "agent loop guardrail: dropping repeated tool call %r "
                         "(fingerprint=%s count=%d)",
