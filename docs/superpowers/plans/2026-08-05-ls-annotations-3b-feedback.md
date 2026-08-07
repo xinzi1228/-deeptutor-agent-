@@ -23,7 +23,7 @@
 ### Task 1: 后端——暴露 task_bank 单任务 ground_truth 端点
 
 **Files:**
-- Modify: `deeptutor/api/routers/annotation.py`（加 `GET /{task_id}/ground-truth`）
+- Modify: `deeptutor/api/routers/annotation.py`（加 `GET /ground-truth/{task_id}`）
 - Test: `tests/api/test_annotation_check_router.py`
 
 前端需要按 `taskId` 拿 ground_truth（否则得读 data 文件，跨层）。加一个轻量端点。
@@ -158,7 +158,7 @@ export default function AnnotationResultCard({ metrics, report }: AnnotationResu
 
   const toneClass =
     tone === "good"
-      ? "border-[var(--success)]/40 text-[var(--success)]"
+      ? "border-[var(--primary)]/40 text-[var(--primary)]"
       : tone === "bad"
         ? "border-[var(--destructive)]/40 text-[var(--destructive)]"
         : "border-[var(--border)] text-[var(--muted-foreground)]";
@@ -198,7 +198,7 @@ export default function AnnotationResultCard({ metrics, report }: AnnotationResu
 }
 ```
 
-> 风格对齐 `AnnotationProgress.tsx` / `AnnotationCoach.tsx`。CSS 变量 `--success`/`--destructive` 若不存在则用 `--primary`（先 grep 确认，不存在就统一用 `--primary`）。
+> 风格对齐 `AnnotationProgress.tsx` / `AnnotationCoach.tsx`。已核实：`--destructive` 存在（globals.css:40），`--success` **不存在**——good tone 用 `--primary`。
 
 - [ ] **Step 2: 验证 tsc**
 
