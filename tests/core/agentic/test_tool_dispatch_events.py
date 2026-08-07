@@ -80,40 +80,54 @@ async def test_parallel_tool_calls_overlap() -> None:
 
     overlap: list[str] = []
     release = asyncio.Event()
+    fast_started = asyncio.Event()
 
     class _SlowRegistry:
-        async def execute(self, name: str, **kwargs):
+        async def execute(self, name: str, **kwargs: Any) -> ToolResult:
             if name == "blocker":
                 overlap.append("blocker-start")
                 await release.wait()
                 overlap.append("blocker-end")
                 return ToolResult(content="blocked done", success=True)
             overlap.append("fast-run")
+            fast_started.set()
             return ToolResult(content="fast done", success=True)
 
-    async with asyncio.timeout(2.0):
-        dispatch_task = asyncio.create_task(
-            dispatch_tool_calls(
-                tool_calls=[
-                    {"id": "b1", "name": "blocker", "arguments": "{}"},
-                    {"id": "f1", "name": "fast", "arguments": "{}"},
-                ],
-                context=UnifiedContext(session_id="s1", user_message="hi"),
-                stream=StreamBus(),
-                source="chat",
-                stage="responding",
-                iteration_index=0,
-                registry=_SlowRegistry(),
+    try:
+        async with asyncio.timeout(2.0):
+            dispatch_task = asyncio.create_task(
+                dispatch_tool_calls(
+                    tool_calls=[
+                        {"id": "b1", "name": "blocker", "arguments": "{}"},
+                        {"id": "f1", "name": "fast", "arguments": "{}"},
+                    ],
+                    context=UnifiedContext(session_id="s1", user_message="hi"),
+                    stream=StreamBus(),
+                    source="chat",
+                    stage="responding",
+                    iteration_index=0,
+                    registry=_SlowRegistry(),
+                )
             )
-        )
-        # Poll until fast has run while blocker is still blocked on release.
-        # If dispatch were serial, fast could not start before release.set(),
-        # so this loop would spin until the timeout fires.
-        while "fast-run" not in overlap:
-            await asyncio.sleep(0.01)
-        assert "blocker-start" in overlap, "blocker must start"
-        release.set()
-        outcome = await dispatch_task
+            # Wait until fast has run while blocker is still blocked on release.
+            # If dispatch were serial, fast could not start before release.set(),
+            # so this wait would time out.
+            fast_waiter = asyncio.ensure_future(fast_started.wait())
+            done, _ = await asyncio.wait(
+                {dispatch_task, fast_waiter}, timeout=2.0, return_when=asyncio.FIRST_COMPLETED
+            )
+            if fast_waiter not in done:
+                fast_waiter.cancel()
+                if dispatch_task in done:
+                    outcome = await dispatch_task  # re-raise the real dispatcher error
+                else:
+                    raise TimeoutError("fast did not start while blocker was blocked")
+            else:
+                assert "blocker-start" in overlap, "blocker must start"
+                release.set()
+                outcome = await dispatch_task
+    finally:
+        release.set()  # unblock blocker so a leaked task can finish
 
     results = {m["name"] for m in outcome.tool_messages}
     assert results == {"blocker", "fast"}
