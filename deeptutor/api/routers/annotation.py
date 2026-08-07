@@ -24,7 +24,6 @@ _SCORERS = {
 }
 
 _REPORTERS = {
-    "bbox": lambda p, g: annotation_check._bbox_report(p, g)[0],
     "classification": annotation_check._classify_report,
     "judgment": annotation_check._judgment_report,
     "standard": annotation_check._standard_report,
@@ -72,7 +71,6 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
 
     metrics = _SCORERS[task_type](predictions, ground_truth)
 
-    report = _REPORTERS[task_type](predictions, ground_truth)
     if task_type == "bbox":
         image_size = (1000, 1000)
         raw_size = str(body.get("image_size") or "").strip()
@@ -85,5 +83,7 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
         report, _ = annotation_check._bbox_report(
             predictions, ground_truth, image_size=image_size
         )
+    else:
+        report = _REPORTERS[task_type](predictions, ground_truth)
 
     return {"task_type": task_type, "metrics": metrics, "report": report}
