@@ -861,6 +861,126 @@ async def test_round_budget_forces_tool_less_finish(monkeypatch: pytest.MonkeyPa
     assert result.metadata["completed"] is True
 
 
+def _annotation_tool_call(task_id: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": f"call-{task_id}",
+            "name": "annotation_check",
+            "arguments": json.dumps({"task_id": task_id, "strict": True}),
+        }
+    ]
+
+
+def _loop_system_texts(client: _ScriptedChatClient) -> list[str]:
+    return [
+        str(m.get("content") or "")
+        for call in client.calls
+        for m in call["messages"]
+        if m.get("role") == "system"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_loop_warns_on_repeated_tool_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The loop guardrail injects a Chinese system warning when the same tool
+    call (same name + same args) repeats for 3 rounds. The 3rd round still
+    dispatches (warn-and-continue); the next LLM call sees the warning."""
+    registry = _Registry()
+    client = _ScriptedChatClient(
+        [
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Done.")],
+        ]
+    )
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = registry
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _context: ["annotation_check"])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(session_id="s1", user_message="Check", enabled_tools=["annotation_check"]),
+    )
+
+    # warn-and-continue: all 3 identical rounds still executed the tool.
+    assert len(registry.executed) == 3
+    assert client.call_count == 4
+    system_texts = _loop_system_texts(client)
+    assert any("重复调用" in t and "annotation_check" in t for t in system_texts)
+    result = _result(events)
+    assert result.metadata["response"] == "Done."
+    assert result.metadata["completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_loop_halts_on_repeated_tool_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the same tool call repeats for 5 rounds, the guardrail force-drops
+    the dispatch (≤4 executions) and the loop ends with a text answer."""
+    registry = _Registry()
+    client = _ScriptedChatClient(
+        [
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Stopped.")],
+        ]
+    )
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = registry
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _context: ["annotation_check"])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(session_id="s1", user_message="Check", enabled_tools=["annotation_check"]),
+    )
+
+    # Rounds 1-4 dispatch; the 5th round is dropped by the guardrail.
+    assert len(registry.executed) == 4
+    assert client.call_count == 6
+    system_texts = _loop_system_texts(client)
+    assert any("已强制中断" in t for t in system_texts)
+    result = _result(events)
+    assert result.metadata["response"] == "Stopped."
+    assert result.metadata["completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_loop_no_warning_for_distinct_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Distinct tool calls (same tool name but different args) must NOT trip
+    the guardrail: no warning injected and the loop completes normally."""
+    registry = _Registry()
+    client = _ScriptedChatClient(
+        [
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t1"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t2"))],
+            [_llm_chunk(content="Checking."), _llm_chunk(tool_calls=_annotation_tool_call("t3"))],
+            [_llm_chunk(content="Done.")],
+        ]
+    )
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = registry
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _context: ["annotation_check"])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(session_id="s1", user_message="Check", enabled_tools=["annotation_check"]),
+    )
+
+    assert len(registry.executed) == 3
+    assert client.call_count == 4
+    system_texts = _loop_system_texts(client)
+    assert not any("重复调用" in t or "已强制中断" in t for t in system_texts)
+    result = _result(events)
+    assert result.metadata["response"] == "Done."
+    assert result.metadata["completed"] is True
+
+
 def test_compose_enabled_tools_injects_rag_when_kb_selected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

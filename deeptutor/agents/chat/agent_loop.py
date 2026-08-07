@@ -24,8 +24,11 @@ tells the frontend how to render that round's text.
 
 from __future__ import annotations
 
+from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass, field
+import hashlib
+import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any
@@ -60,6 +63,39 @@ _THINK_OPEN_RE = re.compile(r"<\s*think(?:ing)?\b[^>]*>", re.IGNORECASE)
 _THINK_CLOSE_RE = re.compile(r"<\s*/\s*think(?:ing)?\s*>", re.IGNORECASE)
 # Longest partial tag worth waiting a chunk for (e.g. "</thinking" + slack).
 _TAG_HOLDBACK_CHARS = 24
+
+# Loop guardrail: a tool call whose name+args fingerprint repeats this many
+# times inside the sliding window triggers a warning (then a forced drop).
+_LOOP_REPEAT_WARN = 3
+_LOOP_REPEAT_DROP = 5
+_LOOP_REPEAT_WINDOW = 20
+
+
+def _call_fingerprint(tool_call: dict[str, Any]) -> str:
+    """Stable hash of a tool call's name + normalized arguments.
+
+    Tool calls in this codebase carry ``arguments`` as a JSON string (native
+    ``delta.tool_calls``) or as a dict (the DSML fallback path); ``args`` is
+    accepted for forward compatibility. The fingerprint is order-insensitive
+    so identical calls hash identically regardless of key ordering.
+    """
+    args = tool_call.get("args")
+    if not isinstance(args, dict):
+        arguments = tool_call.get("arguments")
+        if isinstance(arguments, str):
+            try:
+                parsed = json.loads(arguments)
+            except (TypeError, ValueError):
+                parsed = {"_raw": arguments}
+        else:
+            parsed = arguments
+        args = parsed if isinstance(parsed, dict) else {"_raw": parsed}
+    blob = json.dumps(
+        [tool_call.get("name"), args],
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return hashlib.md5(blob.encode("utf-8")).hexdigest()
 
 
 class InlineThinkFilter:
@@ -240,6 +276,11 @@ class AgentLoop:
         """
         explore_label = self.pipeline._t("labels.exploring", default="Exploring")
         nudged_empty_finish = False
+        # Loop guardrail: sliding window of tool-call fingerprints so a model
+        # stuck repeating the same call (same name + same args) is warned at
+        # >=3 hits and force-dropped at >=5 instead of spinning forever.
+        recent_calls: deque[str] = deque(maxlen=_LOOP_REPEAT_WINDOW)
+        warned: set[str] = set()
         for _round in range(max(1, self.pipeline.effective_max_rounds(self.context))):
             try:
                 result = await self._call_llm(
@@ -305,6 +346,56 @@ class AgentLoop:
                     continue
                 # Finish: the text streamed live this round IS the answer.
                 return await self._finalize_finish(final_text)
+
+            # Loop guardrail: detect the model stuck re-emitting the same tool
+            # call (same name + same args). >=3 hits inject a one-time Chinese
+            # warning but still run the round; >=5 hits force-drop the round's
+            # dispatch entirely so the model must answer from what it has.
+            fingerprints = [_call_fingerprint(tc) for tc in result.tool_calls]
+            recent_calls.extend(fingerprints)
+            drop_tool_calls = False
+            for tc, fp in zip(result.tool_calls, fingerprints):
+                count = recent_calls.count(fp)
+                tool_name = tc.get("name")
+                if count >= _LOOP_REPEAT_DROP:
+                    drop_tool_calls = True
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                "已强制中断重复的工具调用（同一调用已出现 5 次）。"
+                                "停止重复，直接基于已有结果输出结论。"
+                            ),
+                        }
+                    )
+                    logger.warning(
+                        "agent loop guardrail: dropping repeated tool call %r "
+                        "(fingerprint=%s count=%d)",
+                        tool_name,
+                        fp,
+                        count,
+                    )
+                    break
+                if count >= _LOOP_REPEAT_WARN and fp not in warned:
+                    warned.add(fp)
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                f"警告：你已重复调用 {tool_name} 相同参数 {count} 次。"
+                                "停止重复，基于已有结果直接给出结论或换一种方式。"
+                            ),
+                        }
+                    )
+                    logger.warning(
+                        "agent loop guardrail: repeated tool call %r "
+                        "(fingerprint=%s count=%d)",
+                        tool_name,
+                        fp,
+                        count,
+                    )
+            if drop_tool_calls:
+                continue
 
             messages.append(assistant_message_with_tool_calls(result.text, result.tool_calls))
             dispatch = await self.pipeline._dispatch_tool_calls(
