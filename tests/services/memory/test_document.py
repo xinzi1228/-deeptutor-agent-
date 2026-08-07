@@ -279,3 +279,75 @@ def test_mark_unmark() -> None:
     unknown = "m_01HZKNONEXISTENTQRSTUVWX"
     assert doc.mark_stale(unknown) is False
     assert doc.unmark_stale(unknown) is False
+
+
+# ── E4: confidence / source 行尾注释持久化 ──────────────────────────────
+
+
+def test_round_trip_preserves_confidence_and_source() -> None:
+    doc = Document(title="X")
+    section: list[Entry] = []
+    doc.sections.append(("S", section))
+    section.append(
+        Entry(
+            id="m_01HZK1ABCDEFGHJKMNPQRSTVWX",
+            section="S",
+            text="fact",
+            refs=[],
+            confidence=0.8,
+            source="chat:abc",
+        )
+    )
+    rendered = serialize(doc)
+    assert "<!--confidence=0.80-->" in rendered
+    assert "<!--source=chat:abc-->" in rendered
+    reparsed = parse(rendered).all_entries()[0]
+    assert reparsed.confidence == 0.8
+    assert reparsed.source == "chat:abc"
+
+
+def test_legacy_docs_yield_none_confidence() -> None:
+    for e in parse(_SAMPLE).all_entries():
+        assert e.confidence is None
+        assert e.source is None
+
+
+def test_new_format_without_comments_yields_none() -> None:
+    for e in parse(_NEW_SAMPLE).all_entries():
+        assert e.confidence is None
+        assert e.source is None
+
+
+def test_confidence_parse_failure_is_none() -> None:
+    md = """\
+# X
+
+## S
+- a <!--m_01HZK1ABCDEFGHJKMNPQRSTVWX--> <!--confidence=1.2.3-->
+
+"""
+    e = parse(md).all_entries()[0]
+    assert e.confidence is None
+
+
+def test_stale_with_confidence_round_trip() -> None:
+    doc = Document(title="X")
+    section: list[Entry] = []
+    doc.sections.append(("S", section))
+    section.append(
+        Entry(
+            id="m_01HZK1ABCDEFGHJKMNPQRSTVWX",
+            section="S",
+            text="old",
+            refs=[],
+            stale=True,
+            confidence=0.4,
+            source="chat:zzz",
+        )
+    )
+    rendered = serialize(doc)
+    assert " <!-- stale --> <!--confidence=0.40--> <!--source=chat:zzz-->" in rendered
+    reparsed = parse(rendered).all_entries()[0]
+    assert reparsed.stale is True
+    assert reparsed.confidence == 0.4
+    assert reparsed.source == "chat:zzz"

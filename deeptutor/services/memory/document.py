@@ -50,18 +50,27 @@ _STALE_MARKER = "<!-- stale -->"
 _STALE_TAG = _STALE_MARKER.split()[1]  # "stale"
 _STALE_RE = rf"\s*<!--\s*{_STALE_TAG}\s*-->"
 
+# E4 metadata comments appended after the stale marker: ``<!--confidence=0.80-->``
+# and ``<!--source=chat:abc-->``. Extracted from the raw bullet line during
+# ``parse`` (never part of the bullet's structure), so a malformed value
+# degrades to ``None`` instead of breaking the round-trip.
+_CONF_RE = re.compile(r"<!--confidence=([0-9.]+)-->")
+_SRC_RE = re.compile(r"<!--source=([^>]+)-->")
+
 # New bullet:  "- text [^1], [^3] <!--m_xxx-->"
 # Markers are optional (an entry may cite no refs); commas + whitespace
 # between markers are tolerated so the rendered superscripts read
 # ``¹, ³`` instead of the visually-merged ``¹³``.
 # A trailing ``<!-- stale -->`` marker (emitted after the id anchor) is
-# tolerated so stale entries round-trip.
+# tolerated so stale entries round-trip. E4 metadata comments
+# (``<!--confidence=0.80-->`` ``<!--source=chat:abc-->``) are likewise
+# tolerated after the stale marker.
 _NEW_BULLET_RE = re.compile(
-    rf"^\s*-\s+(?P<text>.*?)(?P<markers>(?:\s*,?\s*\[\^[^\]]+\])*)\s*<!--\s*(?P<id>{_ENTRY_ID_RE})\s*-->(?P<stale>{_STALE_RE})?\s*$"
+    rf"^\s*-\s+(?P<text>.*?)(?P<markers>(?:\s*,?\s*\[\^[^\]]+\])*)\s*<!--\s*(?P<id>{_ENTRY_ID_RE})\s*-->(?P<stale>{_STALE_RE})?(?P<tail>(?:\s*<!--[^>]*-->)*)\s*$"
 )
 # Legacy bullet: "- text[^m_xxx]"
 _OLD_BULLET_RE = re.compile(
-    rf"^\s*-\s+(?P<text>.*?)\[\^(?P<id>{_ENTRY_ID_RE})\](?P<stale>{_STALE_RE})?\s*$"
+    rf"^\s*-\s+(?P<text>.*?)\[\^(?P<id>{_ENTRY_ID_RE})\](?P<stale>{_STALE_RE})?(?P<tail>(?:\s*<!--[^>]*-->)*)\s*$"
 )
 
 # Legacy footnote def: "[^m_xxx]: ref1, ref2"
@@ -79,6 +88,8 @@ class Entry:
     text: str
     refs: list[str] = field(default_factory=list)
     stale: bool = False
+    confidence: float | None = None
+    source: str | None = None
 
 
 @dataclass
@@ -191,6 +202,11 @@ def parse(md: str) -> Document:
                 ref = ref_by_label.get(marker)
                 if ref is not None and ref not in entry_refs:
                     entry_refs.append(ref)
+            try:
+                confidence = float(m.group(1)) if (m := _CONF_RE.search(line)) else None
+            except ValueError:
+                confidence = None
+            source = (m.group(1).strip() or None) if (m := _SRC_RE.search(line)) else None
             current_entries.append(
                 Entry(
                     id=entry_id,
@@ -198,6 +214,8 @@ def parse(md: str) -> Document:
                     text=text,
                     refs=entry_refs,
                     stale=bool(m_new_b.group("stale")),
+                    confidence=confidence,
+                    source=source,
                 )
             )
             continue
@@ -207,6 +225,11 @@ def parse(md: str) -> Document:
         if m_old_b and current_entries is not None and current_section is not None:
             entry_id = m_old_b.group("id")
             text = m_old_b.group("text").strip()
+            try:
+                confidence = float(m.group(1)) if (m := _CONF_RE.search(line)) else None
+            except ValueError:
+                confidence = None
+            source = (m.group(1).strip() or None) if (m := _SRC_RE.search(line)) else None
             current_entries.append(
                 Entry(
                     id=entry_id,
@@ -214,6 +237,8 @@ def parse(md: str) -> Document:
                     text=text,
                     refs=list(refs_by_entry.get(entry_id, [])),
                     stale=bool(m_old_b.group("stale")),
+                    confidence=confidence,
+                    source=source,
                 )
             )
             continue
@@ -256,6 +281,10 @@ def serialize(doc: Document) -> str:
             markers = ", ".join(f"[^{ref_to_label[r]}]" for r in entry.refs if r in ref_to_label)
             text = entry.text.rstrip()
             tail = f" {_STALE_MARKER}" if entry.stale else ""
+            if entry.confidence is not None:
+                tail += f" <!--confidence={entry.confidence:.2f}-->"
+            if entry.source:
+                tail += f" <!--source={entry.source}-->"
             if markers:
                 lines.append(f"- {text} {markers} <!--{entry.id}-->{tail}")
             else:
