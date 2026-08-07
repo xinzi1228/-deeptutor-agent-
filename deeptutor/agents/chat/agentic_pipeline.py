@@ -787,10 +787,9 @@ class AgenticChatPipeline:
                 "notices.start_retrieval", default="Starting retrieval"
             ),
             retrieve_label=self._t("labels.retrieve", default="Retrieve"),
-            unknown_error_message_factory=lambda tn: self._t(
-                "notices.tool_unknown_error",
-                tool=tn,
-                default=f"An unknown error occurred while executing {tn}.",
+            unknown_error_message_factory=lambda tn, err: (
+                f"工具 {tn} 执行失败：{err}。请检查参数是否正确，或改用其他工具；"
+                "若无法继续，基于已有结果直接输出阶段性结论。"
             ),
         )
 
@@ -829,10 +828,9 @@ class AgenticChatPipeline:
                 "notices.start_retrieval", default="Starting retrieval"
             ),
             too_many_tool_calls_message=too_many,
-            unknown_error_message_factory=lambda tn: self._t(
-                "notices.tool_unknown_error",
-                tool=tn,
-                default=f"An unknown error occurred while executing {tn}.",
+            unknown_error_message_factory=lambda tn, err: (
+                f"工具 {tn} 执行失败：{err}。请检查参数是否正确，或改用其他工具；"
+                "若无法继续，基于已有结果直接输出阶段性结论。"
             ),
             trace_id_prefix="chat-loop",
         )

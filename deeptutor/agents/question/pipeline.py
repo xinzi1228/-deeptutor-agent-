@@ -1938,7 +1938,7 @@ class _BaseLoopHost:
                 "notices.start_retrieval", default="Starting retrieval"
             ),
             too_many_tool_calls_message=too_many,
-            unknown_error_message_factory=lambda tn: self._pipeline._t(
+            unknown_error_message_factory=lambda tn, err: self._pipeline._t(
                 "notices.tool_unknown_error",
                 tool=tn,
                 default=f"Error executing {tn}.",

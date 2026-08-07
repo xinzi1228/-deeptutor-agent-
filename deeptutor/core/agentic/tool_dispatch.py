@@ -43,7 +43,8 @@ MAX_PARALLEL_TOOL_CALLS = 8
 
 KwargAugmenter = Callable[[str, dict[str, Any], UnifiedContext], dict[str, Any]]
 RetrieveMetaFactory = Callable[[dict[str, Any], str, dict[str, Any]], dict[str, Any] | None]
-UnknownErrorMessageFactory = Callable[[str], str]
+# Maps (tool_name, truncated_error_reason) to a user-facing failure message.
+UnknownErrorMessageFactory = Callable[[str, str], str]
 
 
 @dataclass(frozen=True)
@@ -412,10 +413,12 @@ async def execute_tool_call(
                     error=str(exc),
                 ),
             )
+        reason = str(exc)
+        truncated = reason[:300] + ("…" if len(reason) > 300 else "")
         unknown_msg = (
-            unknown_error_message_factory(tool_name)
+            unknown_error_message_factory(tool_name, truncated)
             if unknown_error_message_factory is not None
-            else f"Error executing {tool_name}: {exc}"
+            else f"工具 {tool_name} 执行失败：{truncated}"
         )
         return {
             "result_text": unknown_msg,
