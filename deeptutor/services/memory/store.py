@@ -152,12 +152,40 @@ class MemoryStore:
         """Entry count + first-line preview for one L2 surface file."""
         text = md.read_text(encoding="utf-8")
         doc = parse(text)
-        entries = doc.all_entries()
+        entries = doc.visible_entries()
         if entries:
             preview = entries[0].text.strip()[:80]
         else:
             preview = next((ln.strip()[:80] for ln in text.splitlines() if ln.strip()), "")
         return {"surface": md.stem, "entries": len(entries), "preview": preview}
+
+    def _render_surface(self, md: Path) -> str:
+        """Render one L2 surface md: visible entries grouped by section.
+
+        Document-format files render as ``## [{stem}]`` followed by
+        ``## <section>`` headers and ``- <text>`` bullets for visible
+        (non-stale) entries only. Files with no parseable entries (legacy
+        raw text) fall back to their raw body so pre-document content
+        still surfaces. Returns ``""`` when the file contributes nothing
+        (empty body, or every entry marked stale).
+        """
+        text = md.read_text(encoding="utf-8")
+        doc = parse(text)
+        visible = doc.visible_entries()
+        if not visible:
+            if doc.all_entries():
+                return ""  # all entries stale — nothing visible to render
+            body = text.strip()
+            if not body:
+                return ""
+            return f"## [{md.stem}]\n{body}"
+        lines = [f"## [{md.stem}]"]
+        for section, entries in doc.sections:
+            section_visible = [e for e in entries if not e.stale]
+            if section_visible:
+                lines.append(f"## {section}")
+                lines.extend(f"- {e.text}" for e in section_visible)
+        return "\n".join(lines)
 
     def read_bucket(self, bucket: str, *, fallback: bool = True) -> str:
         """Read a memory bucket: its L2 summaries across surfaces + global L3.
@@ -175,17 +203,17 @@ class MemoryStore:
         if bdir.is_dir():
             bucket_files = sorted(bdir.glob("*.md"))
             for md in bucket_files:
-                body = md.read_text(encoding="utf-8").strip()
+                body = self._render_surface(md)
                 if body:
-                    parts.append(f"## [{md.stem}]\n{body}")
+                    parts.append(body)
         fallback_note = ""
         if not bucket_files and fallback:
             gdir = paths.l2_dir()
             if gdir.is_dir():
                 for md in sorted(gdir.glob("*.md")):
-                    body = md.read_text(encoding="utf-8").strip()
+                    body = self._render_surface(md)
                     if body:
-                        parts.append(f"## [{md.stem}]\n{body}")
+                        parts.append(body)
             if parts:
                 fallback_note = "（当前记忆区暂无内容，已回退到全局记忆）\n\n"
         for slot in paths.L3_SLOTS:
@@ -238,6 +266,52 @@ class MemoryStore:
         async with self._lock_for(path):
             doc = parse(path.read_text(encoding="utf-8"))
             if not doc.remove(entry_id):
+                return False
+            await asyncio.to_thread(_atomic_write, path, serialize(doc))
+            return True
+
+    async def mark_stale(
+        self, surface: str, entry_id: str, *, bucket: str | None = None
+    ) -> bool:
+        """Mark an L2 entry stale so read paths hide it (no physical delete).
+
+        Only L2 surfaces accept stale marks — L3 slots (preferences
+        included) raise :class:`ValueError`. Returns ``True`` iff the entry
+        existed and was marked.
+        """
+        if surface in paths.L3_SLOTS:
+            raise ValueError(f"L3 slot {surface!r} cannot be marked stale")
+        if surface not in paths.SURFACES:
+            raise ValueError(f"unknown surface {surface!r}")
+        path = paths.l2_file(surface, bucket)  # type: ignore[arg-type]
+        if not path.exists():
+            return False
+        async with self._lock_for(path):
+            doc = parse(path.read_text(encoding="utf-8"))
+            if not doc.mark_stale(entry_id):
+                return False
+            await asyncio.to_thread(_atomic_write, path, serialize(doc))
+            return True
+
+    async def unmark_stale(
+        self, surface: str, entry_id: str, *, bucket: str | None = None
+    ) -> bool:
+        """Clear an L2 entry's stale flag (restores it to read paths).
+
+        Same safeguard as :meth:`mark_stale`: L3 slots raise
+        :class:`ValueError`. Returns ``True`` iff the entry existed and was
+        unmarked.
+        """
+        if surface in paths.L3_SLOTS:
+            raise ValueError(f"L3 slot {surface!r} cannot be unmarked")
+        if surface not in paths.SURFACES:
+            raise ValueError(f"unknown surface {surface!r}")
+        path = paths.l2_file(surface, bucket)  # type: ignore[arg-type]
+        if not path.exists():
+            return False
+        async with self._lock_for(path):
+            doc = parse(path.read_text(encoding="utf-8"))
+            if not doc.unmark_stale(entry_id):
                 return False
             await asyncio.to_thread(_atomic_write, path, serialize(doc))
             return True

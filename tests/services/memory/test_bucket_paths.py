@@ -171,3 +171,88 @@ async def test_read_memory_overview_only(monkeypatch, tmp_path):
     assert result.metadata["bucket"] == "标注学习"
     assert "[chat]" in result.content
     assert "2 条" in result.content
+
+
+# ── stale marking (O3) ───────────────────────────────────────────────
+
+
+def _entry_id(monkeypatch, tmp_path, surface, bucket):
+    from deeptutor.services.memory.document import parse as doc_parse
+
+    md = tmp_path / "L2" / bucket / f"{surface}.md"
+    return doc_parse(md.read_text(encoding="utf-8")).all_entries()[0].id
+
+
+@pytest.mark.asyncio
+async def test_mark_stale_hides_from_read_bucket(monkeypatch, tmp_path):
+    from deeptutor.services.memory.store import get_memory_store
+
+    _seed_surface(
+        tmp_path / "L2" / "标注学习" / "chat.md",
+        ["遮挡目标处理已掌握", "置信度阈值设置原则"],
+    )
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    store = get_memory_store()
+
+    entry_id = _entry_id(monkeypatch, tmp_path, "chat", "标注学习")
+    assert await store.mark_stale("chat", entry_id, bucket="标注学习") is True
+
+    text = store.read_bucket("标注学习")
+    assert "遮挡目标处理已掌握" not in text
+    assert "置信度阈值设置原则" in text
+
+
+@pytest.mark.asyncio
+async def test_unmark_stale_restores(monkeypatch, tmp_path):
+    from deeptutor.services.memory.store import get_memory_store
+
+    _seed_surface(
+        tmp_path / "L2" / "标注学习" / "chat.md",
+        ["遮挡目标处理已掌握", "置信度阈值设置原则"],
+    )
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    store = get_memory_store()
+
+    entry_id = _entry_id(monkeypatch, tmp_path, "chat", "标注学习")
+    await store.mark_stale("chat", entry_id, bucket="标注学习")
+    assert "遮挡目标处理已掌握" not in store.read_bucket("标注学习")
+
+    assert await store.unmark_stale("chat", entry_id, bucket="标注学习") is True
+    assert "遮挡目标处理已掌握" in store.read_bucket("标注学习")
+
+
+@pytest.mark.asyncio
+async def test_mark_stale_l3_rejected(monkeypatch, tmp_path):
+    from deeptutor.services.memory.store import get_memory_store
+
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    store = get_memory_store()
+    with pytest.raises(ValueError):
+        await store.mark_stale("preferences", "m_01HZK1ABCDEFGHJKMNPQRSTVWX")
+    with pytest.raises(ValueError):
+        await store.unmark_stale("preferences", "m_01HZK1ABCDEFGHJKMNPQRSTVWX")
+
+
+@pytest.mark.asyncio
+async def test_overview_counts_visible_only(monkeypatch, tmp_path):
+    from deeptutor.services.memory.store import get_memory_store
+
+    _seed_surface(
+        tmp_path / "L2" / "标注学习" / "chat.md",
+        ["遮挡目标处理已掌握", "置信度阈值设置原则"],
+    )
+    monkeypatch.setattr("deeptutor.services.memory.paths.memory_root", lambda: tmp_path)
+    store = get_memory_store()
+
+    chat = next(
+        s for s in store.bucket_overview("标注学习")["surfaces"] if s["surface"] == "chat"
+    )
+    assert chat["entries"] == 2
+
+    entry_id = _entry_id(monkeypatch, tmp_path, "chat", "标注学习")
+    await store.mark_stale("chat", entry_id, bucket="标注学习")
+
+    chat = next(
+        s for s in store.bucket_overview("标注学习")["surfaces"] if s["surface"] == "chat"
+    )
+    assert chat["entries"] == 1
