@@ -212,6 +212,26 @@ def test_merge_anchor_group_keeps_zero_confidence():
     assert canonical["confidence"] == 0.8  # 0.0 不是 None，不触发 0.5 兜底
 
 
+def test_merge_anchor_group_all_zero_confidence_stays_zero():
+    group = [
+        _record(confidence=0.0, timestamp="2026-08-01T00:00:00+00:00"),
+        _record(confidence=0.0, timestamp="2026-08-02T00:00:00+00:00"),
+    ]
+    out = merge_anchor_group(list(group), group)
+    canonical = [r for r in out if r.get("timestamp") == "2026-08-02T00:00:00+00:00"][0]
+    assert canonical["confidence"] == 0.0
+
+
+def test_merge_anchor_group_all_none_confidence_defaults():
+    group = [
+        _record(confidence=None, timestamp="2026-08-01T00:00:00+00:00"),
+        _record(confidence=None, timestamp="2026-08-02T00:00:00+00:00"),
+    ]
+    out = merge_anchor_group(list(group), group)
+    canonical = [r for r in out if r.get("timestamp") == "2026-08-02T00:00:00+00:00"][0]
+    assert canonical["confidence"] == 0.5
+
+
 def _tmp_store(tmp_path):
     import deeptutor.services.learning_records as lr_mod
 

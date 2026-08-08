@@ -109,8 +109,10 @@ def merge_anchor_group(
     canonical["merged_from"] = sorted(
         str(r.get("id") or r.get("timestamp") or "") for r in older
     )
-    confidences = [r.get("confidence") for r in group]
-    canonical["confidence"] = max(c for c in confidences if c is not None) or 0.5
+    confidences = [
+        c for c in (r.get("confidence") for r in group) if isinstance(c, (int, float))
+    ]
+    canonical["confidence"] = max(confidences) if confidences else 0.5
 
     patterns: dict[str, int] = {}
     for r in group:
