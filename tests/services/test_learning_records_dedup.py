@@ -10,9 +10,10 @@ from __future__ import annotations
 import json
 
 from deeptutor.services.learning_records_dedup import (
-    build_candidates,
-    parse_decisions,
     apply_decision,
+    build_candidates,
+    merge_anchor_group,
+    parse_decisions,
 )
 
 
@@ -149,13 +150,46 @@ def test_parse_decisions_strips_markdown_fence():
     assert decisions["r1"]["action"] == "store"
 
 
-def test_reflect_anchor_merge_path(monkeypatch, tmp_path):
+def test_merge_anchor_group_converges_in_place():
+    old = _record(
+        confidence=0.7,
+        timestamp="2026-08-01T00:00:00+00:00",
+        knowledge_points=["边界框绘制规范"],
+        pattern_evidence=["ep1", "ep2"],
+    )
+    latest = _record(
+        confidence=0.9,
+        timestamp="2026-08-02T00:00:00+00:00",
+        knowledge_points=["边界框绘制规范", "标签类别"],
+        pattern_evidence=["ep2", "ep3"],
+    )
+    records = [old, latest]
+
+    out = merge_anchor_group(records, [old, latest])
+
+    # 原地收敛：不追加副本
+    assert len(out) == 2
+    canonical = [r for r in out if not r.get("archived")]
+    assert len(canonical) == 1
+    assert canonical[0] is latest  # 最新记录即 canonical，原地更新
+    assert old.get("archived") is True
+    assert canonical[0]["confidence"] == 0.9  # 取组内置信度最大值
+    assert canonical[0]["merged_from"] == ["2026-08-01T00:00:00+00:00"]
+    assert set(canonical[0]["knowledge_points"]) == {"边界框绘制规范", "标签类别"}
+    assert canonical[0]["pattern_evidence"] == ["ep1", "ep2", "ep3"]
+
+
+def _tmp_store(tmp_path):
     import deeptutor.services.learning_records as lr_mod
 
-    monkeypatch.setattr(
-        lr_mod.LearningRecordStore, "file", lambda self: tmp_path / "records.jsonl"
-    )
     store = lr_mod.LearningRecordStore()
+    store._root = tmp_path
+    store._file = tmp_path / "records.jsonl"
+    return store
+
+
+def test_reflect_anchor_merge_path(tmp_path):
+    store = _tmp_store(tmp_path)
     store._write_all([
         _record(confidence=0.7, timestamp="2026-08-01T00:00:00+00:00"),
         _record(confidence=0.9, timestamp="2026-08-02T00:00:00+00:00"),
@@ -164,25 +198,29 @@ def test_reflect_anchor_merge_path(monkeypatch, tmp_path):
     result = store.reflect()
     assert result["dedup_mode"] == "anchor-merge"
     assert result["records_archived"] >= 1
+    assert result["active_records"] == 1  # 去重收敛：同一锚点只留 1 条活跃记录
     records = store._read_records()
     merged = [r for r in records if r.get("merged_from")]
     assert merged, "expected a merged record"
     assert merged[0]["confidence"] == 0.9  # 最新记录置信度提升
+    active = [r for r in records if not r.get("archived")]
+    assert len(active) == 1
+
+    # 再次 reflect 不新增重复：活跃数保持 1
+    result2 = store.reflect()
+    assert result2["active_records"] == 1
+    records2 = store._read_records()
+    assert len([r for r in records2 if not r.get("archived")]) == 1
 
 
 def test_reflect_falls_back_on_dedup_failure(monkeypatch, tmp_path):
-    import deeptutor.services.learning_records as lr_mod
-
     def _boom(*args, **kwargs):
         raise RuntimeError("llm down")
 
     monkeypatch.setattr(
         "deeptutor.services.learning_records_dedup.build_candidates", _boom
     )
-    monkeypatch.setattr(
-        lr_mod.LearningRecordStore, "file", lambda self: tmp_path / "records.jsonl"
-    )
-    store = lr_mod.LearningRecordStore()
+    store = _tmp_store(tmp_path)
     store._write_all([
         _record(f1=0.7, timestamp="2026-08-01T00:00:00+00:00"),
         _record(f1=0.9, timestamp="2026-08-02T00:00:00+00:00"),

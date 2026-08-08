@@ -273,20 +273,7 @@ class LearningRecordStore:
                 for group in groups:
                     if len(group) <= 1:
                         continue
-                    group.sort(key=lambda x: x.get("timestamp", ""))
-                    new_rec = dict(group[-1])
-                    candidates = group[:-1]
-                    decision = {
-                        "action": "merge",
-                        "target_ids": [
-                            str(c.get("id") or c.get("timestamp") or "")
-                            for c in candidates
-                        ],
-                        "merged_confidence": max(
-                            float(c.get("confidence") or 0.5) for c in group
-                        ),
-                    }
-                    records = dedup_mod.apply_decision(records, new_rec, decision)
+                    records = dedup_mod.merge_anchor_group(records, group)
                 self._write_all(records)
                 merged = sum(1 for r in records if r.get("merged_from"))
                 archived = sum(1 for r in records if r.get("archived"))
@@ -421,8 +408,6 @@ class LearningRecordStore:
         Returns ``[{"date": "YYYY-MM-DD", "records": [...], "count": n}, ...]``
         with one entry per day that has at least one record.
         """
-        from datetime import date as _date
-
         by_day: dict[str, list[dict[str, Any]]] = {}
         for r in self.list_records():  # active only
             day = (r.get("timestamp") or "")[:10]

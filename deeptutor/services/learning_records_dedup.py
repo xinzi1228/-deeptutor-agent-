@@ -90,6 +90,48 @@ def parse_decisions(raw: str, new_ids: list[str]) -> dict[str, dict[str, Any]]:
     return decisions
 
 
+def merge_anchor_group(
+    records: list[dict[str, Any]],
+    group: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Canonicalize one anchor group in place: latest wins, older archived.
+
+    Unlike ``apply_decision``'s append-always merge (which leaves the original
+    latest active AND appends a merged copy, so dedup never converges), this
+    mutates the canonical record directly: older records are archived, the
+    latest absorbs their evidence and stays the single active record. Returns
+    the (mutated) records list — no duplicate is appended.
+    """
+    group = sorted(group, key=lambda x: x.get("timestamp", ""))
+    canonical = group[-1]
+    older = group[:-1]
+
+    canonical["merged_from"] = sorted(
+        str(r.get("id") or r.get("timestamp") or "") for r in older
+    )
+    canonical["confidence"] = max(
+        float(r.get("confidence") or 0.5) for r in group
+    )
+
+    kps: set[str] = set()
+    for r in group:
+        kps.update(r.get("knowledge_points") or [])
+    if kps:
+        canonical["knowledge_points"] = sorted(kps)
+
+    evidence: list[Any] = []
+    for r in group:
+        for e in (r.get("pattern_evidence") or []):
+            if e not in evidence:
+                evidence.append(e)
+    if evidence:
+        canonical["pattern_evidence"] = evidence
+
+    for r in older:
+        r["archived"] = True
+    return records
+
+
 def apply_decision(
     records: list[dict[str, Any]],
     new_record: dict[str, Any],
