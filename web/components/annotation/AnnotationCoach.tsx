@@ -206,6 +206,7 @@ export default function AnnotationCoach({
   const [hint, setHint] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(true);
   const [quickUses, setQuickUses] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
     try {
       const raw = window.localStorage.getItem(QUICK_USES_KEY);
       return raw ? (JSON.parse(raw) as Record<string, number>) : {};
