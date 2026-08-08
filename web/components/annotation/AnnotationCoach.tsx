@@ -215,6 +215,15 @@ export default function AnnotationCoach({
     }
   });
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(QUICK_USES_KEY, JSON.stringify(quickUses));
+    } catch {
+      // localStorage 不可用则仅内存
+    }
+  }, [quickUses]);
+
   const clientRef = useRef<UnifiedWSClient | null>(null);
   const sessionIdRef = useRef<string>(sessionId || readStoredActiveSessionId() || "");
   const shownStrugglesRef = useRef<Set<string>>(new Set());
@@ -356,15 +365,10 @@ export default function AnnotationCoach({
   const sendQuickPhrase = useCallback(
     (phrase: QuickPhrase) => {
       if (sending) return; // 忙时不排队，静默忽略（快捷语不抢焦点）
-      setQuickUses((prev) => {
-        const next = { ...prev, [phrase.key]: (prev[phrase.key] ?? 0) + 1 };
-        try {
-          window.localStorage.setItem(QUICK_USES_KEY, JSON.stringify(next));
-        } catch {
-          // localStorage 不可用则仅内存
-        }
-        return next;
-      });
+      setQuickUses((prev) => ({
+        ...prev,
+        [phrase.key]: (prev[phrase.key] ?? 0) + 1,
+      }));
       sendText(phrase.label, { showUserMessage: true });
       flashCoach(); // H2 wave flash
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
@@ -569,7 +573,7 @@ export default function AnnotationCoach({
 
           {/* PetPhrase 借鉴：快捷语 chip 栏，点 chip 一键发送 */}
           <div className="border-t border-[var(--border)] px-3 pt-2">
-            <div className="flex flex-wrap gap-1.5 pb-2">
+            <div className="flex flex-wrap gap-2.5 pb-2">
               {QUICK_PHRASES.map((group) => {
                 const sorted = sortByUses(group.phrases, quickUses);
                 return (
@@ -581,7 +585,7 @@ export default function AnnotationCoach({
                           key={phrase.key}
                           onClick={() => sendQuickPhrase(phrase)}
                           disabled={sending}
-                          className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                          className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                             active
                               ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]"
                               : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--foreground)]"
