@@ -239,51 +239,61 @@ export default function AnnotationCoach({
     return client;
   }, [handleEvent]);
 
+  // PetPhrase copy_item 借鉴：发送核心（供输入框 send 与快捷语 sendQuickPhrase 复用）
+  const sendText = useCallback(
+    (content: string, opts?: { showUserMessage?: boolean }) => {
+      const text = content.trim();
+      if (!text) return;
+      if (sending) {
+        // 快捷语不弹忙时提示（不抢焦点）；输入框 send 由调用方处理忙时提示
+        if (opts?.showUserMessage === false) return;
+        if (!hint) {
+          setHint(t("annotation.coach.busyHint", { defaultValue: "我在分析上一个问题，稍等一下～" }));
+        }
+        return;
+      }
+      if (opts?.showUserMessage !== false) {
+        setMessages((prev) => [...prev, { role: "user", content: text }]);
+      }
+      setInput("");
+      setSending(true);
+      setCards([]); // 新回合开始，重置上回合图表实例
+
+      const client = ensureClient();
+      if (!client.connected) client.connect();
+
+      const payload: StartTurnMessage = {
+        type: "message",
+        content: text,
+        session_id: sessionIdRef.current || null,
+        capability: "chat",
+        language: readStoredLanguage(),
+        persona: "annotation-coach",
+      };
+
+      const attemptSend = (attempt = 0) => {
+        if (client.connected) {
+          client.send(payload);
+          return;
+        }
+        if (attempt >= 10) {
+          setSending(false);
+          setMessages((prev) => [
+            ...prev,
+            { role: "coach", content: "连接不上服务，请稍后再试。" },
+          ]);
+          return;
+        }
+        window.setTimeout(() => attemptSend(attempt + 1), 200);
+      };
+      attemptSend();
+    },
+    [sending, hint, t, ensureClient],
+  );
+
   const send = useCallback(() => {
-    const content = input.trim();
-    if (!content) return;
-    // Hermes markSubmitting 借鉴：忙时输入给陪伴式提示，而非静默忽略
-    // 用 hint 浮层而非追加 messages，避免流式响应被拼接污染（P1 修复）
-    if (sending) {
-      if (!hint) {
-        setHint(t("annotation.coach.busyHint", { defaultValue: "我在分析上一个问题，稍等一下～" }));
-      }
-      return;
-    }
-    setMessages((prev) => [...prev, { role: "user", content }]);
-    setInput("");
-    setSending(true);
-    setCards([]); // 新回合开始，重置上回合图表实例
-
-    const client = ensureClient();
-    if (!client.connected) client.connect();
-
-    const payload: StartTurnMessage = {
-      type: "message",
-      content,
-      session_id: sessionIdRef.current || null,
-      capability: "chat",
-      language: readStoredLanguage(),
-      persona: "annotation-coach",
-    };
-
-    const attemptSend = (attempt = 0) => {
-      if (client.connected) {
-        client.send(payload);
-        return;
-      }
-      if (attempt >= 10) {
-        setSending(false);
-        setMessages((prev) => [
-          ...prev,
-          { role: "coach", content: "连接不上服务，请稍后再试。" },
-        ]);
-        return;
-      }
-      window.setTimeout(() => attemptSend(attempt + 1), 200);
-    };
-    attemptSend();
-  }, [input, sending, ensureClient, hint, t]);
+    sendText(input);
+  }, [input, sendText]);
 
   // 卡点主动介入：~30s 轮询 trace-log，最近 1 分钟内有 struggle 介入 → 弹气泡
   useEffect(() => {
