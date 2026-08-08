@@ -11,6 +11,10 @@ import {
 } from "@/lib/unified-ws";
 import { shouldAppendEventContent } from "@/lib/stream";
 import {
+  ChatChartCard,
+  type ChartData,
+} from "@/components/chat/home/ChatChartCard";
+import {
   readStoredActiveSessionId,
   readStoredLanguage,
 } from "@/context/app-shell-storage";
@@ -138,6 +142,7 @@ export default function AnnotationCoach({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
+  const [cards, setCards] = useState<ChartData[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [awaitingInput, setAwaitingInput] = useState(false);
@@ -196,6 +201,15 @@ export default function AnnotationCoach({
     }
     if (event.type === "wait_for_input") {
       setAwaitingInput(true);
+      return;
+    }
+    if (event.type === "tool_result") {
+      const meta = (event.metadata ?? {}) as Record<string, unknown>;
+      const toolMeta = (meta.tool_metadata ?? {}) as Record<string, unknown>;
+      const chart = toolMeta.chart as ChartData | undefined;
+      if (chart) {
+        setCards((prev) => [...prev, chart]);
+      }
       return;
     }
     if (event.type === "content" && shouldAppendEventContent(event)) {
@@ -445,6 +459,11 @@ export default function AnnotationCoach({
                 <CoachBubble key={i} content={msg.content} />
               ),
             )}
+            {cards.map((card, ci) => (
+              <div key={`card-${ci}`} className="max-w-[85%]">
+                <ChatChartCard chart={card} />
+              </div>
+            ))}
             {sending && (
               <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[13px] text-[var(--muted-foreground)]">
                 思考中…

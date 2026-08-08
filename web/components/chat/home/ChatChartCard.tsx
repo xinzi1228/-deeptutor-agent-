@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type ChartData =
+export type ChartData =
   | { type: "scorecard"; data: { f1: number; precision: number; recall: number; passed: boolean } }
   | { type: "radar"; data: { labels: string[]; values: number[] } }
   | { type: "progress"; data: { completed: number; total: number; modules: { name: string; done: number; total: number }[] } }
