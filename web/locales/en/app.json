@@ -2505,6 +2505,8 @@
   "ago": "ago",
   "animation": "animation",
   "annotation.basicMode": "Basic Mode",
+  "annotation.coach.greeting": "Hi, I'm your annotation training buddy 🤗 What would you like to practice today? Ask me anything you're unsure about, and after you finish I'll help you see where you can do better.",
+  "annotation.coach.struggleHint": "Take it easy — many beginners have tripped over this same spot. Want a hint on how to think it through?",
   "annotation.currentTask": "Current task position",
   "annotation.flowStep": "Flow step",
   "annotation.openInNewTab": "Open in new tab",

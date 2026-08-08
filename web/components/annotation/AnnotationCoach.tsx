@@ -173,7 +173,8 @@ export default function AnnotationCoach({
           if (!cancelled) {
             setHint(
               t("annotation.coach.struggleHint", {
-                defaultValue: "我看到你在标注上有点卡，要我提示思路吗？",
+                defaultValue:
+                  "别急，这个坑很多新手都踩过。要我提示一下思路吗？",
               }),
             );
           }
@@ -303,7 +304,7 @@ export default function AnnotationCoach({
               <div className="rounded-2xl rounded-bl-sm border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--foreground)]">
                 {t("annotation.coach.greeting", {
                   defaultValue:
-                    "你好，我是你的标注教练 🤖 遇到不会的标注操作、想了解评分规则，都可以问我。",
+                    "Hi，我是你的标注陪练 🤗 今天想练哪块？有不懂的随时问我，练完我帮你看看哪里能更好。",
                 })}
               </div>
             )}

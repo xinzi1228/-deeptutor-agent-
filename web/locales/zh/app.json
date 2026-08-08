@@ -2505,6 +2505,8 @@
   "ago": "前",
   "animation": "动画",
   "annotation.basicMode": "基础模式",
+  "annotation.coach.greeting": "Hi，我是你的标注陪练 🤗 今天想练哪块？有不懂的随时问我，练完我帮你看看哪里能更好。",
+  "annotation.coach.struggleHint": "别急，这个坑很多新手都踩过。要我提示一下思路吗？",
   "annotation.currentTask": "当前任务在能力树位置",
   "annotation.flowStep": "教学流程",
   "annotation.openInNewTab": "新窗口打开",
