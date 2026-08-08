@@ -226,7 +226,15 @@ export default function AnnotationCoach({
 
   const send = useCallback(() => {
     const content = input.trim();
-    if (!content || sending) return;
+    if (!content) return;
+    // Hermes markSubmitting 借鉴：忙时输入给陪伴式提示，而非静默忽略
+    if (sending) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "coach", content: "我在分析上一个问题，稍等一下～" },
+      ]);
+      return;
+    }
     setMessages((prev) => [...prev, { role: "user", content }]);
     setInput("");
     setSending(true);
