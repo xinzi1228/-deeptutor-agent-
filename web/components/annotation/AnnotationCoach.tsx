@@ -24,6 +24,37 @@ interface CoachMessage {
   content: string;
 }
 
+type CoachMood = "celebrating" | "empathetic" | "curious" | "neutral";
+
+const MOOD_KEYWORDS: { mood: CoachMood; words: string[] }[] = [
+  {
+    mood: "celebrating",
+    words: ["太棒了", "恭喜", "进步", "不错", "完美", "满分", "过关", "厉害了", "提升", "画得真准", "IoU"],
+  },
+  {
+    mood: "empathetic",
+    words: ["别急", "没关系", "再试一次", "不难", "别灰心", "正常", "都会遇到", "加油"],
+  },
+  {
+    mood: "curious",
+    words: ["试试", "换个思路", "想一想", "你觉得呢", "为什么", "要不要"],
+  },
+];
+
+const MOOD_EMOJI: Record<CoachMood, string> = {
+  celebrating: "🎉",
+  empathetic: "💪",
+  curious: "💡",
+  neutral: "",
+};
+
+function detectCoachMood(text: string): CoachMood {
+  for (const { mood, words } of MOOD_KEYWORDS) {
+    if (words.some((w) => text.includes(w))) return mood;
+  }
+  return "neutral";
+}
+
 interface AnnotationCoachProps {
   /** Existing chat session id. Falls back to the app's active session, then
    *  the backend creates a new session on first send. */
@@ -316,14 +347,23 @@ export default function AnnotationCoach({
                 >
                   {msg.content}
                 </div>
-              ) : (
-                <div
-                  key={i}
-                  className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--foreground)]"
-                >
-                  {msg.content}
-                </div>
-              ),
+              ) : (() => {
+                const mood = detectCoachMood(msg.content);
+                const moodEmoji = MOOD_EMOJI[mood];
+                return (
+                  <div
+                    key={i}
+                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                      mood === "celebrating"
+                        ? "bg-[var(--primary)]/5 text-[var(--foreground)]"
+                        : "bg-[var(--background)] text-[var(--foreground)]"
+                    }`}
+                  >
+                    {moodEmoji && <span className="mr-1">{moodEmoji}</span>}
+                    {msg.content}
+                  </div>
+                );
+              })(),
             )}
             {sending && (
               <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[13px] text-[var(--muted-foreground)]">
