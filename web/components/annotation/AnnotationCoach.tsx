@@ -349,6 +349,34 @@ export default function AnnotationCoach({
     sendText(input);
   }, [input, sendText]);
 
+  // PetPhrase copy_item 借鉴：点 chip → 发送 + wave flash + ✓ 高亮 800ms
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copiedTimerRef = useRef<number | null>(null);
+
+  const sendQuickPhrase = useCallback(
+    (phrase: QuickPhrase) => {
+      if (sending) return; // 忙时不排队，静默忽略（快捷语不抢焦点）
+      setQuickUses((prev) => {
+        const next = { ...prev, [phrase.key]: (prev[phrase.key] ?? 0) + 1 };
+        try {
+          window.localStorage.setItem(QUICK_USES_KEY, JSON.stringify(next));
+        } catch {
+          // localStorage 不可用则仅内存
+        }
+        return next;
+      });
+      sendText(phrase.label, { showUserMessage: true });
+      flashCoach(); // H2 wave flash
+      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
+      setCopiedKey(phrase.key);
+      copiedTimerRef.current = window.setTimeout(() => {
+        setCopiedKey(null);
+        copiedTimerRef.current = null;
+      }, 800);
+    },
+    [sending, sendText, flashCoach],
+  );
+
   // 卡点主动介入：~30s 轮询 trace-log，最近 1 分钟内有 struggle 介入 → 弹气泡
   useEffect(() => {
     let cancelled = false;
@@ -390,6 +418,7 @@ export default function AnnotationCoach({
       cancelled = true;
       window.clearInterval(timer);
       if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
       clientRef.current?.disconnect();
       clientRef.current = null;
     };
@@ -536,6 +565,36 @@ export default function AnnotationCoach({
               </div>
             )}
             <div ref={listEndRef} />
+          </div>
+
+          {/* PetPhrase 借鉴：快捷语 chip 栏，点 chip 一键发送 */}
+          <div className="border-t border-[var(--border)] px-3 pt-2">
+            <div className="flex flex-wrap gap-1.5 pb-2">
+              {QUICK_PHRASES.map((group) => {
+                const sorted = sortByUses(group.phrases, quickUses);
+                return (
+                  <div key={group.group} className="flex flex-wrap items-center gap-1.5">
+                    {sorted.map((phrase) => {
+                      const active = copiedKey === phrase.key;
+                      return (
+                        <button
+                          key={phrase.key}
+                          onClick={() => sendQuickPhrase(phrase)}
+                          disabled={sending}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                            active
+                              ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)]"
+                              : "border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--foreground)]"
+                          }`}
+                        >
+                          {active ? `✓ ${t(phrase.key, phrase.label)}` : t(phrase.key, phrase.label)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 border-t border-[var(--border)] p-3">
