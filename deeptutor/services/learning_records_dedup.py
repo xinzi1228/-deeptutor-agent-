@@ -109,9 +109,18 @@ def merge_anchor_group(
     canonical["merged_from"] = sorted(
         str(r.get("id") or r.get("timestamp") or "") for r in older
     )
-    canonical["confidence"] = max(
-        float(r.get("confidence") or 0.5) for r in group
-    )
+    confidences = [r.get("confidence") for r in group]
+    canonical["confidence"] = max(c for c in confidences if c is not None) or 0.5
+
+    patterns: dict[str, int] = {}
+    for r in group:
+        ep = r.get("error_pattern")
+        if ep:
+            patterns[ep] = patterns.get(ep, 0) + 1
+    if any(v >= 2 for v in patterns.values()):
+        canonical["pattern_status"] = "confirmed"
+    else:
+        canonical.setdefault("pattern_status", "unconfirmed")
 
     kps: set[str] = set()
     for r in group:

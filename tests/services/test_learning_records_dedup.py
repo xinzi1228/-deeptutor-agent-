@@ -179,6 +179,39 @@ def test_merge_anchor_group_converges_in_place():
     assert canonical[0]["pattern_evidence"] == ["ep1", "ep2", "ep3"]
 
 
+def test_merge_anchor_group_confirms_repeated_pattern():
+    group = [
+        _record(error_pattern="边界框过大", pattern_status="unconfirmed",
+                timestamp="2026-08-01T00:00:00+00:00"),
+        _record(error_pattern="边界框过大", pattern_status="unconfirmed",
+                timestamp="2026-08-02T00:00:00+00:00"),
+    ]
+    out = merge_anchor_group(list(group), group)
+    canonical = [r for r in out if r.get("timestamp") == "2026-08-02T00:00:00+00:00"][0]
+    assert canonical["pattern_status"] == "confirmed"
+
+
+def test_merge_anchor_group_keeps_unconfirmed_when_sparse():
+    group = [
+        _record(error_pattern="边界框过大", pattern_status="unconfirmed",
+                timestamp="2026-08-01T00:00:00+00:00"),
+        _record(error_pattern=None, timestamp="2026-08-02T00:00:00+00:00"),
+    ]
+    out = merge_anchor_group(list(group), group)
+    canonical = [r for r in out if r.get("timestamp") == "2026-08-02T00:00:00+00:00"][0]
+    assert canonical.get("pattern_status") != "confirmed"
+
+
+def test_merge_anchor_group_keeps_zero_confidence():
+    group = [
+        _record(confidence=0.0, timestamp="2026-08-01T00:00:00+00:00"),
+        _record(confidence=0.8, timestamp="2026-08-02T00:00:00+00:00"),
+    ]
+    out = merge_anchor_group(list(group), group)
+    canonical = [r for r in out if r.get("timestamp") == "2026-08-02T00:00:00+00:00"][0]
+    assert canonical["confidence"] == 0.8  # 0.0 不是 None，不触发 0.5 兜底
+
+
 def _tmp_store(tmp_path):
     import deeptutor.services.learning_records as lr_mod
 
