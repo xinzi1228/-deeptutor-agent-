@@ -90,11 +90,56 @@ const MOOD_EMOJI: Record<CoachMood, string> = {
   neutral: "",
 };
 
+// PetPhrase 借鉴（logic.rs layout_group）：快捷语分组，chip 流式 + 使用频率排序
+interface QuickPhrase {
+  key: string; // i18n key
+  label: string; // 默认中文兜底
+}
+
+const QUICK_PHRASES: { group: string; phrases: QuickPhrase[] }[] = [
+  {
+    group: "praise",
+    phrases: [
+      { key: "annotation.quick.praise.1", label: "夸一下" },
+      { key: "annotation.quick.praise.2", label: "画得不错" },
+      { key: "annotation.quick.praise.3", label: "进步了" },
+    ],
+  },
+  {
+    group: "hint",
+    phrases: [
+      { key: "annotation.quick.hint.1", label: "给点思路" },
+      { key: "annotation.quick.hint.2", label: "我卡住了" },
+    ],
+  },
+  {
+    group: "advance",
+    phrases: [
+      { key: "annotation.quick.advance.1", label: "换一题" },
+      { key: "annotation.quick.advance.2", label: "再练一遍" },
+    ],
+  },
+  {
+    group: "help",
+    phrases: [
+      { key: "annotation.quick.help.1", label: "帮我看看" },
+      { key: "annotation.quick.help.2", label: "评分规则" },
+    ],
+  },
+];
+
+const QUICK_USES_KEY = "annotation.coach.quick.uses";
+
 function detectCoachMood(text: string): CoachMood {
   for (const { mood, words } of MOOD_KEYWORDS) {
     if (words.some((w) => text.includes(w))) return mood;
   }
   return "neutral";
+}
+
+// PetPhrase 借鉴：同组内按使用频率降序（同频保预设序），点击不重排
+function sortByUses(phrases: QuickPhrase[], uses: Record<string, number>): QuickPhrase[] {
+  return [...phrases].sort((a, b) => (uses[b.key] ?? 0) - (uses[a.key] ?? 0));
 }
 
 function CoachBubble({ content }: { content: string }) {
@@ -160,6 +205,14 @@ export default function AnnotationCoach({
 
   const [hint, setHint] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(true);
+  const [quickUses, setQuickUses] = useState<Record<string, number>>(() => {
+    try {
+      const raw = window.localStorage.getItem(QUICK_USES_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  });
 
   const clientRef = useRef<UnifiedWSClient | null>(null);
   const sessionIdRef = useRef<string>(sessionId || readStoredActiveSessionId() || "");
