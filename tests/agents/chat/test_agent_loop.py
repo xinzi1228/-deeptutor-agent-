@@ -1463,3 +1463,4 @@ def test_memory_tool_set_excludes_write_tools() -> None:
     assert "write_learning_record" not in _MEMORY_TOOLS
     assert "log_decision" not in _MEMORY_TOOLS
     assert "kb_search" in _MEMORY_TOOLS
+    assert "read_memory" in _MEMORY_TOOLS

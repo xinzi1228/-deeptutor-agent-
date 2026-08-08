@@ -88,6 +88,7 @@ _MEMORY_TOOLS = frozenset(
         "competency_map",
         "ability_radar",
         "get_annotation_task",
+        "read_memory",
     }
 )
 _MAX_MEMORY_TOOLS_PER_ROUND = 3
@@ -482,15 +483,12 @@ class AgentLoop:
             memory_count = sum(1 for tc in kept_tool_calls if tc.get("name") in _MEMORY_TOOLS)
             if memory_count > _MAX_MEMORY_TOOLS_PER_ROUND:
                 kept_memory = 0
-                new_kept: list[dict[str, Any]] = []
-                for tc in kept_tool_calls:
-                    if tc.get("name") in _MEMORY_TOOLS:
-                        if kept_memory < _MAX_MEMORY_TOOLS_PER_ROUND:
-                            new_kept.append(tc)
-                        kept_memory += 1
-                    else:
-                        new_kept.append(tc)
-                kept_tool_calls = new_kept
+                kept_tool_calls = [
+                    tc
+                    for tc in kept_tool_calls
+                    if tc.get("name") not in _MEMORY_TOOLS
+                    or (kept_memory := kept_memory + 1) <= _MAX_MEMORY_TOOLS_PER_ROUND
+                ]
                 messages.append(
                     {
                         "role": "system",

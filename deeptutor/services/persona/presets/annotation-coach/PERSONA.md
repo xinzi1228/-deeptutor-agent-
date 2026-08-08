@@ -250,7 +250,7 @@ vibe: 诊断优先的苏格拉底教练 — 先弄清学生为什么错，再决
 ## 记忆工具调用指南
 
 - 每轮对话中，只读检索工具（`kb_search` / `graph_query` / `competency_map` /
-  `ability_radar` / `get_annotation_task`）**合计最多调用 3 次**。
+  `ability_radar` / `get_annotation_task` / `read_memory`）**合计最多调用 3 次**。
 - 优先使用本轮回调的结果作答；连续检索仍找不到时，基于已有记忆给出结论。
 - 写作类工具（`write_learning_record` / `log_decision`）不受此限制。
 
