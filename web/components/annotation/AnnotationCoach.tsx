@@ -228,11 +228,11 @@ export default function AnnotationCoach({
     const content = input.trim();
     if (!content) return;
     // Hermes markSubmitting 借鉴：忙时输入给陪伴式提示，而非静默忽略
+    // 用 hint 浮层而非追加 messages，避免流式响应被拼接污染（P1 修复）
     if (sending) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "coach", content: "我在分析上一个问题，稍等一下～" },
-      ]);
+      if (!hint) {
+        setHint(t("annotation.coach.busyHint", { defaultValue: "我在分析上一个问题，稍等一下～" }));
+      }
       return;
     }
     setMessages((prev) => [...prev, { role: "user", content }]);
@@ -267,7 +267,7 @@ export default function AnnotationCoach({
       window.setTimeout(() => attemptSend(attempt + 1), 200);
     };
     attemptSend();
-  }, [input, sending, ensureClient]);
+  }, [input, sending, ensureClient, hint, t]);
 
   // 卡点主动介入：~30s 轮询 trace-log，最近 1 分钟内有 struggle 介入 → 弹气泡
   useEffect(() => {
