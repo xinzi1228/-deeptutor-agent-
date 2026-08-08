@@ -76,6 +76,22 @@ _LOOP_REPEAT_WINDOW = 20
 # (which drops whole repeated rounds); this one trims a single round's fan-out.
 _MAX_DELEGATE_PER_ROUND = 2
 
+# Per-round memory-retrieval concurrency guardrail (TencentDB-Agent-Memory
+# borrow, format.ts MEMORY_TOOLS_GUIDE): at most this many read-only memory /
+# knowledge-retrieval tools may run in one round. The coach should prefer
+# already-recalled results over repeatedly hitting retrieval tools with new
+# queries; write tools (write_learning_record / log_decision) are NOT counted.
+_MEMORY_TOOLS = frozenset(
+    {
+        "kb_search",
+        "graph_query",
+        "competency_map",
+        "ability_radar",
+        "get_annotation_task",
+    }
+)
+_MAX_MEMORY_TOOLS_PER_ROUND = 3
+
 # Long-session context folding: once a single turn's message list grows past
 # the trigger, rounds older than the most recent ``_SUMMARY_KEEP_ROUNDS`` are
 # folded into one system placeholder. No LLM summary call (MVP): the fold is
@@ -456,6 +472,39 @@ class AgentLoop:
                     "to %d per round (session=%s)",
                     delegate_count,
                     _MAX_DELEGATE_PER_ROUND,
+                    self.context.session_id,
+                )
+
+            # Memory-retrieval guardrail: cap how many read-only memory / KB
+            # tools run in a single round (TencentDB-Agent-Memory borrow).
+            # Excess memory-tool calls are dropped; non-memory tools are
+            # untouched and keep their original relative order.
+            memory_count = sum(1 for tc in kept_tool_calls if tc.get("name") in _MEMORY_TOOLS)
+            if memory_count > _MAX_MEMORY_TOOLS_PER_ROUND:
+                kept_memory = 0
+                new_kept: list[dict[str, Any]] = []
+                for tc in kept_tool_calls:
+                    if tc.get("name") in _MEMORY_TOOLS:
+                        if kept_memory < _MAX_MEMORY_TOOLS_PER_ROUND:
+                            new_kept.append(tc)
+                        kept_memory += 1
+                    else:
+                        new_kept.append(tc)
+                kept_tool_calls = new_kept
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            f"已截断本轮多余的记忆检索（单轮最多 {_MAX_MEMORY_TOOLS_PER_ROUND} 次）。"
+                            "请优先基于已召回的记忆/知识作答，或合并检索目标；"
+                            "连续检索仍找不到时直接给出已有结论。"
+                        ),
+                    }
+                )
+                logger.warning(
+                    "agent loop guardrail: truncated %d memory tools to %d per round (session=%s)",
+                    memory_count,
+                    _MAX_MEMORY_TOOLS_PER_ROUND,
                     self.context.session_id,
                 )
 

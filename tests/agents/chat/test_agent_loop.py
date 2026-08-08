@@ -1362,3 +1362,104 @@ async def test_run_loop_folds_long_session_without_breaking(
     result = _result(events)
     assert result.metadata["response"] == "All done."
     assert result.metadata["completed"] is True
+
+
+def _memory_tool_call(tool: str) -> dict:
+    return {
+        "id": f"call-{tool}",
+        "name": tool,
+        "arguments": json.dumps({"query": "边界框"}),
+    }
+
+
+@pytest.mark.asyncio
+async def test_loop_truncates_excess_memory_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _Registry()
+    client = _ScriptedChatClient(
+        [
+            [
+                _llm_chunk(content="Recalling."),
+                _llm_chunk(
+                    tool_calls=[
+                        _memory_tool_call("kb_search"),
+                        _memory_tool_call("graph_query"),
+                        _memory_tool_call("competency_map"),
+                        _memory_tool_call("ability_radar"),
+                    ]
+                ),
+            ],
+            [_llm_chunk(content="Done.")],
+        ]
+    )
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = registry
+    monkeypatch.setattr(
+        pipeline, "_compose_enabled_tools",
+        lambda _context: ["kb_search", "graph_query", "competency_map", "ability_radar"],
+    )
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(
+            session_id="s1", user_message="Recalling",
+            enabled_tools=["kb_search", "graph_query", "competency_map", "ability_radar"],
+        ),
+    )
+
+    memory_tools = {"kb_search", "graph_query", "competency_map", "ability_radar", "get_annotation_task"}
+    memory_executed = [e for e in registry.executed if e["name"] in memory_tools]
+    assert len(memory_executed) == 3, f"expected 3 memory tools dispatched, got {len(memory_executed)}"
+    system_texts = _loop_system_texts(client)
+    assert any("记忆" in t and "3" in t for t in system_texts), "expected memory-tool guide notice"
+    result = _result(events)
+    assert result.metadata["response"] == "Done."
+    assert result.metadata["completed"] is True
+
+
+@pytest.mark.asyncio
+async def test_loop_keeps_three_memory_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _Registry()
+    client = _ScriptedChatClient(
+        [
+            [
+                _llm_chunk(content="Recalling."),
+                _llm_chunk(
+                    tool_calls=[
+                        _memory_tool_call("kb_search"),
+                        _memory_tool_call("graph_query"),
+                        _memory_tool_call("competency_map"),
+                    ]
+                ),
+            ],
+            [_llm_chunk(content="Done.")],
+        ]
+    )
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = registry
+    monkeypatch.setattr(
+        pipeline, "_compose_enabled_tools",
+        lambda _context: ["kb_search", "graph_query", "competency_map"],
+    )
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(
+            session_id="s1", user_message="Recalling",
+            enabled_tools=["kb_search", "graph_query", "competency_map"],
+        ),
+    )
+
+    memory_tools = {"kb_search", "graph_query", "competency_map", "ability_radar", "get_annotation_task"}
+    memory_executed = [e for e in registry.executed if e["name"] in memory_tools]
+    assert len(memory_executed) == 3
+    system_texts = _loop_system_texts(client)
+    assert not any("已截断本轮多余的记忆检索" in t for t in system_texts)
+
+
+def test_memory_tool_set_excludes_write_tools() -> None:
+    from deeptutor.agents.chat.agent_loop import _MEMORY_TOOLS
+    assert "write_learning_record" not in _MEMORY_TOOLS
+    assert "log_decision" not in _MEMORY_TOOLS
+    assert "kb_search" in _MEMORY_TOOLS
