@@ -42,10 +42,11 @@ function deriveCoachStatus(sending: boolean, awaitingInput: boolean): CoachStatu
 }
 
 const STATUS_RING: Record<string, string> = {
-  idle: "",
-  working: "border-[var(--primary)]/40 border-t-[var(--primary)]",
-  "waiting-input": "border-[var(--muted-foreground)]/40 border-t-[var(--muted-foreground)]",
-  flash: "border-[var(--primary)]/60 border-t-[var(--primary)]",
+  idle: "border-[var(--border)]",
+  working: "border-[var(--primary-foreground)]/50 border-t-[var(--primary-foreground)]",
+  "waiting-input":
+    "border-[var(--primary-foreground)]/40 border-t-[var(--primary-foreground)]",
+  flash: "border-[var(--primary-foreground)]/70 border-t-[var(--primary-foreground)]",
 };
 
 const MOOD_KEYWORDS: { mood: CoachMood; words: string[] }[] = [
@@ -217,6 +218,7 @@ export default function AnnotationCoach({
     if (clientRef.current) return clientRef.current;
     const client = new UnifiedWSClient(handleEvent, () => {
       setSending(false);
+      setAwaitingInput(false);
     });
     clientRef.current = client;
     return client;
