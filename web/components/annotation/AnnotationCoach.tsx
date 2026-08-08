@@ -29,7 +29,22 @@ type CoachMood = "celebrating" | "empathetic" | "curious" | "neutral";
 const MOOD_KEYWORDS: { mood: CoachMood; words: string[] }[] = [
   {
     mood: "celebrating",
-    words: ["太棒了", "恭喜", "进步", "不错", "完美", "满分", "过关", "厉害了", "提升", "画得真准", "IoU"],
+    words: [
+      "太棒了",
+      "恭喜",
+      "很不错",
+      "不错！",
+      "完美",
+      "满分",
+      "过关了",
+      "已过关",
+      "厉害了",
+      "提升很大",
+      "明显提升",
+      "进步很大",
+      "进步明显",
+      "画得真准",
+    ],
   },
   {
     mood: "empathetic",
@@ -53,6 +68,27 @@ function detectCoachMood(text: string): CoachMood {
     if (words.some((w) => text.includes(w))) return mood;
   }
   return "neutral";
+}
+
+function CoachBubble({ content }: { content: string }) {
+  const mood = detectCoachMood(content);
+  const moodEmoji = MOOD_EMOJI[mood];
+  return (
+    <div
+      className={`max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] leading-relaxed ${
+        mood === "celebrating"
+          ? "bg-[var(--primary)]/5 text-[var(--foreground)]"
+          : "bg-[var(--background)] text-[var(--foreground)]"
+      }`}
+    >
+      {moodEmoji && (
+        <span className="mr-1" aria-hidden="true">
+          {moodEmoji}
+        </span>
+      )}
+      {content}
+    </div>
+  );
 }
 
 interface AnnotationCoachProps {
@@ -347,23 +383,9 @@ export default function AnnotationCoach({
                 >
                   {msg.content}
                 </div>
-              ) : (() => {
-                const mood = detectCoachMood(msg.content);
-                const moodEmoji = MOOD_EMOJI[mood];
-                return (
-                  <div
-                    key={i}
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                      mood === "celebrating"
-                        ? "bg-[var(--primary)]/5 text-[var(--foreground)]"
-                        : "bg-[var(--background)] text-[var(--foreground)]"
-                    }`}
-                  >
-                    {moodEmoji && <span className="mr-1">{moodEmoji}</span>}
-                    {msg.content}
-                  </div>
-                );
-              })(),
+              ) : (
+                <CoachBubble key={i} content={msg.content} />
+              ),
             )}
             {sending && (
               <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-[13px] text-[var(--muted-foreground)]">
