@@ -26,6 +26,28 @@ interface CoachMessage {
 
 type CoachMood = "celebrating" | "empathetic" | "curious" | "neutral";
 
+type CoachStatus = "idle" | "working" | "waiting-input" | "flash";
+
+interface CoachFlash {
+  status: CoachStatus;
+  until: number;
+}
+
+// Hermes 宠物状态机借鉴（agent/pet/state.py derive_pet_state 优先级）：
+// waiting-input(学生回合) > working(发送中) > idle；flash 瞬态覆盖稳态。
+function deriveCoachStatus(sending: boolean, awaitingInput: boolean): CoachStatus {
+  if (awaitingInput) return "waiting-input";
+  if (sending) return "working";
+  return "idle";
+}
+
+const STATUS_RING: Record<string, string> = {
+  idle: "",
+  working: "border-[var(--primary)]/40 border-t-[var(--primary)]",
+  "waiting-input": "border-[var(--muted-foreground)]/40 border-t-[var(--muted-foreground)]",
+  flash: "border-[var(--primary)]/60 border-t-[var(--primary)]",
+};
+
 const MOOD_KEYWORDS: { mood: CoachMood; words: string[] }[] = [
   {
     mood: "celebrating",
@@ -117,6 +139,19 @@ export default function AnnotationCoach({
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [awaitingInput, setAwaitingInput] = useState(false);
+  const [flash, setFlash] = useState<CoachFlash | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+
+  const flashCoach = useCallback((ms = 1600) => {
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    setFlash({ status: "flash", until: Date.now() + ms });
+    flashTimerRef.current = window.setTimeout(() => {
+      setFlash(null);
+      flashTimerRef.current = null;
+    }, ms);
+  }, []);
+
   const [hint, setHint] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(true);
 
@@ -144,14 +179,22 @@ export default function AnnotationCoach({
     }
     if (event.type === "done") {
       setSending(false);
+      setAwaitingInput(false);
+      flashCoach(); // 回合完成 → flash（Hermes just_completed→WAVE 借鉴）
       return;
     }
     if (event.type === "error") {
       setSending(false);
+      setAwaitingInput(false);
       setMessages((prev) => [
         ...prev,
         { role: "coach", content: event.content || "抱歉，我遇到了一点问题，请稍后再试。" },
       ]);
+      flashCoach(); // 错误也 flash（Hermes error→FAILED 借鉴，emoji 走 mood）
+      return;
+    }
+    if (event.type === "wait_for_input") {
+      setAwaitingInput(true);
       return;
     }
     if (event.type === "content" && shouldAppendEventContent(event)) {
@@ -256,6 +299,7 @@ export default function AnnotationCoach({
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
       clientRef.current?.disconnect();
       clientRef.current = null;
     };
@@ -286,6 +330,10 @@ export default function AnnotationCoach({
       }
     }
   };
+
+  const coachStatus = deriveCoachStatus(sending, awaitingInput);
+  const flashActive = flash !== null && Date.now() < flash.until;
+  const ringClass = flashActive ? STATUS_RING.flash : STATUS_RING[coachStatus];
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
@@ -425,7 +473,7 @@ export default function AnnotationCoach({
       <button
         aria-label="toggle annotation coach"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-14 w-14 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--primary)] text-2xl shadow-lg transition-transform hover:scale-105"
+        className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 ${ringClass} bg-[var(--primary)] text-2xl shadow-lg transition-transform hover:scale-105`}
       >
         <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-[var(--primary)] opacity-30" />
         <span className="relative">🤖</span>
