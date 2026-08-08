@@ -13,10 +13,11 @@ import logging
 import re
 from typing import Any
 
+from deeptutor.services.learning_records import RECORD_TYPES
+
 logger = logging.getLogger(__name__)
 
 _VALID_ACTIONS = {"store", "skip", "update", "merge"}
-_VALID_TYPES = {"diagnosis", "theory_mastered", "annotation_exercise"}
 
 
 def build_candidates(records: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
@@ -61,23 +62,29 @@ def parse_decisions(raw: str, new_ids: list[str]) -> dict[str, dict[str, Any]]:
         array_match = re.search(r"\[[\s\S]*\]", cleaned)
         parsed = json.loads(array_match.group(0)) if array_match else []
         items = parsed if isinstance(parsed, list) else []
-    except (ValueError, TypeError, json.JSONDecodeError):
+    except (TypeError, ValueError):
         items = []
     decisions: dict[str, dict[str, Any]] = {}
     for item in items:
         if not isinstance(item, dict):
             continue
-        rid = str(item.get("record_id") or "").strip()
-        if not rid:
-            continue
-        action = str(item.get("action") or "store")
-        decisions[rid] = {
-            "action": action if action in _VALID_ACTIONS else "store",
-            "target_ids": [str(t) for t in (item.get("target_ids") or [])],
-            "merged_content": item.get("merged_content") if isinstance(item.get("merged_content"), str) else None,
-            "merged_type": item.get("merged_type") if item.get("merged_type") in _VALID_TYPES else None,
-            "merged_confidence": item.get("merged_confidence") if isinstance(item.get("merged_confidence"), (int, float)) else None,
-        }
+        try:
+            rid = str(item.get("record_id") or "").strip()
+            if not rid:
+                continue
+            action = str(item.get("action") or "store")
+            raw_tids = item.get("target_ids") or []
+            tids = [str(t) for t in raw_tids] if isinstance(raw_tids, list) else []
+            merged_type = item.get("merged_type")
+            decisions[rid] = {
+                "action": action if action in _VALID_ACTIONS else "store",
+                "target_ids": tids,
+                "merged_content": item.get("merged_content") if isinstance(item.get("merged_content"), str) else None,
+                "merged_type": merged_type if isinstance(merged_type, str) and merged_type in RECORD_TYPES else None,
+                "merged_confidence": item.get("merged_confidence") if isinstance(item.get("merged_confidence"), (int, float)) else None,
+            }
+        except (TypeError, ValueError):
+            logger.warning("Malformed dedup decision item dropped: %r", item)
     for rid in new_ids:
         decisions.setdefault(rid, {"action": "store", "target_ids": []})
     return decisions
@@ -96,6 +103,8 @@ def apply_decision(
     Truth-preserving: targets are archived, never deleted.
     """
     action = decision.get("action", "store")
+    if action not in _VALID_ACTIONS:
+        action = "store"
     target_ids = [str(t) for t in decision.get("target_ids") or []]
 
     if action == "store":

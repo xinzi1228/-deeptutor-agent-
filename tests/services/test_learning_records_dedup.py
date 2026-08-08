@@ -113,3 +113,37 @@ def test_apply_update_archives_target():
     updated = [r for r in out if r.get("timestamp") == "2026-08-02T00:00:00+00:00"][0]
     assert updated["confidence"] == 0.95
     assert updated.get("updated_from") == ["2026-08-01T00:00:00+00:00"]
+
+
+def test_parse_decisions_robust_against_malformed():
+    raw = json.dumps([
+        {"record_id": "r1", "action": "store", "target_ids": 5},           # int target_ids
+        {"record_id": "r2", "action": "merge", "merged_type": ["x"]},      # list merged_type
+    ])
+    decisions = parse_decisions(raw, new_ids=["r1", "r2"])
+    assert decisions["r1"]["action"] == "store"
+    assert decisions["r1"]["target_ids"] == []  # int target_ids 不报错
+    assert decisions["r2"]["action"] == "merge"  # 非法 merged_type 字段被置空，条目保留
+    assert decisions["r2"]["merged_type"] is None  # list 不参与 in 判断
+
+
+def test_parse_decisions_string_target_ids_not_char_split():
+    raw = json.dumps([{"record_id": "r1", "action": "update",
+                       "target_ids": "old1,old2"}])
+    decisions = parse_decisions(raw, new_ids=["r1"])
+    assert decisions["r1"]["target_ids"] == []  # 字符串不拆分
+
+
+def test_apply_decision_invalid_action_defaults_store():
+    records = [_record(timestamp="2026-08-01T00:00:00+00:00")]
+    new = _record(f1=0.7, timestamp="2026-08-02T00:00:00+00:00")
+    out = apply_decision(records, new, {"action": "delete", "target_ids": ["2026-08-01T00:00:00+00:00"]})
+    # invalid action → store：不归档目标、追加新记录
+    assert not any(r.get("archived") for r in out)
+    assert len(out) == 2
+
+
+def test_parse_decisions_strips_markdown_fence():
+    raw = "```json\n" + json.dumps([{"record_id": "r1", "action": "store"}]) + "\n```"
+    decisions = parse_decisions(raw, new_ids=["r1"])
+    assert decisions["r1"]["action"] == "store"
