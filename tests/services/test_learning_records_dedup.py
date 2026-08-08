@@ -147,3 +147,49 @@ def test_parse_decisions_strips_markdown_fence():
     raw = "```json\n" + json.dumps([{"record_id": "r1", "action": "store"}]) + "\n```"
     decisions = parse_decisions(raw, new_ids=["r1"])
     assert decisions["r1"]["action"] == "store"
+
+
+def test_reflect_anchor_merge_path(monkeypatch, tmp_path):
+    import deeptutor.services.learning_records as lr_mod
+
+    monkeypatch.setattr(
+        lr_mod.LearningRecordStore, "file", lambda self: tmp_path / "records.jsonl"
+    )
+    store = lr_mod.LearningRecordStore()
+    store._write_all([
+        _record(confidence=0.7, timestamp="2026-08-01T00:00:00+00:00"),
+        _record(confidence=0.9, timestamp="2026-08-02T00:00:00+00:00"),
+    ])
+
+    result = store.reflect()
+    assert result["dedup_mode"] == "anchor-merge"
+    assert result["records_archived"] >= 1
+    records = store._read_records()
+    merged = [r for r in records if r.get("merged_from")]
+    assert merged, "expected a merged record"
+    assert merged[0]["confidence"] == 0.9  # 最新记录置信度提升
+
+
+def test_reflect_falls_back_on_dedup_failure(monkeypatch, tmp_path):
+    import deeptutor.services.learning_records as lr_mod
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("llm down")
+
+    monkeypatch.setattr(
+        "deeptutor.services.learning_records_dedup.build_candidates", _boom
+    )
+    monkeypatch.setattr(
+        lr_mod.LearningRecordStore, "file", lambda self: tmp_path / "records.jsonl"
+    )
+    store = lr_mod.LearningRecordStore()
+    store._write_all([
+        _record(f1=0.7, timestamp="2026-08-01T00:00:00+00:00"),
+        _record(f1=0.9, timestamp="2026-08-02T00:00:00+00:00"),
+    ])
+
+    result = store.reflect()
+    assert "clusters_merged" in result  # 回退到规则式
+    assert result.get("dedup_mode") != "anchor-merge"
+    records = store._read_records()
+    assert len(records) >= 1  # 不丢记录

@@ -246,11 +246,16 @@ class LearningRecordStore:
         await self._mirror_recent_summary(record)
         return record
 
-    def reflect(self) -> dict[str, Any]:
+    def reflect(self, *, llm_dedup: bool = True) -> dict[str, Any]:
         """Memory evolution (EverOS Reflection): merge / dedupe / archive.
 
-        Clusters active exercise + theory records by (type, task_id,
-        knowledge_point). For clusters with >1 record:
+        Prefers the candidate-cluster dedup path (TencentDB-Agent-Memory
+        borrow: anchor clustering + merge decision + apply) when enabled;
+        every failure falls back to the deterministic rule-based path below,
+        so records are never lost. Both paths are truth-preserving.
+
+        The rule-based fallback clusters active exercise + theory records by
+        (type, task_id, knowledge_point). For clusters with >1 record:
           * keeps the LATEST as the canonical record (latest F1/metrics);
           * merges error_pattern evidence from older records and promotes
             ``pattern_status`` to ``confirmed`` when a pattern recurs ≥2×;
@@ -259,6 +264,42 @@ class LearningRecordStore:
         ``reflect()`` is a pure in-memory transformation of the JSONL truth —
         nothing is deleted, so it is reversible by un-archiving.
         """
+        records = self._read_records()
+        if llm_dedup:
+            from deeptutor.services import learning_records_dedup as dedup_mod
+
+            try:
+                groups = dedup_mod.build_candidates(records)
+                for group in groups:
+                    if len(group) <= 1:
+                        continue
+                    group.sort(key=lambda x: x.get("timestamp", ""))
+                    new_rec = dict(group[-1])
+                    candidates = group[:-1]
+                    decision = {
+                        "action": "merge",
+                        "target_ids": [
+                            str(c.get("id") or c.get("timestamp") or "")
+                            for c in candidates
+                        ],
+                        "merged_confidence": max(
+                            float(c.get("confidence") or 0.5) for c in group
+                        ),
+                    }
+                    records = dedup_mod.apply_decision(records, new_rec, decision)
+                self._write_all(records)
+                merged = sum(1 for r in records if r.get("merged_from"))
+                archived = sum(1 for r in records if r.get("archived"))
+                return {
+                    "clusters_merged": merged,
+                    "records_archived": archived,
+                    "active_records": len([r for r in records if not r.get("archived")]),
+                    "dedup_mode": "anchor-merge",
+                }
+            except Exception as exc:
+                logger.warning("reflect dedup path failed, falling back to rule-based: %s", exc)
+        # rule-based fallback: re-read so it always starts from the latest disk
+        # state (the dedup path may have partially mutated records in memory).
         records = self._read_records()
         active = [r for r in records if not r.get("archived")]
         archived = [r for r in records if r.get("archived")]
