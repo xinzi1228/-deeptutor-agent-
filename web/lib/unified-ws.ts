@@ -48,6 +48,35 @@ export interface LLMSelection {
   model_id: string;
 }
 
+// ---- Notification types (process-wide turn-completion notifications) ----
+
+/** A turn-completion notification pushed by the backend (``notification``
+ *  message) or replayed inside a ``notifications_snapshot`` buffer. */
+export interface NotificationEvent {
+  seq: number;
+  epoch: string;
+  event_type: string;
+  title: string;
+  body: string;
+  turn_id: string;
+  session_id: string;
+  timestamp: number;
+}
+
+/** Live push: ``{"type": "notification", ...NotificationEvent}``. */
+export interface NotificationMessage extends NotificationEvent {
+  type: "notification";
+}
+
+/** Replay snapshot for ``get_missed_notifications``: the backend echoes its
+ *  current epoch plus every buffered notification with ``seq > after_seq``. */
+export interface NotificationsSnapshotMessage {
+  type: "notifications_snapshot";
+  epoch: string;
+  next_seq: number;
+  notifications: NotificationEvent[];
+}
+
 // ---- Client message ----
 
 export interface StartTurnMessage {
@@ -136,6 +165,15 @@ export interface SubmitUserReplyMessage {
   answers?: Array<{ questionId: string; text: string }>;
 }
 
+export interface SubscribeNotificationsMessage {
+  type: "subscribe_notifications";
+}
+
+export interface GetMissedNotificationsMessage {
+  type: "get_missed_notifications";
+  after_seq: number;
+}
+
 export type ChatMessage =
   | StartTurnMessage
   | SubscribeTurnMessage
@@ -144,7 +182,9 @@ export type ChatMessage =
   | UnsubscribeMessage
   | CancelTurnMessage
   | RegenerateMessage
-  | SubmitUserReplyMessage;
+  | SubmitUserReplyMessage
+  | SubscribeNotificationsMessage
+  | GetMissedNotificationsMessage;
 
 // ---- Connection manager ----
 
@@ -170,6 +210,14 @@ export class UnifiedWSClient {
   private activeTurnId: string | null = null;
   private lastSeq = 0;
 
+  // Process-wide turn-completion notifications. These persist across
+  // reconnects within the client's lifetime (but not across a page refresh
+  // — a fresh client requests the whole current process-epoch buffer by
+  // sending ``after_seq=0``).
+  private notificationListeners: ((n: NotificationEvent) => void)[] = [];
+  lastNotificationSeq: number | null = null;
+  notificationEpoch: string | null = null;
+
   constructor(onEvent: EventHandler, onClose?: () => void) {
     this.onEvent = onEvent;
     this.onClose = onClose;
@@ -179,6 +227,21 @@ export class UnifiedWSClient {
   setResumeState(turnId: string | null, seq: number): void {
     this.activeTurnId = turnId;
     this.lastSeq = seq;
+  }
+
+  /** Subscribe to process-wide turn-completion notifications. Returns an
+   *  unsubscribe function. */
+  onNotificationEvent(cb: (n: NotificationEvent) => void): () => void {
+    this.notificationListeners.push(cb);
+    return () => {
+      this.notificationListeners = this.notificationListeners.filter(
+        (f) => f !== cb,
+      );
+    };
+  }
+
+  private emitNotification(n: NotificationEvent): void {
+    for (const cb of this.notificationListeners) cb(n);
   }
 
   connect(): void {
@@ -200,6 +263,17 @@ export class UnifiedWSClient {
           seq: this.lastSeq,
         });
       }
+
+      // Process-wide notifications: subscribe on every (re)connect, then
+      // request missed notifications since the last seen seq so a client
+      // that dropped mid-stream catches up on turn completions that landed
+      // while it was offline. Idempotent — the backend replays only
+      // ``seq > after_seq`` from its in-process buffer.
+      this.send({ type: "subscribe_notifications" });
+      this.send({
+        type: "get_missed_notifications",
+        after_seq: this.lastNotificationSeq ?? 0,
+      });
     };
 
     this.ws.onmessage = (ev) => {
@@ -213,6 +287,16 @@ export class UnifiedWSClient {
         // error rows, especially during long-running turns.
         const type = (event as { type?: string }).type;
         if (type === "ping" || type === "pong") return;
+        if (type === "notifications_snapshot") {
+          this.handleNotificationsSnapshot(
+            event as unknown as NotificationsSnapshotMessage,
+          );
+          return;
+        }
+        if (type === "notification") {
+          this.handleNotification(event as unknown as NotificationMessage);
+          return;
+        }
         if (event.turn_id) this.activeTurnId = event.turn_id;
         if (event.seq != null) this.lastSeq = Math.max(this.lastSeq, event.seq);
         this.onEvent(event);
@@ -246,6 +330,8 @@ export class UnifiedWSClient {
     this.intentionalClose = true;
     this.stopHeartbeat();
     this.clearReconnectTimer();
+    // Drop listeners so a disposed client can't fire stale callbacks.
+    this.notificationListeners = [];
     this.ws?.close();
     this.ws = null;
     this.resetResumeState();
@@ -253,6 +339,41 @@ export class UnifiedWSClient {
 
   get connected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  // ---- Notifications ----
+
+  private handleNotificationsSnapshot(
+    msg: NotificationsSnapshotMessage,
+  ): void {
+    if (
+      msg.epoch &&
+      this.notificationEpoch &&
+      msg.epoch !== this.notificationEpoch
+    ) {
+      // Backend restarted (a new process epoch restarted its monotonic
+      // seq): replay from the beginning so the fresh buffer isn't skipped.
+      this.lastNotificationSeq = null;
+    }
+    if (msg.epoch) this.notificationEpoch = msg.epoch;
+    for (const n of msg.notifications ?? []) {
+      this.lastNotificationSeq = Math.max(
+        this.lastNotificationSeq ?? 0,
+        n.seq,
+      );
+      this.emitNotification(n);
+    }
+  }
+
+  private handleNotification(msg: NotificationMessage): void {
+    if (msg.epoch) this.notificationEpoch = msg.epoch;
+    if (msg.seq != null) {
+      this.lastNotificationSeq = Math.max(
+        this.lastNotificationSeq ?? 0,
+        msg.seq,
+      );
+    }
+    this.emitNotification(msg);
   }
 
   // ---- Heartbeat ----

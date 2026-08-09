@@ -18,7 +18,12 @@ import {
   readStoredLanguage,
   writeStoredActiveSessionId,
 } from "@/context/app-shell-storage";
-import type { StreamEvent, ChatMessage, LLMSelection } from "@/lib/unified-ws";
+import type {
+  StreamEvent,
+  ChatMessage,
+  LLMSelection,
+  NotificationEvent,
+} from "@/lib/unified-ws";
 import { UnifiedWSClient } from "@/lib/unified-ws";
 import {
   getSession,
@@ -1188,6 +1193,15 @@ export function UnifiedChatProvider({
     [moveRunner],
   );
 
+  const handleTurnNotification = useCallback((n: NotificationEvent) => {
+    // Surface process-wide turn-completion notifications as success
+    // toasts. Only ``capability_complete`` maps to a user-facing
+    // notification today. MVP: toast unconditionally (P2 could skip when
+    // the user is already watching the finished session).
+    if (n.event_type !== "capability_complete") return;
+    notify(n.body || n.title, { tone: "success" });
+  }, []);
+
   const ensureRunner = useCallback(
     (key: string) => {
       const existing = runnersRef.current.get(key);
@@ -1232,6 +1246,10 @@ export function UnifiedChatProvider({
           },
         ),
       };
+      // Turn-completion notifications (incl. catch-up after a reconnect).
+      // Cleanup is handled by the client's ``disconnect()`` dropping its
+      // listener list.
+      record.client.onNotificationEvent(handleTurnNotification);
       runnersRef.current.set(key, record);
       const session = stateRef.current.sessions[key];
       if (session?.activeTurnId) {
@@ -1240,7 +1258,7 @@ export function UnifiedChatProvider({
       record.client.connect();
       return record;
     },
-    [handleRunnerEvent],
+    [handleRunnerEvent, handleTurnNotification],
   );
 
   const sendThroughRunner = useCallback(
