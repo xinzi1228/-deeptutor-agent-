@@ -9,6 +9,7 @@ lazily via context variables.
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
@@ -20,7 +21,7 @@ from typing import Callable, Literal
 
 from deeptutor.services.memory import consolidator, paths, trace
 from deeptutor.services.memory.consolidator import ConsolidateResult, OnEvent
-from deeptutor.services.memory.document import Document, parse, serialize
+from deeptutor.services.memory.document import Document, Entry, parse, serialize
 from deeptutor.services.memory.ops import AddOp, ApplyReport, EditOp, OpResult
 from deeptutor.services.memory.ops import apply as ops_apply
 from deeptutor.services.memory.paths import L3Slot, Surface
@@ -78,6 +79,21 @@ def _scrub_session_noise(text: str) -> str:
 def _confidence_key(entry) -> tuple[bool, float]:
     """Stable sort key: confidence descending, ``None``/absent last."""
     return (entry.confidence is None, -(entry.confidence or 0.0))
+
+
+def _entry_sort_key(entry, md_mtime: float) -> tuple:
+    """O2 read-path sort key: confidence primary + recency secondary.
+
+    ``md_mtime`` is the source file's ``st_mtime`` — a file-level recency
+    proxy (entries carry no per-entry timestamp). Same confidence → the
+    newer file (higher ``st_mtime``) sorts first, so recent memory is
+    preferred when confidence ties.
+    """
+    return (
+        entry.confidence is None,
+        -(entry.confidence or 0.0),
+        -md_mtime,
+    )
 
 
 def validate_bucket_name(name: str) -> None:
@@ -183,7 +199,13 @@ class MemoryStore:
                 budget -= toks
                 continue
             prefix = [f"# {doc.title}"] if doc.title else []
-            text, t, k, used = self._render_doc_budgeted(doc, budget, prefix)
+            try:
+                md_mtime = paths.l3_file(slot).stat().st_mtime
+            except OSError:
+                md_mtime = 0.0
+            text, t, k, used = self._render_doc_budgeted(
+                doc, budget, prefix, md_mtime=md_mtime
+            )
             total += t
             kept += k
             budget -= used
@@ -245,16 +267,24 @@ class MemoryStore:
         return {"surface": md.stem, "entries": len(entries), "preview": preview}
 
     def _render_doc_budgeted(
-        self, doc: Document, budget_left: int, prefix_lines: list[str]
+        self,
+        doc: Document,
+        budget_left: int,
+        prefix_lines: list[str],
+        md_mtime: float = 0.0,
+        keep_entry_ids: set[str] | None = None,
     ) -> tuple[str, int, int, int]:
         """Render ``doc``'s visible (non-stale) entries grouped by section.
 
         Within each section, entries are sorted by confidence descending
-        (``None``/absent last, stable). Only entries whose estimated token
-        count (``ceil(len(text)/2)``) still fits in ``budget_left`` are
-        kept — this is a *per-surface* sort followed by a *global* budget
-        applied across surfaces by the caller. Sections with no kept entry
-        are omitted entirely.
+        (``None``/absent last) with **file recency as the tiebreak** — same
+        confidence → the newer source file (higher ``st_mtime``) sorts
+        first (O2). ``keep_entry_ids`` optionally limits which entries may
+        render (cross-file same-section dedup; ``None`` keeps everything).
+        Only entries whose estimated token count (``ceil(len(text)/2)``)
+        still fits in ``budget_left`` are kept — this is a *per-surface*
+        sort followed by a *global* budget applied across surfaces by the
+        caller. Sections with no kept entry are omitted entirely.
 
         Returns ``(text, total_visible, kept, tokens_used)``.
         """
@@ -264,10 +294,14 @@ class MemoryStore:
         used = 0
         for section, entries in doc.sections:
             section_visible = [e for e in entries if not e.stale]
+            if keep_entry_ids is not None:
+                section_visible = [e for e in section_visible if e.id in keep_entry_ids]
             if not section_visible:
                 continue
             total += len(section_visible)
-            section_visible = sorted(section_visible, key=_confidence_key)
+            section_visible = sorted(
+                section_visible, key=lambda e: _entry_sort_key(e, md_mtime)
+            )
             kept_lines: list[str] = []
             for e in section_visible:
                 toks = _est_tokens(e.text)
@@ -283,17 +317,21 @@ class MemoryStore:
             return "", total, 0, 0
         return "\n".join(lines), total, kept, used
 
-    def _render_surface(self, md: Path, budget_left: int) -> tuple[str, int, int, int]:
+    def _render_surface(
+        self, md: Path, budget_left: int, keep_entry_ids: set[str] | None = None
+    ) -> tuple[str, int, int, int]:
         """Render one L2 surface md: visible entries grouped by section.
 
         Document-format files render as ``## [{stem}]`` followed by
         ``## <section>`` headers and ``- <text>`` bullets for visible
-        (non-stale) entries only — confidence-sorted per surface and
-        budget-truncated. Files with no parseable entries (legacy raw
-        text) fall back to their raw body so pre-document content still
-        surfaces; the raw body counts as one opaque entry against the
-        budget. Returns ``(text, total_visible, kept, tokens_used)``;
-        ``text`` is ``""`` when the file contributes nothing.
+        (non-stale) entries only — confidence-sorted (recency tiebreak)
+        per surface and budget-truncated. ``keep_entry_ids`` optionally
+        restricts which entries may render (O2 cross-file dedup). Files
+        with no parseable entries (legacy raw text) fall back to their raw
+        body so pre-document content still surfaces; the raw body counts as
+        one opaque entry against the budget. Returns
+        ``(text, total_visible, kept, tokens_used)``; ``text`` is ``""``
+        when the file contributes nothing.
         """
         text = md.read_text(encoding="utf-8")
         doc = parse(text)
@@ -308,14 +346,62 @@ class MemoryStore:
             if toks > budget_left:
                 return "", 1, 0, 0
             return f"## [{md.stem}]\n{body}", 1, 1, toks
-        text, total, kept, used = self._render_doc_budgeted(doc, budget_left, [f"## [{md.stem}]"])
+        try:
+            md_mtime = md.stat().st_mtime
+        except OSError:
+            md_mtime = 0.0
+        text, total, kept, used = self._render_doc_budgeted(
+            doc,
+            budget_left,
+            [f"## [{md.stem}]"],
+            md_mtime=md_mtime,
+            keep_entry_ids=keep_entry_ids,
+        )
         return text, total, kept, used
+
+    def _cross_file_dedup(self, files: list[Path]) -> set[str] | None:
+        """O2: dedup same-section entries across surface files.
+
+        A section name is a *topic* grouping. Different surface files
+        (``chat.md`` / ``notebook.md`` / ``quiz.md`` / ...) can record the
+        same topic under the same section header, so across files we keep
+        only the single best entry per section — highest confidence, then
+        newest source file — and drop the rest (设计: 保留 1 条/主题 去冗余).
+        Sections confined to a single file keep every entry: within one file
+        a section's bullets are distinct facts, not duplicates.
+
+        Returns the set of entry ids allowed to render, or ``None`` when no
+        cross-file redundancy exists (no filtering needed).
+        """
+        if len(files) < 2:
+            return None
+        by_section: dict[str, list[tuple[float, Path, Entry]]] = defaultdict(list)
+        for md in files:
+            try:
+                mtime = md.stat().st_mtime
+            except OSError:
+                mtime = 0.0
+            doc = parse(md.read_text(encoding="utf-8"))
+            for e in doc.visible_entries():
+                by_section[e.section].append((mtime, md, e))
+        keep_ids: set[str] = set()
+        deduped = False
+        for _section, entries in by_section.items():
+            source_files = {md for _, md, _ in entries}
+            if len(source_files) < 2:
+                keep_ids.update(e.id for _, _, e in entries)
+                continue
+            deduped = True
+            best = min(entries, key=lambda it: _entry_sort_key(it[2], it[0]))
+            keep_ids.add(best[2].id)
+        return keep_ids if deduped else None
 
     def read_bucket(self, bucket: str, *, fallback: bool = True) -> str:
         """Read a memory bucket: its L2 summaries across surfaces + global L3.
 
         L2 surfaces are rendered confidence-sorted (descending, ``None``
-        last) *per surface*, then a *global* token budget
+        last, file-recency tiebreak) *per surface*, deduplicated across
+        surfaces to one entry per topic, then a *global* token budget
         (``MEMORY_TOKEN_BUDGET``) is applied across surfaces in file order;
         once the budget is exhausted remaining entries are dropped and a
         truncation note is appended. L3 slots (preferences etc.) are
@@ -333,30 +419,25 @@ class MemoryStore:
         budget = MEMORY_TOKEN_BUDGET
         total = 0
         kept = 0
-        bucket_files: list[Path] = []
         bdir = paths.buckets_dir() / bucket
-        if bdir.is_dir():
-            bucket_files = sorted(bdir.glob("*.md"))
-            for md in bucket_files:
-                body, t, k, used = self._render_surface(md, budget)
-                total += t
-                kept += k
-                budget -= used
-                if body:
-                    parts.append(body)
-        fallback_note = ""
+        bucket_files: list[Path] = sorted(bdir.glob("*.md")) if bdir.is_dir() else []
+        fallback_files: list[Path] = []
         if not bucket_files and fallback:
             gdir = paths.l2_dir()
             if gdir.is_dir():
-                for md in sorted(gdir.glob("*.md")):
-                    body, t, k, used = self._render_surface(md, budget)
-                    total += t
-                    kept += k
-                    budget -= used
-                    if body:
-                        parts.append(body)
-            if parts:
-                fallback_note = "（当前记忆区暂无内容，已回退到全局记忆）\n\n"
+                fallback_files = sorted(gdir.glob("*.md"))
+        source_files = bucket_files or fallback_files
+        keep_ids = self._cross_file_dedup(source_files)
+        for md in source_files:
+            body, t, k, used = self._render_surface(md, budget, keep_entry_ids=keep_ids)
+            total += t
+            kept += k
+            budget -= used
+            if body:
+                parts.append(body)
+        fallback_note = ""
+        if not bucket_files and fallback and parts:
+            fallback_note = "（当前记忆区暂无内容，已回退到全局记忆）\n\n"
         for slot in paths.L3_SLOTS:
             body = self.read_raw("L3", slot).strip()
             if body:
