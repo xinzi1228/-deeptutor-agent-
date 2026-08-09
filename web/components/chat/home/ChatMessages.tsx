@@ -29,6 +29,7 @@ import { useTranslation } from "react-i18next";
 import type { SelectedHistorySession } from "@/components/chat/HistorySessionPicker";
 import type { SelectedQuestionEntry } from "@/components/chat/QuestionBankPicker";
 import { ChatChartCard } from "@/components/chat/home/ChatChartCard";
+import { ExpertFleetBoard } from "@/components/chat/home/ExpertFleetBoard";
 import AssistantResponse from "@/components/common/AssistantResponse";
 import {
   InlineFileCardProvider,
@@ -427,6 +428,7 @@ const AssistantMessage = memo(function AssistantMessage({
         content={msg.content}
         className="mb-3"
       />
+      <ExpertFleetBoard events={events} className="mb-2" />
       {outlinePreview && outlinePreview.sub_topics.length > 0 ? (
         <>
           {/* Layout for the merged research bubble:
