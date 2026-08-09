@@ -47,10 +47,10 @@ function deriveCoachStatus(sending: boolean, awaitingInput: boolean): CoachStatu
 
 const STATUS_RING: Record<string, string> = {
   idle: "border-[var(--border)]",
-  working: "border-[var(--primary-foreground)]/50 border-t-[var(--primary-foreground)]",
+  working: "border-amber-500/40 border-t-amber-500",
   "waiting-input":
-    "border-[var(--primary-foreground)]/40 border-t-[var(--primary-foreground)]",
-  flash: "border-[var(--primary-foreground)]/70 border-t-[var(--primary-foreground)]",
+    "border-[var(--muted-foreground)]/40 border-t-[var(--muted-foreground)]",
+  flash: "border-emerald-500/60 border-t-emerald-500",
 };
 
 const MOOD_KEYWORDS: { mood: CoachMood; words: string[] }[] = [
