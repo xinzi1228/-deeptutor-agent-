@@ -41,6 +41,27 @@ CONFIG_DRIFT_ERROR_TEMPLATE = (
 )
 
 
+async def hook_capability_complete(event: object) -> None:
+    """Publish turn-completion notifications from global EventBus events.
+
+    Notification failures must never break the main loop, so every failure is
+    swallowed silently.
+    """
+    try:
+        from deeptutor.services.notifications.broadcaster import NotificationBroadcaster
+
+        metadata = getattr(event, "metadata", None) or {}
+        await NotificationBroadcaster.instance().publish(
+            "capability_complete",
+            "回合完成",
+            "助手已回复，可以查看新消息了。",
+            turn_id=str(metadata.get("turn_id", "")),
+            session_id=str(metadata.get("session_id", "")),
+        )
+    except Exception:
+        pass
+
+
 class SafeOutputStaticFiles(StaticFiles):
     """Static file mount that only exposes explicitly whitelisted artifacts."""
 
@@ -143,6 +164,16 @@ async def lifespan(app: FastAPI):
         logger.info("EventBus started")
     except Exception as e:
         logger.warning(f"Failed to start EventBus: {e}")
+
+    # Bridge CAPABILITY_COMPLETE onto the notification broadcaster so clients
+    # can catch up missed turn-completions after a WS reconnect (seq/epoch replay).
+    try:
+        from deeptutor.events.event_bus import EventBus, EventType
+
+        EventBus.instance().subscribe(EventType.CAPABILITY_COMPLETE, hook_capability_complete)
+        logger.info("Notification broadcaster hooked to CAPABILITY_COMPLETE")
+    except Exception as e:
+        logger.warning(f"Failed to hook notification broadcaster: {e}")
 
     try:
         from deeptutor.services.partners import get_partner_manager
