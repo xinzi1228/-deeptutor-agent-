@@ -115,13 +115,83 @@ async def test_capability_complete_hook_publishes_notification():
 
 
 @pytest.mark.asyncio
-async def test_capability_complete_hook_survives_bad_event():
+async def test_capability_complete_hook_skips_events_without_turn_id():
     from deeptutor.api.main import hook_capability_complete
 
     b = NotificationBroadcaster.instance()
 
-    # metadata-less payloads still publish (empty fields) without raising
+    # metadata-less payloads are ignored rather than publishing empty toasts
     await hook_capability_complete(object())
     await hook_capability_complete(None)
 
-    assert [r.turn_id for r in b.get_missed(0)] == ["", ""]
+    # partner completions carry partner metadata but no turn_id -> ignored
+    await hook_capability_complete(
+        Event(
+            type=EventType.CAPABILITY_COMPLETE,
+            task_id="partner:wx:group:chat1",
+            user_input="",
+            agent_output="partner reply",
+            metadata={
+                "source": "partner",
+                "partner_id": "wx",
+                "channel": "wechat",
+                "chat_id": "chat1",
+            },
+        )
+    )
+
+    assert b.get_missed(0) == []
+
+
+def test_capability_complete_hook_registered_on_real_event_bus():
+    from deeptutor.api.main import (
+        hook_capability_complete,
+        register_capability_complete_hook,
+    )
+    from deeptutor.events.event_bus import EventType, get_event_bus
+
+    event_bus = get_event_bus()
+    subscribers = event_bus._subscribers[EventType.CAPABILITY_COMPLETE]
+    before = list(subscribers)
+
+    assert register_capability_complete_hook() is True
+    assert subscribers.count(hook_capability_complete) == 1
+    # idempotent — a second lifespan boot must not double-subscribe
+    assert register_capability_complete_hook() is True
+    assert subscribers.count(hook_capability_complete) == 1
+
+    subscribers[:] = before
+
+
+@pytest.mark.asyncio
+async def test_capability_complete_hook_fires_via_real_event_bus():
+    from deeptutor.api.main import (
+        hook_capability_complete,
+        register_capability_complete_hook,
+    )
+    from deeptutor.events.event_bus import Event, EventType, get_event_bus
+
+    b = NotificationBroadcaster.instance()
+    q = b.subscribe()
+
+    assert register_capability_complete_hook() is True
+    event_bus = get_event_bus()
+    try:
+        await event_bus.publish(
+            Event(
+                type=EventType.CAPABILITY_COMPLETE,
+                task_id="turn-9",
+                user_input="标注第 4 张图",
+                agent_output="",
+                metadata={"turn_id": "turn-9", "session_id": "sess-9"},
+            )
+        )
+        await asyncio.wait_for(event_bus.flush(), timeout=5)
+
+        got = q.get_nowait()
+        assert got.event_type == "capability_complete"
+        assert got.turn_id == "turn-9"
+        assert got.session_id == "sess-9"
+    finally:
+        await event_bus.stop()
+        event_bus.unsubscribe(EventType.CAPABILITY_COMPLETE, hook_capability_complete)

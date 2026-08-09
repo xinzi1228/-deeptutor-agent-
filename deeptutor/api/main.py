@@ -44,13 +44,17 @@ CONFIG_DRIFT_ERROR_TEMPLATE = (
 async def hook_capability_complete(event: object) -> None:
     """Publish turn-completion notifications from global EventBus events.
 
-    Notification failures must never break the main loop, so every failure is
+    Only user-facing turns (those carrying a ``turn_id``) produce
+    notifications; partner/background completions are ignored. Notification
+    failures must never break the main loop, so per-event failures are
     swallowed silently.
     """
     try:
         from deeptutor.services.notifications.broadcaster import NotificationBroadcaster
 
         metadata = getattr(event, "metadata", None) or {}
+        if not metadata.get("turn_id"):
+            return
         await NotificationBroadcaster.instance().publish(
             "capability_complete",
             "回合完成",
@@ -60,6 +64,24 @@ async def hook_capability_complete(event: object) -> None:
         )
     except Exception:
         pass
+
+
+def register_capability_complete_hook() -> bool:
+    """Subscribe the CAPABILITY_COMPLETE notification hook on the real EventBus.
+
+    Returns True when the hook is registered. A setup failure is logged loudly
+    (and returns False) so F2 notifications can't silently go dead in
+    production.
+    """
+    try:
+        from deeptutor.events.event_bus import EventType, get_event_bus
+
+        get_event_bus().subscribe(EventType.CAPABILITY_COMPLETE, hook_capability_complete)
+        logger.info("Notification broadcaster hooked to CAPABILITY_COMPLETE")
+        return True
+    except Exception as e:
+        logger.exception("Failed to hook notification broadcaster: %s", e)
+        return False
 
 
 class SafeOutputStaticFiles(StaticFiles):
@@ -167,13 +189,8 @@ async def lifespan(app: FastAPI):
 
     # Bridge CAPABILITY_COMPLETE onto the notification broadcaster so clients
     # can catch up missed turn-completions after a WS reconnect (seq/epoch replay).
-    try:
-        from deeptutor.events.event_bus import EventBus, EventType
-
-        EventBus.instance().subscribe(EventType.CAPABILITY_COMPLETE, hook_capability_complete)
-        logger.info("Notification broadcaster hooked to CAPABILITY_COMPLETE")
-    except Exception as e:
-        logger.warning(f"Failed to hook notification broadcaster: {e}")
+    if not register_capability_complete_hook():
+        logger.error("CAPABILITY_COMPLETE hook not registered — F2 notifications disabled")
 
     try:
         from deeptutor.services.partners import get_partner_manager

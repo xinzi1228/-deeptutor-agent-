@@ -346,6 +346,7 @@ export class UnifiedWSClient {
   private handleNotificationsSnapshot(
     msg: NotificationsSnapshotMessage,
   ): void {
+    let epochChanged = false;
     if (
       msg.epoch &&
       this.notificationEpoch &&
@@ -354,14 +355,24 @@ export class UnifiedWSClient {
       // Backend restarted (a new process epoch restarted its monotonic
       // seq): replay from the beginning so the fresh buffer isn't skipped.
       this.lastNotificationSeq = null;
+      epochChanged = true;
     }
     if (msg.epoch) this.notificationEpoch = msg.epoch;
     for (const n of msg.notifications ?? []) {
+      // A notification published between subscribe and get_missed is both
+      // pushed live and included in the snapshot — skip already-seen seqs.
+      if (n.seq <= (this.lastNotificationSeq ?? 0)) continue;
       this.lastNotificationSeq = Math.max(
         this.lastNotificationSeq ?? 0,
         n.seq,
       );
       this.emitNotification(n);
+    }
+    if (epochChanged) {
+      // The get_missed request that produced this snapshot ran with the
+      // stale old-epoch seq, so its replay came back empty. Re-issue with
+      // after_seq: 0 to actually refetch the new process buffer.
+      this.send({ type: "get_missed_notifications", after_seq: 0 });
     }
   }
 
