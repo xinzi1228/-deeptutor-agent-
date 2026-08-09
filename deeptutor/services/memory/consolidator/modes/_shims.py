@@ -37,6 +37,7 @@ from deeptutor.services.memory.consolidator.modes.update import (
 from deeptutor.services.memory.document import parse, serialize
 from deeptutor.services.memory.ops import ApplyReport, Op
 from deeptutor.services.memory.paths import L3Slot, Surface
+from deeptutor.services.memory.read_cache import invalidate as invalidate_read_cache
 
 OnEvent = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -132,6 +133,7 @@ def _rollback_new_entries(
         entries[:] = [e for e in entries if e.id not in drop]
     doc.sections[:] = [(n, e) for n, e in doc.sections if e]
     path.write_text(serialize(doc), encoding="utf-8")
+    invalidate_read_cache()
 
 
 __all__ = ["ConsolidateResult", "consolidate_l2", "consolidate_l3"]

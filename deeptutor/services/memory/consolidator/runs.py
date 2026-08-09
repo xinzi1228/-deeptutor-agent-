@@ -217,6 +217,9 @@ class RunManager:
             await asyncio.to_thread(_atomic_write, path, checkpoint.previous_content)
         else:
             await asyncio.to_thread(_remove_if_exists, path)
+        from deeptutor.services.memory.read_cache import invalidate
+
+        invalidate()
 
         return await self._emit(
             run,

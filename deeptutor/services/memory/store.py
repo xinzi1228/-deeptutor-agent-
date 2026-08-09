@@ -25,6 +25,7 @@ from deeptutor.services.memory.document import Document, Entry, parse, serialize
 from deeptutor.services.memory.ops import AddOp, ApplyReport, EditOp, OpResult
 from deeptutor.services.memory.ops import apply as ops_apply
 from deeptutor.services.memory.paths import L3Slot, Surface
+from deeptutor.services.memory.read_cache import cached_read, invalidate
 from deeptutor.services.memory.trace import TraceEvent
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,17 @@ def _entry_sort_key(entry, md_mtime: float) -> tuple:
         -(entry.confidence or 0.0),
         -md_mtime,
     )
+
+
+# ── O4: read_bucket 进程内 TTL 缓存 ────────────────────────────────────────
+# 读记忆是教学高频操作（ReadMemoryTool / Memory 页），每次调用重读磁盘浪费
+# 且无收益；教学单用户规模下加一个 30s 进程内缓存即可。key 含 memory_root +
+# bucket + fallback + overview_only（与 ReadMemoryTool 的参数面一致，为将来
+# 概览模式预留），值 = (写入时刻, 结果字符串)。所有写记忆入口成功后必须清
+# 缓存，否则 30s 内读不到新记忆。缓存本体在 ``read_cache`` 叶子模块，store
+# 与 consolidator 写路径共用，避免 store↔consolidator 循环导入。
+_invalidate_read_cache = invalidate
+_READ_CACHE_TTL_S = 30.0  # re-export for callers/tests
 
 
 def validate_bucket_name(name: str) -> None:
@@ -399,6 +411,11 @@ class MemoryStore:
     def read_bucket(self, bucket: str, *, fallback: bool = True) -> str:
         """Read a memory bucket: its L2 summaries across surfaces + global L3.
 
+        O4: the assembled text is cached process-locally for 30s (keyed by
+        resolved memory root + bucket + fallback + overview flag). Writes
+        through :class:`MemoryStore` (or the consolidator) invalidate the
+        cache so a fresh read never serves stale memory during teaching.
+
         L2 surfaces are rendered confidence-sorted (descending, ``None``
         last, file-recency tiebreak) *per surface*, deduplicated across
         surfaces to one entry per topic, then a *global* token budget
@@ -415,6 +432,10 @@ class MemoryStore:
         empty bucket returns the empty placeholder and never touches the
         global root.
         """
+        key = (str(paths.memory_root()), bucket, fallback, False)
+        return cached_read(key, lambda: self._read_bucket_uncached(bucket, fallback=fallback))
+
+    def _read_bucket_uncached(self, bucket: str, *, fallback: bool = True) -> str:
         parts: list[str] = []
         budget = MEMORY_TOKEN_BUDGET
         total = 0
@@ -475,6 +496,8 @@ class MemoryStore:
         path = paths.buckets_dir() / name
         existed = path.exists()
         shutil.rmtree(path, ignore_errors=True)
+        if existed:
+            _invalidate_read_cache()
         return existed
 
     # ── L2 / L3 write (manual paths) ──────────────────────────────────────
@@ -484,6 +507,7 @@ class MemoryStore:
         path = self._path(layer, key)
         async with self._lock_for(path):
             await asyncio.to_thread(_atomic_write, path, md)
+        _invalidate_read_cache()
 
     async def delete_entry(self, layer: Layer, key: str, entry_id: str) -> bool:
         path = self._path(layer, key)
@@ -537,7 +561,7 @@ class MemoryStore:
     ) -> ConsolidateResult:
         path = paths.l2_file(surface, bucket)
         async with self._lock_for(path):
-            return await consolidator.consolidate_l2(
+            result = await consolidator.consolidate_l2(
                 surface,
                 language=language,
                 user_label=user_label,
@@ -545,6 +569,8 @@ class MemoryStore:
                 apply_ops=apply_ops,
                 bucket=bucket,
             )
+        _invalidate_read_cache()
+        return result
 
     async def update_l3(
         self,
@@ -559,13 +585,15 @@ class MemoryStore:
             raise ValueError("preferences.md is not auto-consolidated")
         path = paths.l3_file(slot)
         async with self._lock_for(path):
-            return await consolidator.consolidate_l3(
+            result = await consolidator.consolidate_l3(
                 slot,
                 language=language,
                 user_label=user_label,
                 on_event=on_event,
                 apply_ops=apply_ops,
             )
+        _invalidate_read_cache()
+        return result
 
     async def apply_ops_payload(
         self, layer: Layer, key: str, ops_payload: list[dict]
@@ -594,6 +622,7 @@ class MemoryStore:
             if report.accepted and ops:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 await asyncio.to_thread(_atomic_write, path, serialize(doc))
+                _invalidate_read_cache()
             return report
 
     async def write_preference(
@@ -656,6 +685,7 @@ class MemoryStore:
                 )
             if report.accepted:
                 await asyncio.to_thread(_atomic_write, path, serialize(doc))
+                _invalidate_read_cache()
             if reason:
                 # Surface the reason in logs for workbench observability.
                 logger.info("write_memory %s id=%s reason=%s", op, target_id or "new", reason)
@@ -686,6 +716,7 @@ class MemoryStore:
             if report.accepted:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 await asyncio.to_thread(_atomic_write, path, serialize(doc))
+                _invalidate_read_cache()
             return report
 
     # ── Workbench overview ────────────────────────────────────────────────
@@ -779,6 +810,7 @@ class MemoryStore:
             after = serialize(doc)
             if after != before:
                 await asyncio.to_thread(_atomic_write, path, after)
+                _invalidate_read_cache()
             return True
 
 

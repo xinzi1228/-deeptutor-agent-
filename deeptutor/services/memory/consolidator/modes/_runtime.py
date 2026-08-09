@@ -24,6 +24,7 @@ from deeptutor.services.llm import clean_thinking_tags
 from deeptutor.services.llm import complete as llm_complete
 from deeptutor.services.llm import stream as llm_stream
 from deeptutor.services.memory.document import Document, parse, serialize
+from deeptutor.services.memory.read_cache import invalidate as invalidate_read_cache
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,7 @@ async def write_doc_atomic(path: Path, doc: Document) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = serialize(doc)
     await asyncio.to_thread(_atomic_write, path, text)
+    invalidate_read_cache()
 
 
 async def write_doc_checkpoint(
