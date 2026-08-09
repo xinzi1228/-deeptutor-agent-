@@ -30,7 +30,11 @@ function summarize(content: string): string {
 function expertStateFromEvents(expertId: string, events: StreamEvent[]): ExpertTask {
   const label = EXPERT_LABELS[expertId] ?? expertId;
   const progress = events.filter(
-    (e) => e.type === "progress" && e.metadata?.query === expertId,
+    (e) =>
+      e.type === "progress" &&
+      e.metadata?.query === expertId &&
+      typeof e.content === "string" &&
+      e.content.startsWith("专家"),
   );
   const latest = progress[progress.length - 1];
   const done = events.find(
@@ -62,7 +66,9 @@ export function ExpertFleetBoard({ events, className = "" }: { events: StreamEve
         e.type === "tool_call" &&
         (e.metadata as any)?.tool_name === "delegate_to_expert",
     );
-    return calls
+    const uniqueCalls = new Map<string, StreamEvent>();
+    calls.forEach((c) => uniqueCalls.set((c.metadata as any)?.args?.expert_id, c));
+    return [...uniqueCalls.values()]
       .map((c) => expertStateFromEvents((c.metadata as any)?.args?.expert_id, events))
       .filter((t) => t.expertId);
   }, [events]);
