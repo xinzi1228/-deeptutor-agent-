@@ -858,6 +858,7 @@ export default memo(function ChatComposer({
                       strokeWidth={2.6}
                       className="relative z-10 fill-current"
                     />
+                    <span className="sr-only">{t("Stop generating")}</span>
                   </button>
                 ) : (
                   <button
