@@ -26,6 +26,12 @@ Supported client message ``type`` values:
   persisted "running" rows as cancelled when no live execution exists.
 - ``user_input`` — deliver a learner answer to the turn's StreamBus
   (resolves a pending ``wait_for_input``, e.g. an ``ask_user`` pause).
+- ``subscribe_notifications`` — start forwarding process-wide notifications
+  (e.g. turn completions from ``NotificationBroadcaster``) to this connection
+  as ``notification`` events.
+- ``get_missed_notifications`` — replay notifications whose ``seq`` is greater
+  than ``after_seq`` as a ``notifications_snapshot`` (``epoch`` / ``next_seq`` /
+  ``notifications``), for catch-up after a reconnect.
 """
 
 from __future__ import annotations
@@ -53,6 +59,7 @@ async def unified_websocket(ws: WebSocket) -> None:
     await ws.accept()
     closed = False
     subscription_tasks: dict[str, asyncio.Task[None]] = {}
+    notification_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def safe_send(data: dict[str, Any]) -> None:
         nonlocal closed
@@ -98,6 +105,32 @@ async def unified_websocket(ws: WebSocket) -> None:
         key = f"session:{session_id}"
         await stop_subscription(key)
         subscription_tasks[key] = asyncio.create_task(_forward())
+
+    async def stop_notifications(key: str) -> None:
+        task = notification_tasks.pop(key, None)
+        if task is None:
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    async def subscribe_notifications() -> None:
+        from deeptutor.services.notifications.broadcaster import NotificationBroadcaster
+
+        async def _forward() -> None:
+            broadcaster = NotificationBroadcaster.instance()
+            queue = broadcaster.subscribe()
+            try:
+                while True:
+                    record = await queue.get()
+                    await safe_send({"type": "notification", **broadcaster._to_dict(record)})
+            finally:
+                broadcaster.unsubscribe(queue)
+
+        await stop_notifications("notifications")
+        notification_tasks["notifications"] = asyncio.create_task(_forward())
 
     try:
         while not closed:
@@ -309,6 +342,18 @@ async def unified_websocket(ws: WebSocket) -> None:
                 bus.submit_input(str(msg.get("content") or ""))
                 continue
 
+            if msg_type == "subscribe_notifications":
+                await subscribe_notifications()
+                continue
+
+            if msg_type == "get_missed_notifications":
+                from deeptutor.services.notifications.broadcaster import NotificationBroadcaster
+
+                after_seq = int(msg.get("after_seq") or 0)
+                snapshot = NotificationBroadcaster.instance().snapshot(after_seq)
+                await safe_send({"type": "notifications_snapshot", **snapshot})
+                continue
+
             await safe_send({"type": "error", "content": f"Unknown type: {msg_type}"})
 
     except WebSocketDisconnect:
@@ -320,5 +365,7 @@ async def unified_websocket(ws: WebSocket) -> None:
         closed = True
         for key in list(subscription_tasks.keys()):
             await stop_subscription(key)
+        for key in list(notification_tasks.keys()):
+            await stop_notifications(key)
         if user_token is not None:
             reset_current_user(user_token)
