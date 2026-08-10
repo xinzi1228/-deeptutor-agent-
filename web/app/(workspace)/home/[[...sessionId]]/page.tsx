@@ -718,11 +718,15 @@ export default function ChatPage() {
           annotationAutoSendRef.current = true;
           localStorage.removeItem("annotation_pending_message");
           localStorage.removeItem("annotation_pending_time");
+          // O8 疑问标记：学生点了"这里有疑问" → 消息加优先前缀，Coach 优先回应
+          const isDoubt = localStorage.getItem("annotation_doubt") === "1";
+          localStorage.removeItem("annotation_doubt");
+          const finalMsg = isDoubt ? `[学生有疑问，优先回应] ${pendingMsg}` : pendingMsg;
           // 评分卡：读最近结果 → 调评分端点 → 渲染
           const rawResult = localStorage.getItem("annotation_last_result");
           localStorage.removeItem("annotation_last_result");
           if (rawResult) {
-            let enriched = pendingMsg;
+            let enriched = finalMsg;
             try {
               const result = JSON.parse(rawResult) as {
                 taskId?: string;
@@ -763,7 +767,7 @@ export default function ChatPage() {
             }
             void sendMessage(enriched);
           } else {
-            void sendMessage(pendingMsg);
+            void sendMessage(finalMsg);
           }
         }
       } catch {}
