@@ -18,6 +18,17 @@
         "label": "car"
       }
     ],
+    "pre_annotation": [
+      {
+        "x": 195,
+        "y": 128,
+        "w": 370,
+        "h": 290,
+        "label": "car"
+      }
+    ],
+    "pre_annotation_mode": "review",
+    "pre_annotation_note": "预标注框比 GT 略大（左边缘超出车身 12px、整体偏左上），IoU≈0.90。练审阅：AI 基本正确，学生确认或微调紧贴轮廓即可，教学点=边界框紧贴目标轮廓。",
     "next_task": "task2",
     "knowledge_points": [
       "边界框绘制规范",
@@ -65,6 +76,31 @@
         "label": "car"
       }
     ],
+    "pre_annotation": [
+      {
+        "x": 187,
+        "y": 351,
+        "w": 144,
+        "h": 140,
+        "label": "car"
+      },
+      {
+        "x": 431,
+        "y": 308,
+        "w": 89,
+        "h": 109,
+        "label": "car"
+      },
+      {
+        "x": 664,
+        "y": 409,
+        "w": 138,
+        "h": 137,
+        "label": "car"
+      }
+    ],
+    "pre_annotation_mode": "find_error",
+    "pre_annotation_note": "AI 漏标了远处那辆小目标车（x=564,y=141,w=71,h=35）。漏标是召回率杀手，AI recall=0.75。教学点=小目标标注策略+漏标预防：远处小目标容易看漏，需放大检查。",
     "next_task": "task3",
     "knowledge_points": [
       "多目标检测",
@@ -139,6 +175,38 @@
         "label": "horse"
       }
     ],
+    "pre_annotation": [
+      {
+        "x": 0,
+        "y": 157,
+        "w": 88,
+        "h": 116,
+        "label": "horse"
+      },
+      {
+        "x": 520,
+        "y": 220,
+        "w": 160,
+        "h": 300,
+        "label": "horse"
+      },
+      {
+        "x": 26,
+        "y": 121,
+        "w": 292,
+        "h": 295,
+        "label": "horse"
+      },
+      {
+        "x": 313,
+        "y": 130,
+        "w": 116,
+        "h": 291,
+        "label": "horse"
+      }
+    ],
+    "pre_annotation_mode": "find_error",
+    "pre_annotation_note": "AI 把右边那匹马的框整体向右下偏移（GT x=433,y=74,w=181,h=358 被画成 x=520,y=220,w=160,h=300，IoU≈0.21）。定位偏移=该目标漏检+一个误报框。教学点=多目标检测：框必须紧贴目标实际位置，先粗筛再逐个核对。",
     "next_task": "task5",
     "knowledge_points": [
       "多目标检测",
