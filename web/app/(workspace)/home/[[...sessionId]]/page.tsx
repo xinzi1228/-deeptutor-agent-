@@ -758,7 +758,7 @@ export default function ChatPage() {
                       metrics: checkData.metrics,
                       report: checkData.report,
                     });
-                    enriched = `${pendingMsg}\n\n（后端自动评分附在下方评分卡中，请结合评分给出针对性反馈）`;
+                    enriched = `${finalMsg}\n\n（后端自动评分附在下方评分卡中，请结合评分给出针对性反馈）`;
                   }
                 }
               }
