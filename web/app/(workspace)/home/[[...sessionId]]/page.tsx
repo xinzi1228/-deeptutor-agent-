@@ -732,6 +732,7 @@ export default function ChatPage() {
                 taskId?: string;
                 boxes?: unknown;
                 f1?: number;
+                pre_annotation?: unknown;
               };
               if (result.taskId && Array.isArray(result.boxes) && result.boxes.length > 0) {
                 const gtRes = await fetch(
@@ -740,25 +741,48 @@ export default function ChatPage() {
                 );
                 if (gtRes.ok) {
                   const gtData = (await gtRes.json()) as { ground_truth?: unknown[] };
+                  const checkBody: Record<string, unknown> = {
+                    task_type: "bbox",
+                    predictions: result.boxes,
+                    ground_truth: gtData.ground_truth ?? [],
+                  };
+                  if (Array.isArray(result.pre_annotation)) {
+                    checkBody.pre_annotation = result.pre_annotation;
+                  }
                   const checkRes = await fetch("/api/v1/annotation/check", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      task_type: "bbox",
-                      predictions: result.boxes,
-                      ground_truth: gtData.ground_truth ?? [],
-                    }),
+                    body: JSON.stringify(checkBody),
                   });
                   if (checkRes.ok) {
                     const checkData = (await checkRes.json()) as {
                       metrics: Record<string, number | undefined>;
                       report?: string;
+                      pre_annotation_metrics?: Record<string, number | undefined>;
+                      improvement?: number;
                     };
                     setAnnotationResult({
                       metrics: checkData.metrics,
                       report: checkData.report,
                     });
                     enriched = `${finalMsg}\n\n（后端自动评分附在下方评分卡中，请结合评分给出针对性反馈）`;
+                    const aiF1 = checkData.pre_annotation_metrics?.f1;
+                    const myF1 = checkData.metrics?.f1;
+                    const improvement = checkData.improvement;
+                    if (
+                      typeof aiF1 === "number" &&
+                      typeof myF1 === "number" &&
+                      typeof improvement === "number"
+                    ) {
+                      const aiPct = (aiF1 * 100).toFixed(0);
+                      const myPct = (myF1 * 100).toFixed(0);
+                      const diffPct = (Math.abs(improvement) * 100).toFixed(0);
+                      const compare =
+                        improvement >= 0
+                          ? `提升 +${diffPct}%`
+                          : `注意：你修正后比 AI 还低 ${diffPct}%`;
+                      enriched = `${finalMsg}\n\nAI 预标注 F1=${aiPct}%，你修正后 F1=${myPct}%，${compare}。\n\n（后端自动评分附在下方评分卡中，请结合评分给出针对性反馈）`;
+                    }
                   }
                 }
               }

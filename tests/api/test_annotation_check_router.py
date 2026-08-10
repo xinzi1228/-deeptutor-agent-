@@ -50,6 +50,46 @@ def test_check_bbox(client: TestClient) -> None:
     assert data["metrics"]["f1"] > 0
 
 
+def test_check_bbox_pre_annotation_double_scoring(client: TestClient) -> None:
+    """pre_annotation 双评: 同 ground_truth 评 AI 预标注, 返回 pre_annotation_metrics + improvement."""
+    res = client.post(
+        f"{API}/check",
+        json={
+            "task_type": "bbox",
+            "predictions": [
+                {"x": 10, "y": 10, "w": 50, "h": 50, "label": "cat"},
+                {"x": 90, "y": 90, "w": 50, "h": 50, "label": "cat"},
+            ],
+            "ground_truth": [{"x": 10, "y": 10, "w": 50, "h": 50, "label": "cat"}],
+            "pre_annotation": [{"x": 10, "y": 10, "w": 50, "h": 50, "label": "cat"}],
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "pre_annotation_metrics" in data
+    assert "f1" in data["pre_annotation_metrics"]
+    assert data["pre_annotation_metrics"]["f1"] == 1.0
+    assert "improvement" in data
+    assert data["improvement"] < 0  # 学生多画一个多余框, F1 < AI 预标注
+
+
+def test_check_bbox_pre_annotation_malformed_ignored(client: TestClient) -> None:
+    """pre_annotation 格式错误时忽略, 不阻塞正常评分."""
+    res = client.post(
+        f"{API}/check",
+        json={
+            "task_type": "bbox",
+            "predictions": [{"x": 10, "y": 10, "w": 50, "h": 50, "label": "cat"}],
+            "ground_truth": [{"x": 10, "y": 10, "w": 50, "h": 50, "label": "cat"}],
+            "pre_annotation": "not-json",
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "pre_annotation_metrics" not in data
+    assert data["metrics"]["f1"] == 1.0
+
+
 def test_check_classification(client: TestClient) -> None:
     res = client.post(
         f"{API}/check",

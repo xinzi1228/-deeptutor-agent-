@@ -56,8 +56,11 @@ def _load_json_list(raw: Any, field: str) -> list[dict]:
 async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
     """Grade a single annotation submission against ground truth.
 
-    Body: ``{task_type, predictions, ground_truth, image_size?}``.
+    Body: ``{task_type, predictions, ground_truth, image_size?, pre_annotation?}``.
     Returns ``{task_type, metrics, report}``. ``task_type`` defaults to ``bbox``.
+    When ``pre_annotation`` (AI 预标注, bbox only) is provided, also returns
+    ``pre_annotation_metrics`` + ``improvement`` (学生 F1 - AI 预标注 F1) for
+    the AI 辅助标注审阅教学 double-scoring flow.
     """
     task_type = str(body.get("task_type") or "bbox").strip()
     if task_type not in _SCORERS:
@@ -69,6 +72,9 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
     ground_truth = _load_json_list(body.get("ground_truth"), "ground_truth")
 
     metrics = _SCORERS[task_type](predictions, ground_truth)
+
+    pre_annotation_metrics: dict[str, Any] | None = None
+    improvement: float | None = None
 
     if task_type == "bbox":
         image_size = (1000, 1000)
@@ -82,10 +88,24 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
         report, _ = annotation_check._bbox_report(
             predictions, ground_truth, image_size=image_size
         )
+        raw_pre = body.get("pre_annotation")
+        if raw_pre:
+            # 双评: 同一 ground_truth 额外评 AI 预标注; 格式错误则忽略, 不阻塞正常评分
+            try:
+                pre_annotation = _load_json_list(raw_pre, "pre_annotation")
+                pre_annotation_metrics = annotation_check._bbox_dict(pre_annotation, ground_truth)
+                improvement = round(metrics["f1"] - pre_annotation_metrics["f1"], 4)
+            except HTTPException:
+                pre_annotation_metrics = None
+                improvement = None
     else:
         report = _REPORTERS[task_type](predictions, ground_truth)
 
-    return {"task_type": task_type, "metrics": metrics, "report": report}
+    resp: dict[str, Any] = {"task_type": task_type, "metrics": metrics, "report": report}
+    if pre_annotation_metrics is not None:
+        resp["pre_annotation_metrics"] = pre_annotation_metrics
+        resp["improvement"] = improvement
+    return resp
 
 
 @router.get("/ground-truth/{task_id}")
