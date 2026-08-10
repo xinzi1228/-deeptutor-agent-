@@ -290,4 +290,14 @@ class GetAnnotationTaskTool(BaseTool):
                 f"评分时调用 `annotation_check`，task_type: {ttype}"
             )
 
-        return ToolResult(content=content, metadata={"task_id": tid, "ground_truth": gt})
+        metadata: dict[str, Any] = {"task_id": tid, "ground_truth": gt}
+        for key in ("pre_annotation", "pre_annotation_mode", "pre_annotation_note"):
+            if key in task:
+                metadata[key] = task[key]
+        if "pre_annotation" in task:
+            content += (
+                "\n\n> 🤖 **AI 预标注**: 本任务附带 AI 预标注（"
+                f"mode={task.get('pre_annotation_mode', 'review')}）。"
+                "请在标注台审阅/修正后提交；评分时会同时对比 AI 预标注与你修正后的结果。"
+            )
+        return ToolResult(content=content, metadata=metadata)

@@ -875,6 +875,17 @@ class AnnotationCheckTool(BaseTool):
                     description="(可选) 当前评测的标注任务 id。评测 bbox 后若提供会自动推进教学流程 evaluate→feedback。",
                     required=False,
                 ),
+                ToolParameter(
+                    name="pre_annotation",
+                    type="string",
+                    description=(
+                        "(可选) AI 预标注的 JSON string（格式同 predictions，仅 bbox 生效）。"
+                        "提供时用同一 ground_truth 额外评 AI 预标注，返回 pre_annotation_metrics "
+                        "（同 predictions metrics 结构）+ improvement（学生 F1 - AI 预标注 F1）。"
+                        "用于『AI 辅助标注审阅教学』双评对比。"
+                    ),
+                    required=False,
+                ),
             ],
         )
 
@@ -892,6 +903,14 @@ class AnnotationCheckTool(BaseTool):
                 content=f"Invalid JSON: {e}\n\nExpected format:\nBbox: [{{\"x\":80,\"y\":120,\"w\":140,\"h\":160,\"label\":\"cat\"}}]\nClassification: [{{\"id\":1,\"label\":\"positive\"}}]",
                 success=False,
             )
+
+        pre_annotation = None
+        pre_raw = kwargs.get("pre_annotation")
+        if pre_raw:
+            try:
+                pre_annotation = json.loads(pre_raw) if isinstance(pre_raw, str) else pre_raw
+            except json.JSONDecodeError:
+                pre_annotation = None  # malformed pre-annotation -> ignore, keep normal grading
 
         if task_type == "classification":
             content = _classify_report(predictions, ground_truth)
@@ -944,6 +963,19 @@ class AnnotationCheckTool(BaseTool):
             readiness = auto_readiness(f1)
             metadata["readiness"] = readiness
             passed = f1 >= 0.7
+            if pre_annotation:
+                pre_metrics = _bbox_dict(pre_annotation, ground_truth)
+                improvement = round(f1 - pre_metrics["f1"], 4)
+                metadata["pre_annotation_metrics"] = pre_metrics
+                metadata["improvement"] = improvement
+                content += (
+                    "\n\n### AI 预标注对比 (双评)\n"
+                    f"**AI 预标注 F1**: {pre_metrics['f1']:.0%} "
+                    f"(precision={pre_metrics['precision']:.0%}, recall={pre_metrics['recall']:.0%}, "
+                    f"正确 {pre_metrics['matched_count']} | 多余 {pre_metrics['extra_count']} | 漏标 {pre_metrics['missed_count']})\n"
+                    f"**你的 F1**: {f1:.0%}\n"
+                    f"**改进 (你的 F1 - AI F1)**: {improvement:+.0%}"
+                )
             if task_id:
                 try:
                     from deeptutor.services.teaching_flow import TeachingFlowEngine
