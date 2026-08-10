@@ -338,6 +338,40 @@ const AssistantMessage = memo(function AssistantMessage({
     return null;
   }, [events]);
 
+  // AI 预标注审阅教学: get_annotation_task 的 pre_annotation metadata 落盘到
+  // localStorage, 供标注台 web/public/annotation_tool.html 的 loadPreAnnotation()
+  // 读取并渲染 AI 预标注框。副作用集中在此一个 useEffect, 组件保持纯展示。
+  const preAnnotationPayload = useMemo(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      const ev = events[i];
+      if (ev.type !== "tool_result") continue;
+      const meta = (ev.metadata ?? {}) as Record<string, unknown>;
+      const toolMeta = (meta.tool_metadata ?? {}) as Record<string, unknown>;
+      if (toolMeta.task_id && toolMeta.pre_annotation) {
+        return {
+          taskId: String(toolMeta.task_id),
+          pre: toolMeta.pre_annotation as unknown[],
+          mode: (toolMeta.pre_annotation_mode as string | undefined) ?? "review",
+          note: (toolMeta.pre_annotation_note as string | undefined) ?? "",
+        };
+      }
+    }
+    return null;
+  }, [events]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!preAnnotationPayload) return;
+    try {
+      window.localStorage.setItem(
+        "annotation_pre_annotation",
+        JSON.stringify(preAnnotationPayload),
+      );
+    } catch {
+      // localStorage 不可用 (隐私模式/配额) 时静默降级, 不影响聊天渲染
+    }
+  }, [preAnnotationPayload]);
+
   const outlinePreview = useMemo(() => {
     if (msg.capability !== "deep_research" || !resultEvent) return null;
     const meta = resultEvent.metadata as Record<string, unknown> | undefined;
