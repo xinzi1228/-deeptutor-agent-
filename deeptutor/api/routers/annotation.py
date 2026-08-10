@@ -90,12 +90,13 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
         )
         raw_pre = body.get("pre_annotation")
         if raw_pre:
-            # 双评: 同一 ground_truth 额外评 AI 预标注; 格式错误则忽略, 不阻塞正常评分
+            # 双评: 同一 ground_truth 额外评 AI 预标注; 畸形则忽略
+            # (合法 JSON 但缺 x/y/w/h 字段会让 _bbox_dict 抛 KeyError), 不阻塞正常评分
             try:
                 pre_annotation = _load_json_list(raw_pre, "pre_annotation")
                 pre_annotation_metrics = annotation_check._bbox_dict(pre_annotation, ground_truth)
                 improvement = round(metrics["f1"] - pre_annotation_metrics["f1"], 4)
-            except HTTPException:
+            except Exception:
                 pre_annotation_metrics = None
                 improvement = None
     else:

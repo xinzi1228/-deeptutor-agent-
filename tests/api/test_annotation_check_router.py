@@ -90,6 +90,23 @@ def test_check_bbox_pre_annotation_malformed_ignored(client: TestClient) -> None
     assert data["metrics"]["f1"] == 1.0
 
 
+def test_check_bbox_pre_annotation_missing_fields_ignored(client: TestClient) -> None:
+    """pre_annotation 是合法 JSON 数组但缺 x/y/w/h -> 双评跳过, 不返回 500."""
+    res = client.post(
+        f"{API}/check",
+        json={
+            "task_type": "bbox",
+            "predictions": [{"x": 10, "y": 10, "w": 50, "h": 50, "label": "cat"}],
+            "ground_truth": [{"x": 10, "y": 10, "w": 50, "h": 50, "label": "cat"}],
+            "pre_annotation": [{"label": "cat"}],
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "pre_annotation_metrics" not in data
+    assert data["metrics"]["f1"] == 1.0
+
+
 def test_check_classification(client: TestClient) -> None:
     res = client.post(
         f"{API}/check",

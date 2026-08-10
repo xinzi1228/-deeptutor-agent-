@@ -170,3 +170,21 @@ async def test_malformed_pre_annotation_ignored(_no_png):
     assert result.success
     assert "pre_annotation_metrics" not in result.metadata
     assert result.metadata["readiness"] == "advance"
+
+
+@pytest.mark.asyncio
+async def test_malformed_pre_annotation_missing_fields_ignored(_no_png):
+    """Structurally-valid pre_annotation missing x/y/w/h (-> KeyError in _bbox_dict) must not break grading."""
+    gt = [{"x": 207, "y": 140, "w": 353, "h": 273, "label": "cat"}]
+
+    tool = AnnotationCheckTool()
+    result = await tool.execute(
+        task_type="bbox",
+        predictions=json.dumps(gt),
+        ground_truth=json.dumps(gt),
+        pre_annotation='[{"label":"cat"}]',  # valid JSON array, missing x/y/w/h
+    )
+    assert result.success
+    assert "pre_annotation_metrics" not in result.metadata
+    assert "AI 预标注对比" not in result.content
+    assert result.metadata["readiness"] == "advance"

@@ -964,18 +964,24 @@ class AnnotationCheckTool(BaseTool):
             metadata["readiness"] = readiness
             passed = f1 >= 0.7
             if pre_annotation:
-                pre_metrics = _bbox_dict(pre_annotation, ground_truth)
-                improvement = round(f1 - pre_metrics["f1"], 4)
-                metadata["pre_annotation_metrics"] = pre_metrics
-                metadata["improvement"] = improvement
-                content += (
-                    "\n\n### AI 预标注对比 (双评)\n"
-                    f"**AI 预标注 F1**: {pre_metrics['f1']:.0%} "
-                    f"(precision={pre_metrics['precision']:.0%}, recall={pre_metrics['recall']:.0%}, "
-                    f"正确 {pre_metrics['matched_count']} | 多余 {pre_metrics['extra_count']} | 漏标 {pre_metrics['missed_count']})\n"
-                    f"**你的 F1**: {f1:.0%}\n"
-                    f"**改进 (你的 F1 - AI F1)**: {improvement:+.0%}"
-                )
+                # 畸形 pre_annotation (合法 JSON 但缺 x/y/w/h 字段) 会令 _bbox_dict
+                # 抛 KeyError -> 忽略双评, 不阻塞主评分 (畸形不致命)
+                try:
+                    pre_metrics = _bbox_dict(pre_annotation, ground_truth)
+                except Exception:
+                    pre_metrics = None
+                if pre_metrics is not None:
+                    improvement = round(f1 - pre_metrics["f1"], 4)
+                    metadata["pre_annotation_metrics"] = pre_metrics
+                    metadata["improvement"] = improvement
+                    content += (
+                        "\n\n### AI 预标注对比 (双评)\n"
+                        f"**AI 预标注 F1**: {pre_metrics['f1']:.0%} "
+                        f"(precision={pre_metrics['precision']:.0%}, recall={pre_metrics['recall']:.0%}, "
+                        f"正确 {pre_metrics['matched_count']} | 多余 {pre_metrics['extra_count']} | 漏标 {pre_metrics['missed_count']})\n"
+                        f"**你的 F1**: {f1:.0%}\n"
+                        f"**改进 (你的 F1 - AI F1)**: {improvement:+.0%}"
+                    )
             if task_id:
                 try:
                     from deeptutor.services.teaching_flow import TeachingFlowEngine
