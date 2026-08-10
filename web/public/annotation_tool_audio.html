@@ -329,9 +329,10 @@ function checkAnnotation() {
 
   const pairs = [];
   segments.forEach((p, pi) => gt.forEach((g, gj) => {
-    if (p.label !== g.label) continue;
-    const tiou = calcTIoU(p, g);
-    if (tiou >= 0.3) pairs.push({ tiou, pi, gj });
+    if (p.label === g.label) {
+      const tiou = calcTIoU(p, g);
+      if (tiou >= 0.3) pairs.push({ tiou, pi, gj });
+    }
   }));
   pairs.sort((a,b) => b.tiou - a.tiou);
 
