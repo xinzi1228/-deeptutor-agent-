@@ -47,6 +47,13 @@ canvas { border:1px solid #444; cursor:crosshair; border-radius:8px; max-width:1
 .legend { display:flex; gap:10px; font-size:10px; color:#888; margin-bottom:8px; flex-wrap:wrap; }
 .legend span { display:flex; align-items:center; gap:3px; }
 .legend .dot { width:10px; height:10px; border-radius:2px; display:inline-block; }
+.banner { background:rgba(217,119,6,0.15); border:1px solid #d97706; color:#fbbf24; padding:8px 12px; border-radius:8px; font-size:13px; margin-bottom:10px; text-align:center; display:none; }
+.ai-tools { display:none; flex-direction:column; gap:6px; }
+.ai-tools button.accept { background:#b45309; border-color:#b45309; }
+.ai-tools button.accept:hover { background:#92400e; }
+.ai-tools button.clear-ai { background:transparent; border-color:#d97706; color:#fbbf24; }
+.ai-tools button.clear-ai:hover { background:rgba(217,119,6,0.15); }
+.edit-hint { font-size:11px; color:#888; margin-top:2px; text-align:center; }
 </style>
 </head>
 <body>
@@ -70,13 +77,19 @@ canvas { border:1px solid #444; cursor:crosshair; border-radius:8px; max-width:1
   <button class="primary" onclick="checkAnnotation()">检查标注</button>
   <button onclick="undoBox()">撤销</button>
   <button onclick="clearBoxes()">清除全部</button>
+  <div class="ai-tools" id="aiTools">
+    <button class="accept" onclick="acceptAllAI()">🤖 全部接受</button>
+    <button class="clear-ai" onclick="clearAllAI()">清除 AI 预标注</button>
+  </div>
   <button class="coach" id="btnCoach" onclick="askCoach()" style="display:none">问Coach：帮我分析</button>
   <button class="coach doubt" id="btnDoubt" onclick="askDoubt()">这里有疑问</button>
 </div>
 
 <div class="main-area">
+  <div class="banner" id="preBanner"></div>
   <canvas id="canvas"></canvas>
   <div class="info" id="info">在图片上拖动画框，选好标签后点「检查标注」</div>
+  <div class="edit-hint" id="editHint">点击框可选中/拖动，拖角缩放，按 Delete 删除</div>
 </div>
 
 <div class="result-panel" id="resultPanel">
@@ -112,11 +125,13 @@ const COLORS = { car:'#E74C3C', horse:'#8E44AD', not_car:'#95A5A6' };
 const LABEL_CN = { car:'车', horse:'马', not_car:'非车' };
 
 let currentTask = 'task1', selectedLabel = '', boxes = [], drawing = null, start = null, checkResult = null;
+let preAnnotation = null, selectedBox = -1, dragMode = null, dragStart = null;
 let img = new Image();
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const resultPanel = document.getElementById('resultPanel');
 const resultContent = document.getElementById('resultContent');
+const AI_COLOR = '#d97706';
 
 function loadTask() {
   currentTask = document.getElementById('taskSelect').value;
@@ -126,13 +141,40 @@ function loadTask() {
     return;
   }
   selectedLabel = t.labels[0];
-  boxes = []; checkResult = null;
+  boxes = []; checkResult = null; preAnnotation = null; selectedBox = -1; dragMode = null;
   resultPanel.classList.remove('show');
   document.getElementById('btnCoach').style.display = 'none';
+  const pb = document.getElementById('preBanner'), at = document.getElementById('aiTools'), eh = document.getElementById('editHint');
+  if (pb) pb.style.display = 'none';
+  if (at) at.style.display = 'none';
+  if (eh) eh.style.display = 'none';
   renderLabels();
-  img.onload = () => { canvas.width = t.w; canvas.height = t.h; draw(); };
+  img.onload = () => { canvas.width = t.w; canvas.height = t.h; loadPreAnnotation(); draw(); };
   img.src = t.url;
   document.getElementById('info').textContent = t.desc + ' (' + (t.difficulty||'') + ')';
+}
+
+function loadPreAnnotation() {
+  let data = null;
+  try {
+    const raw = localStorage.getItem('annotation_pre_annotation');
+    if (raw) data = JSON.parse(raw);
+  } catch(e) { data = null; }
+  if (!data || !Array.isArray(data.pre) || data.taskId !== currentTask) return;
+  preAnnotation = data;
+  data.pre.forEach(p => {
+    boxes.push({ x:Math.round(p.x), y:Math.round(p.y), w:Math.round(p.w), h:Math.round(p.h), label:p.label, isAi:true });
+  });
+  const mode = data.mode === 'find_error' ? 'find_error' : 'review';
+  const banner = document.getElementById('preBanner');
+  banner.style.display = 'block';
+  banner.textContent = mode === 'review'
+    ? '🤖 AI 预标注：请审阅确认或修正'
+    : '🤖 AI 预标注：请找出它的错误';
+  document.getElementById('aiTools').style.display = 'flex';
+  document.getElementById('editHint').style.display = 'block';
+  selectedBox = boxes.length - 1;
+  updateCheckButtons();
 }
 
 function renderLabels() {
@@ -156,11 +198,26 @@ function draw() {
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.drawImage(img,0,0);
   
-  // Draw user boxes
-  boxes.forEach(b => {
-    ctx.strokeStyle = COLORS[b.label]||'#888'; ctx.lineWidth = 2;
-    ctx.strokeRect(b.x,b.y,b.w,b.h);
-    ctx.fillStyle = (COLORS[b.label]||'#888')+'15'; ctx.fillRect(b.x,b.y,b.w,b.h);
+  // Draw boxes (AI pre-annotation boxes are dashed amber with an AI badge)
+  boxes.forEach((b, bi) => {
+    if (b.isAi) {
+      ctx.setLineDash([8,4]);
+      ctx.strokeStyle = AI_COLOR; ctx.lineWidth = 2.5;
+      ctx.strokeRect(b.x,b.y,b.w,b.h);
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(217,119,6,0.12)'; ctx.fillRect(b.x,b.y,b.w,b.h);
+      const badgeW = 28, badgeH = 16;
+      ctx.fillStyle = AI_COLOR;
+      ctx.fillRect(Math.max(0,b.x), Math.max(0,b.y-badgeH), badgeW, badgeH);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'left';
+      ctx.fillText('AI', Math.max(0,b.x)+4, Math.max(0,b.y-badgeH)+12);
+      ctx.textAlign = 'start';
+    } else {
+      ctx.strokeStyle = COLORS[b.label]||'#888'; ctx.lineWidth = 2;
+      ctx.strokeRect(b.x,b.y,b.w,b.h);
+      ctx.fillStyle = (COLORS[b.label]||'#888')+'15'; ctx.fillRect(b.x,b.y,b.w,b.h);
+    }
+    if (bi === selectedBox) drawHandles(b);
   });
   
   // Draw GT after check
@@ -188,28 +245,120 @@ function draw() {
   }
 }
 
+function drawHandles(b) {
+  ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 2;
+  ctx.strokeRect(b.x-3, b.y-3, b.w+6, b.h+6);
+  ctx.fillStyle = '#4fc3f7';
+  [[b.x,b.y],[b.x+b.w,b.y],[b.x,b.y+b.h],[b.x+b.w,b.y+b.h]].forEach(([hx,hy]) => {
+    ctx.fillRect(hx-4, hy-4, 8, 8);
+  });
+}
+
 canvas.addEventListener('mousedown', e => {
   if (checkResult) return;
   const r = canvas.getBoundingClientRect();
-  start = { x:(e.clientX-r.left)*canvas.width/r.width, y:(e.clientY-r.top)*canvas.height/r.height };
+  const mx = (e.clientX-r.left)*canvas.width/r.width, my = (e.clientY-r.top)*canvas.height/r.height;
+
+  const handle = hitTestHandle(mx, my);
+  if (selectedBox >= 0 && handle) {
+    dragMode = 'resize';
+    dragStart = { mx, my, handle, x:boxes[selectedBox].x, y:boxes[selectedBox].y, w:boxes[selectedBox].w, h:boxes[selectedBox].h };
+    draw();
+    return;
+  }
+  const hitIdx = hitTestBox(mx, my);
+  if (hitIdx >= 0) {
+    selectedBox = hitIdx;
+    dragMode = 'move';
+    dragStart = { mx, my, x:boxes[hitIdx].x, y:boxes[hitIdx].y };
+    draw();
+    return;
+  }
+  selectedBox = -1;
+  start = { x:mx, y:my };
   drawing = { x:start.x, y:start.y, w:0, h:0 };
+  draw();
 });
 canvas.addEventListener('mousemove', e => {
-  if (!drawing) return;
   const r = canvas.getBoundingClientRect();
   const mx = (e.clientX-r.left)*canvas.width/r.width, my = (e.clientY-r.top)*canvas.height/r.height;
+  if (dragMode && selectedBox >= 0) {
+    const b = boxes[selectedBox], d = dragStart;
+    if (dragMode === 'move') {
+      b.x = Math.round(d.x + mx - d.mx); b.y = Math.round(d.y + my - d.my);
+    } else if (dragMode === 'resize') {
+      let x = d.x, y = d.y, w = d.w, h = d.h;
+      if (d.handle.includes('e')) w = Math.max(8, d.w + mx - d.mx);
+      if (d.handle.includes('s')) h = Math.max(8, d.h + my - d.my);
+      if (d.handle.includes('w')) { w = Math.max(8, d.w + d.mx - mx); x = d.x + d.w - w; }
+      if (d.handle.includes('n')) { h = Math.max(8, d.h + d.my - my); y = d.y + d.h - h; }
+      b.x = Math.round(x); b.y = Math.round(y); b.w = Math.round(w); b.h = Math.round(h);
+    }
+    draw();
+    return;
+  }
+  if (!drawing) return;
   drawing.x = Math.min(start.x,mx); drawing.y = Math.min(start.y,my);
   drawing.w = Math.abs(mx-start.x); drawing.h = Math.abs(my-start.y);
   draw();
 });
 canvas.addEventListener('mouseup', () => {
+  if (dragMode) { dragMode = null; draw(); return; }
   if (!drawing || drawing.w < 8 || drawing.h < 8) { drawing = null; draw(); return; }
   boxes.push({ x:Math.round(drawing.x), y:Math.round(drawing.y), w:Math.round(drawing.w), h:Math.round(drawing.h), label:selectedLabel });
   drawing = null; draw();
 });
 
-function undoBox() { boxes.pop(); checkResult = null; draw(); renderResults(); }
-function clearBoxes() { boxes = []; checkResult = null; draw(); renderResults(); }
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBox >= 0 && selectedBox < boxes.length) {
+    e.preventDefault();
+    boxes.splice(selectedBox, 1);
+    selectedBox = -1; checkResult = null; dragMode = null;
+    draw(); renderResults(); updateCheckButtons();
+  }
+});
+
+function hitTestBox(mx, my) {
+  for (let i = boxes.length-1; i >= 0; i--) {
+    const b = boxes[i];
+    if (mx >= b.x && mx <= b.x+b.w && my >= b.y && my <= b.y+b.h) return i;
+  }
+  return -1;
+}
+
+function hitTestHandle(mx, my) {
+  if (selectedBox < 0) return null;
+  const b = boxes[selectedBox];
+  const pts = {
+    'nw': [b.x, b.y], 'ne': [b.x+b.w, b.y],
+    'sw': [b.x, b.y+b.h], 'se': [b.x+b.w, b.y+b.h]
+  };
+  for (const [k,[hx,hy]] of Object.entries(pts)) {
+    if (Math.abs(mx-hx) <= 8 && Math.abs(my-hy) <= 8) return k;
+  }
+  return null;
+}
+
+function undoBox() { if (!boxes.length) return; boxes.pop(); selectedBox = -1; checkResult = null; draw(); renderResults(); updateCheckButtons(); }
+function clearBoxes() { boxes = []; selectedBox = -1; checkResult = null; draw(); renderResults(); updateCheckButtons(); }
+
+function updateCheckButtons() {
+  const aiCount = boxes.filter(b => b.isAi).length;
+  const at = document.getElementById('aiTools'), eh = document.getElementById('editHint'), pb = document.getElementById('preBanner');
+  if (at) at.style.display = aiCount > 0 ? 'flex' : 'none';
+  if (eh) eh.style.display = aiCount > 0 ? 'block' : 'none';
+  if (pb) pb.style.display = aiCount > 0 ? 'block' : 'none';
+}
+
+function acceptAllAI() {
+  boxes.forEach(b => { if (b.isAi) { b.isAi = false; } });
+  selectedBox = -1; checkResult = null; draw(); renderResults(); updateCheckButtons();
+}
+
+function clearAllAI() {
+  boxes = boxes.filter(b => !b.isAi);
+  selectedBox = -1; checkResult = null; draw(); renderResults(); updateCheckButtons();
+}
 
 function checkAnnotation() {
   if (boxes.length === 0) { alert('请先在图片上画框'); return; }
@@ -314,7 +463,7 @@ function askCoach() {
 请帮我分析一下哪里需要改进，推荐下一步学什么。`;
   
   // Save to localStorage for the chat page to read
-  localStorage.setItem('annotation_last_result', JSON.stringify({
+  const resultPayload = {
     taskId: currentTask,
     taskTitle: t.desc,
     f1: checkResult.f1,
@@ -325,7 +474,12 @@ function askCoach() {
     boxes: boxes,
     message: msg,
     time: Date.now()
-  }));
+  };
+  if (preAnnotation) {
+    resultPayload.pre_annotation = preAnnotation.pre.map(p => ({ x:p.x, y:p.y, w:p.w, h:p.h, label:p.label }));
+    resultPayload.pre_annotation_mode = preAnnotation.mode === 'find_error' ? 'find_error' : 'review';
+  }
+  localStorage.setItem('annotation_last_result', JSON.stringify(resultPayload));
   
   // Also save the message separately for easy sending
   localStorage.setItem('annotation_pending_message', msg);
@@ -355,12 +509,17 @@ function askDoubt() {
   localStorage.setItem('annotation_pending_time', String(Date.now()));
   localStorage.setItem('annotation_doubt', '1');
   if (checkResult) {
-    localStorage.setItem('annotation_last_result', JSON.stringify({
+    const doubtPayload = {
       taskId: currentTask, taskTitle: t.desc, f1: checkResult.f1,
       precision: checkResult.precision, recall: checkResult.recall,
       tp: checkResult.tp || 0, total: (checkResult.gt && checkResult.gt.length) || 0,
       boxes: boxes, message: msg, time: Date.now(),
-    }));
+    };
+    if (preAnnotation) {
+      doubtPayload.pre_annotation = preAnnotation.pre.map(p => ({ x:p.x, y:p.y, w:p.w, h:p.h, label:p.label }));
+      doubtPayload.pre_annotation_mode = preAnnotation.mode === 'find_error' ? 'find_error' : 'review';
+    }
+    localStorage.setItem('annotation_last_result', JSON.stringify(doubtPayload));
   }
   try { window.parent.location.href = '/home'; } catch(e) { window.top.location.href = '/home'; }
 }
@@ -379,6 +538,7 @@ let classificationAnswer = null;
 let classificationConfidence = null;
 function loadClassificationTask(t) {
   boxes = []; checkResult = null; classificationAnswer = null;
+  preAnnotation = null; selectedBox = -1; dragMode = null;
   resultPanel.classList.remove('show');
   document.getElementById('btnCoach').style.display = 'none';
   
