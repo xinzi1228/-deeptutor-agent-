@@ -15,6 +15,8 @@ body { font-family: system-ui; background:#1a1a2e; color:#eee; display:flex; hei
 .sidebar button.primary:hover { background:#1d4ed8; }
 .sidebar button.coach { background:#7c3aed; border-color:#7c3aed; }
 .sidebar button.coach:hover { background:#6d28d9; }
+.sidebar button.coach.doubt { background:#d97706; border-color:#d97706; }
+.sidebar button.coach.doubt:hover { background:#b45309; }
 .label-btns { display:flex; flex-direction:column; gap:6px; }
 .label-btn { padding:8px 12px; border:2px solid #333; border-radius:6px; background:transparent; color:#ccc; cursor:pointer; text-align:left; font-size:13px; }
 .label-btn.selected { border-color:#4fc3f7; background:rgba(79,195,247,0.15); color:#4fc3f7; }
@@ -71,6 +73,7 @@ body { font-family: system-ui; background:#1a1a2e; color:#eee; display:flex; hei
   <button onclick="undoEntity()">撤销实体</button>
   <button onclick="clearEntities()">清除全部</button>
   <button class="coach" id="btnCoach" onclick="askCoach()" style="display:none">问Coach：帮我分析</button>
+  <button class="coach doubt" id="btnDoubt" onclick="askDoubt()">这里有疑问</button>
 </div>
 
 <div class="main-area">
@@ -440,6 +443,33 @@ function askCoach() {
   localStorage.setItem('annotation_last_result', JSON.stringify({ taskId: currentTask, message: msg, time: Date.now() }));
   localStorage.setItem('annotation_pending_message', msg);
   localStorage.setItem('annotation_pending_time', String(Date.now()));
+  try { window.parent.location.href = '/home'; } catch(e) { window.top.location.href = '/home'; }
+}
+
+// ── Ask Doubt (O8 行内思维快照) ──
+// 学生随时标记"这里有疑问"，不必等提交；Coach 优先回应。
+function askDoubt() {
+  const t = TASKS[currentTask];
+  const hasResult = !!checkResult;
+  let msg = `⚠ 我有疑问（进行中提问）：「${t.desc.split('—')[0]}」标注练习里，`;
+  msg += hasResult
+    ? `刚才提交的结果 F1=${(checkResult.f1*100).toFixed(0)}%，但我在以下地方没把握：\n`
+    : `我还没提交，但做到这里不确定，想先确认一下：\n`;
+  msg += `- 当前任务: ${currentTask}\n- 我画/标的内容: ${JSON.stringify(entities || [])}\n`;
+  msg += `请先解答我的疑问，再告诉我怎么继续。`;
+
+  localStorage.setItem('annotation_pending_message', msg);
+  localStorage.setItem('annotation_pending_time', String(Date.now()));
+  localStorage.setItem('annotation_doubt', '1');
+  if (checkResult) {
+    localStorage.setItem('annotation_last_result', JSON.stringify({
+      taskId: currentTask, taskTitle: t.desc, f1: checkResult.f1,
+      precision: checkResult.precision, recall: checkResult.recall,
+      tp: checkResult.tp || 0,
+      total: (checkResult.gt && checkResult.gt.length) || (checkResult.gtSet && checkResult.gtSet.size) || 0,
+      entities: entities, message: msg, time: Date.now(),
+    }));
+  }
   try { window.parent.location.href = '/home'; } catch(e) { window.top.location.href = '/home'; }
 }
 
