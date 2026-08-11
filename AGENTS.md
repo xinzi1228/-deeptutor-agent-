@@ -4,6 +4,19 @@ DeepTutor 的 fork，改造为**数据标注教学平台**（讯飞职教竞赛�
 
 **当前注册状态**（已核实）：capability 只注册 `chat`（`runtime/bootstrap/builtin_capabilities.py` 仅一行）；persona 只留 `annotation-coach`；上/下游模块（solve/research/visualize、teacher/peer persona 等）代码仍在但**未注册、非主路径**。
 
+## 当前产品状态（2026-08-11）
+
+- **竞赛六模块已落地**：学习计划、会话记忆、任务引导、困难检测、学习报告、练习批改。`docs/session-handoff.md` 是完整交接入口。
+- **三模态标注教学已落地**：文本/图像/视频任务可进入标注台；部分任务携带 AI 预标注，学生需要审阅或找错，系统会展示 AI 与学生的双评差异。改这条链时优先查看 `data/user/workspace/task_bank.json`、`web/components/annotation/`、`annotation_check` 与 `PERSONA.md` 的 `pre_annotation` 规则。
+- **报告与提醒已增强**：`services/learning_communication.py` 从落盘学习记录构造只读事实摘要，`/api/v1/profile/report-summary` 提供进度页“本次学习小结”；定时提醒将该摘要交给 Coach，并在 Coach 未返回时使用确定性文本兜底。不要绕过它自行编造 F1、趋势或薄弱点。
+- **表达质量边界**：报告、提醒必须回答“我现在怎样、为什么这样、下一步做什么”；单次错误只能记为 `unconfirmed`，只有已确认模式才能称作稳定薄弱点。离线质检和样本测试在 `tests/services/test_learning_communication.py`，不应为此给每轮聊天额外增加一次 LLM 调用。
+- **当前 HEAD**：`149950ab`（报告与提醒表达优化）；前一提交 `e3bc0fbd` 是对应设计文档。小改动已提交但尚未统一 push。
+
+### 工作树注意事项
+
+- 工作区有用户保留的未跟踪素材（如 `.playwright-mcp/`、竞赛文件、`工具开发/`、`研究与学习/`、截图和分析脚本）。除非用户明确要求，**不要暂存、删除或格式化这些文件**。
+- `docs/` 和 `data/` 默认被忽略；新建或修改其中需要版本控制的内容，须精确执行 `git add -f -- <目标文件>`，绝不使用宽泛的 `git add -f docs data`。
+
 ---
 
 ## 开发操作（避免踩坑）
@@ -78,6 +91,7 @@ CLI / WebSocket /api/v1/ws / SDK → DeepTutorApp.start_turn
 | `deeptutor/agents/_shared/tool_composition.py` | always_on 工具挂载 |
 | `deeptutor/tools/builtin/__init__.py` | 全部内置工具注册 |
 | `deeptutor/api/routers/profile.py` | trace-log / teaching-flow / standards 端点 |
+| `deeptutor/services/learning_communication.py` | 学习记录 → 可信报告/提醒事实摘要、确定性文案与离线质检 |
 | `deeptutor/api/routers/shares.py` + `services/share.py` | 免登录分享 |
 | `deeptutor/api/routers/cron.py` + `services/cron/` | 定时任务管理 |
 | `deeptutor/tools/render_ui_tool.py` + `web/components/chat/home/ChatChartCard.tsx` | 生成式 UI |
