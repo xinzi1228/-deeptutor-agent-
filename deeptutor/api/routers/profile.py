@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from deeptutor.api.routers.auth import TokenPayload, require_admin
 
 from deeptutor.services.learning_records import LearningStats
 from deeptutor.services.learning_communication import (
@@ -20,6 +23,17 @@ from deeptutor.services.learning_communication import (
 )
 
 router = APIRouter()
+
+
+class WorkspaceRebuildRequest(BaseModel):
+    rebuild_course: bool = False
+    confirmed: bool = False
+
+
+class InboxCreateRequest(BaseModel):
+    raw_text: str
+    source: str = "chat"
+    context: dict[str, Any] = {}
 
 
 def _all_records(scope: str | None = None) -> list[dict[str, Any]]:
@@ -71,6 +85,43 @@ async def report_summary() -> dict[str, Any]:
         "text": text,
         "quality_warnings": audit_learning_copy(text, kind="report", summary=summary),
     }
+
+
+@router.get("/workspace")
+async def workspace_overview() -> dict[str, Any]:
+    from deeptutor.services.learning_workspace import LearningWorkspaceService
+    return {"manifest": LearningWorkspaceService().manifest()}
+
+
+@router.get("/workspace/inbox")
+async def list_workspace_inbox() -> dict[str, Any]:
+    from deeptutor.services.learning_workspace import LearningWorkspaceService
+    return {"items": LearningWorkspaceService().list_inbox()}
+
+
+@router.get("/workspace/views")
+async def workspace_views() -> dict[str, Any]:
+    from deeptutor.services.learning_workspace import LearningWorkspaceService
+    service = LearningWorkspaceService()
+    return {"views": service.views(), "assets": service.asset_versions()}
+
+
+@router.post("/workspace/inbox")
+async def create_workspace_inbox(request: InboxCreateRequest) -> dict[str, Any]:
+    from deeptutor.services.learning_workspace import LearningWorkspaceService
+    try:
+        return {"item": LearningWorkspaceService().add_inbox(request.raw_text, source=request.source, context=request.context)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/workspace/rebuild")
+async def rebuild_workspace(request: WorkspaceRebuildRequest, _: TokenPayload = Depends(require_admin)) -> dict[str, Any]:
+    from deeptutor.services.learning_workspace import LearningWorkspaceService
+    try:
+        return {"result": LearningWorkspaceService().rebuild(rebuild_course=request.rebuild_course, confirmed=request.confirmed)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/radar")

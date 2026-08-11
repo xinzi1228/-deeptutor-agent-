@@ -5,6 +5,7 @@ import { TrendingUp } from "lucide-react";
 import {
   getLearningOverview,
   getLearningReport,
+  getWorkspaceViews,
   getRadarDimensions,
   getF1Trend,
   getSkillTree,
@@ -20,6 +21,7 @@ import {
   getKnowledgeGraph,
   type ProfileOverview,
   type LearningReport,
+  type WorkspaceViews,
   type RadarDimension,
   type F1Point,
   type SkillTreeNode,
@@ -60,6 +62,7 @@ export default function ProgressPage() {
   const [error, setError] = useState<string | null>(null);
   const [overview, setOverview] = useState<ProfileOverview | null>(null);
   const [learningReport, setLearningReport] = useState<LearningReport | null>(null);
+  const [workspaceViews, setWorkspaceViews] = useState<WorkspaceViews | null>(null);
   const [dimensions, setDimensions] = useState<RadarDimension[]>([]);
   const [f1Points, setF1Points] = useState<F1Point[]>([]);
   const [skillTree, setSkillTree] = useState<SkillTreeNode | null>(null);
@@ -76,9 +79,10 @@ export default function ProgressPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, report, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
+        const [ov, report, workspace, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
           getLearningOverview(),
           getLearningReport(),
+          getWorkspaceViews(),
           getRadarDimensions(),
           getF1Trend(),
           getSkillTree(),
@@ -94,6 +98,7 @@ export default function ProgressPage() {
         if (cancelled) return;
         setOverview(ov.overview);
         setLearningReport(report);
+        setWorkspaceViews(workspace.views);
         setDimensions(radar.dimensions);
         setF1Points(f1.points);
         setSkillTree(tree.tree);
@@ -194,6 +199,23 @@ export default function ProgressPage() {
               <div className="space-y-1.5 whitespace-pre-line text-sm leading-6 text-[var(--foreground)]">
                 {learningReport.text}
               </div>
+            </section>
+          )}
+
+          {workspaceViews && (
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ["待整理问题", workspaceViews.inbox.length, workspaceViews.inbox[0]?.raw_text || "暂无问题"],
+                ["已掌握知识点", workspaceViews.mastered.length, workspaceViews.mastered[0]?.knowledge_point || "继续练习后显示"],
+                ["确认易错点", workspaceViews.confirmed_errors.length, workspaceViews.confirmed_errors[0] || "暂无确认模式"],
+                ["下一任务", workspaceViews.next_tasks.length, workspaceViews.next_tasks[0] || "完成诊断后生成"],
+              ].map(([title, count, detail]) => (
+                <div key={String(title)} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                  <p className="text-xs text-[var(--muted-foreground)]">{title}</p>
+                  <p className="mt-1 text-xl font-semibold">{count}</p>
+                  <p className="mt-2 line-clamp-2 text-xs text-[var(--muted-foreground)]">{detail}</p>
+                </div>
+              ))}
             </section>
           )}
 

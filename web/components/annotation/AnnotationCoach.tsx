@@ -129,6 +129,7 @@ const QUICK_PHRASES: { group: string; phrases: QuickPhrase[] }[] = [
 ];
 
 const QUICK_USES_KEY = "annotation.coach.quick.uses";
+const QUESTION_MARKERS = ["？", "?", "不懂", "疑问", "怎么", "为什么", "卡住"];
 
 function detectCoachMood(text: string): CoachMood {
   for (const { mood, words } of MOOD_KEYWORDS) {
@@ -321,6 +322,14 @@ export default function AnnotationCoach({
       setInput("");
       setSending(true);
       setCards([]); // 新回合开始，重置上回合图表实例
+
+      if (QUESTION_MARKERS.some((marker) => text.includes(marker))) {
+        void apiFetch(apiUrl("/api/v1/profile/workspace/inbox"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ raw_text: text, source: "annotation", context: { session_id: sessionIdRef.current || null } }),
+        }).catch(() => undefined);
+      }
 
       const client = ensureClient();
       if (!client.connected) client.connect();

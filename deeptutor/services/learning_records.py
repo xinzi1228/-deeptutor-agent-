@@ -226,6 +226,13 @@ class LearningRecordStore:
         Returns the persisted record (timestamp added if absent).
         """
         self._normalize_record(record)
+        # Asset snapshots make future reports auditable without changing old scores.
+        if "asset_versions" not in record:
+            try:
+                from deeptutor.services.learning_workspace import LearningWorkspaceService
+                record["asset_versions"] = LearningWorkspaceService().asset_versions()
+            except Exception:
+                record["asset_versions"] = {}
         if "timestamp" not in record:
             record["timestamp"] = datetime.now(tz=timezone.utc).isoformat()
 

@@ -31,6 +31,13 @@ export interface LearningReport {
   quality_warnings: string[];
 }
 
+export interface WorkspaceViews {
+  inbox: { id: string; raw_text: string; source: string }[];
+  mastered: { knowledge_point: string; evidence: string }[];
+  confirmed_errors: string[];
+  next_tasks: string[];
+}
+
 export interface RadarDimension {
   name: string;
   english: string;
@@ -149,6 +156,10 @@ export function getLearningOverview(): Promise<{ overview: ProfileOverview }> {
 
 export function getLearningReport(): Promise<LearningReport> {
   return fetchJSON(`${API_BASE}/report-summary`);
+}
+
+export function getWorkspaceViews(): Promise<{ views: WorkspaceViews }> {
+  return fetchJSON(`${API_BASE}/workspace/views`);
 }
 
 export function getRadarDimensions(): Promise<{ dimensions: RadarDimension[] }> {
