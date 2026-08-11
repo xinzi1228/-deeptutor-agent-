@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import {
   getLearningOverview,
+  getLearningReport,
   getRadarDimensions,
   getF1Trend,
   getSkillTree,
@@ -18,6 +19,7 @@ import {
   reflectMemory,
   getKnowledgeGraph,
   type ProfileOverview,
+  type LearningReport,
   type RadarDimension,
   type F1Point,
   type SkillTreeNode,
@@ -57,6 +59,7 @@ export default function ProgressPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [overview, setOverview] = useState<ProfileOverview | null>(null);
+  const [learningReport, setLearningReport] = useState<LearningReport | null>(null);
   const [dimensions, setDimensions] = useState<RadarDimension[]>([]);
   const [f1Points, setF1Points] = useState<F1Point[]>([]);
   const [skillTree, setSkillTree] = useState<SkillTreeNode | null>(null);
@@ -73,8 +76,9 @@ export default function ProgressPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
+        const [ov, report, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
           getLearningOverview(),
+          getLearningReport(),
           getRadarDimensions(),
           getF1Trend(),
           getSkillTree(),
@@ -89,6 +93,7 @@ export default function ProgressPage() {
         ]);
         if (cancelled) return;
         setOverview(ov.overview);
+        setLearningReport(report);
         setDimensions(radar.dimensions);
         setF1Points(f1.points);
         setSkillTree(tree.tree);
@@ -174,6 +179,23 @@ export default function ProgressPage() {
       {tab === "overview" && (
         <>
           <StatCards overview={overview} foresight={foresight} />
+
+          {learningReport && (
+            <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold">本次学习小结</h2>
+                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">基于已保存的学习记录生成</p>
+                </div>
+                <span className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[11px] text-[var(--muted-foreground)]">
+                  {learningReport.summary.data_status === "empty" ? "等待首条记录" : "学习记录已核对"}
+                </span>
+              </div>
+              <div className="space-y-1.5 whitespace-pre-line text-sm leading-6 text-[var(--foreground)]">
+                {learningReport.text}
+              </div>
+            </section>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-5">
             <div className="space-y-3 lg:col-span-3">

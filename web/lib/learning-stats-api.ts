@@ -13,6 +13,24 @@ export interface ProfileOverview {
   goal_type: string | null;
 }
 
+export interface LearningReportSummary {
+  completed_count: number;
+  average_f1: number | null;
+  latest_f1: number | null;
+  trend: "up" | "down" | "steady" | "unknown";
+  strength: string | null;
+  priority_gap: string | null;
+  next_action: string;
+  data_status: "sufficient" | "partial" | "empty";
+  latest_task_id: string | null;
+}
+
+export interface LearningReport {
+  summary: LearningReportSummary;
+  text: string;
+  quality_warnings: string[];
+}
+
 export interface RadarDimension {
   name: string;
   english: string;
@@ -127,6 +145,10 @@ async function fetchJSON<T>(url: string): Promise<T> {
 
 export function getLearningOverview(): Promise<{ overview: ProfileOverview }> {
   return fetchJSON(API_BASE);
+}
+
+export function getLearningReport(): Promise<LearningReport> {
+  return fetchJSON(`${API_BASE}/report-summary`);
 }
 
 export function getRadarDimensions(): Promise<{ dimensions: RadarDimension[] }> {

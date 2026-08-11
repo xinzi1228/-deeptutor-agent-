@@ -20,11 +20,19 @@ async def execute_job(job: CronJob) -> tuple[str, str | None]:
     return await _execute_chat_job(job)
 
 
-def _reminder_prompt(job: CronJob) -> str:
+def _reminder_prompt(job: CronJob, factual_reminder: str | None = None) -> str:
+    factual_part = (
+        "\n\nUse this factual reminder as the only source of learner-specific facts. "
+        "Keep it to these two sentences; do not add scores, weaknesses, or progress claims:\n"
+        f"{factual_reminder}"
+        if factual_reminder
+        else ""
+    )
     return (
         "The scheduled time has arrived. Deliver this reminder to the user now, "
         "as a brief and natural message in their language. Speak directly to them; "
-        "do not narrate scheduler status or mention internal job ids.\n\n"
+        "do not narrate scheduler status or mention internal job ids."
+        f"{factual_part}\n\n"
         f"Reminder: {job.message}"
     )
 
@@ -140,12 +148,21 @@ async def _execute_chat_job(job: CronJob) -> tuple[str, str | None]:
             scope=scope_for_user(job.owner.user_id, is_admin=False),
         )
 
-    prompt = _reminder_prompt(job)
     with user_context(user):
         store = get_sqlite_session_store()
         session = await store.get_session(job.owner.session_id)
         if session is None:
             return "error", "session no longer exists"
+
+        from deeptutor.services.learning_communication import (
+            build_learning_communication_summary,
+            render_learning_reminder,
+        )
+        from deeptutor.services.learning_records import LearningRecordStore
+
+        summary = build_learning_communication_summary(LearningRecordStore().list_records())
+        fallback_reminder = render_learning_reminder(summary, job.message)
+        prompt = _reminder_prompt(job, factual_reminder=fallback_reminder)
 
         history = await store.get_messages_for_context(job.owner.session_id)
         context = UnifiedContext(
@@ -175,7 +192,8 @@ async def _execute_chat_job(job: CronJob) -> tuple[str, str | None]:
                 errors.append(event.content)
 
         if not final_text.strip():
-            return "error", (errors[-1] if errors else "turn produced no answer")
+            logger.warning("Cron job %s produced no coach reply; using factual reminder fallback: %s", job.id, errors[-1] if errors else "empty result")
+            final_text = fallback_reminder
 
         await store.add_message(
             session_id=job.owner.session_id,

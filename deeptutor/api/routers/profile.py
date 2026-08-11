@@ -13,6 +13,11 @@ from typing import Any
 from fastapi import APIRouter
 
 from deeptutor.services.learning_records import LearningStats
+from deeptutor.services.learning_communication import (
+    audit_learning_copy,
+    build_learning_communication_summary,
+    render_learning_report,
+)
 
 router = APIRouter()
 
@@ -54,6 +59,18 @@ def _parse_memory_entries() -> list[dict[str, Any]]:
 @router.get("")
 async def profile_overview() -> dict[str, Any]:
     return {"overview": LearningStats().overview()}
+
+
+@router.get("/report-summary")
+async def report_summary() -> dict[str, Any]:
+    """A concise, evidence-backed learning report for the progress overview."""
+    summary = build_learning_communication_summary(_all_records())
+    text = render_learning_report(summary)
+    return {
+        "summary": summary.to_dict(),
+        "text": text,
+        "quality_warnings": audit_learning_copy(text, kind="report", summary=summary),
+    }
 
 
 @router.get("/radar")
