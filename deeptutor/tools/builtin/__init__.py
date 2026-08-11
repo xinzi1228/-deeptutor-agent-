@@ -47,6 +47,7 @@ from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 from deeptutor.tools.teaching_flow_tool import TeachingFlowTool
 from deeptutor.tools.verify_foresight_tool import VerifyForesightTool
 from deeptutor.tools.write_learning_record import WriteLearningRecordTool
+from deeptutor.tools.learning_path_tool import RenderLearningPathTool
 
 logger = logging.getLogger(__name__)
 
@@ -1675,6 +1676,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     DelegateExpertTool,
     JobAnalysisTool,
     WriteLearningRecordTool,
+    RenderLearningPathTool,
     GenerateIouDemoTool,
     LogDecisionTool,
     EvaluateTeachingPlanTool,
@@ -1772,6 +1774,7 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "verify_foresight",
     "improve_teaching_flow",
     "finalize_diagnosis",
+    "render_learning_path",
     "graph_query",
     "ls_create_project",
     "ls_check_annotations",
@@ -1829,6 +1832,7 @@ __all__ = [
     "VerifyForesightTool",
     "ImproveTeachingFlowTool",
     "FinalizeDiagnosisTool",
+    "RenderLearningPathTool",
     "GraphQueryTool",
     "BrainstormTool",
     "CodeExecutionTool",

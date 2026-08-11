@@ -38,6 +38,26 @@ export interface WorkspaceViews {
   next_tasks: string[];
 }
 
+export interface LearningExtension {
+  id: string;
+  name: string;
+  version: string;
+  kind: "visualization" | "skill";
+  description: string;
+  permissions: string[];
+  tools: string[];
+  approved: boolean;
+  installed: boolean;
+  enabled: boolean;
+}
+
+export interface LearningPathDiagram {
+  title: string;
+  nodes: { id: string; label: string; status: "current" | "done" | "next" | "attention" | "goal" }[];
+  edges: { from: string; to: string }[];
+  notice: string;
+}
+
 export interface RadarDimension {
   name: string;
   english: string;
@@ -160,6 +180,28 @@ export function getLearningReport(): Promise<LearningReport> {
 
 export function getWorkspaceViews(): Promise<{ views: WorkspaceViews }> {
   return fetchJSON(`${API_BASE}/workspace/views`);
+}
+
+export function getExtensionCatalog(): Promise<{ extensions: LearningExtension[] }> {
+  return fetchJSON(`${API_BASE}/extensions/catalog`);
+}
+
+export async function installExtension(id: string): Promise<{ extension: LearningExtension }> {
+  const res = await fetch(`${API_BASE}/extensions/${encodeURIComponent(id)}/install`, { method: "POST" });
+  if (!res.ok) throw new Error(`安装扩展失败：${res.status}`);
+  return res.json();
+}
+
+export async function setExtensionEnabled(id: string, enabled: boolean): Promise<{ extension: LearningExtension }> {
+  const res = await fetch(`${API_BASE}/extensions/${encodeURIComponent(id)}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) throw new Error(`更新扩展失败：${res.status}`);
+  return res.json();
+}
+
+export async function getLearningPathDiagram(): Promise<{ diagram: LearningPathDiagram }> {
+  return fetchJSON(`${API_BASE}/extensions/learning-path`);
 }
 
 export function getRadarDimensions(): Promise<{ dimensions: RadarDimension[] }> {

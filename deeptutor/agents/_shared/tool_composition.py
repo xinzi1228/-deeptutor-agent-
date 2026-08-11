@@ -89,6 +89,7 @@ ALWAYS_ON_TOOLS: tuple[str, ...] = (
     "verify_foresight",
     "improve_teaching_flow",
     "finalize_diagnosis",
+    "render_learning_path",
     "graph_query",
 )
 

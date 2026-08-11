@@ -39,6 +39,10 @@ class InboxOrganizeRequest(BaseModel):
     resolved_to: list[str] = []
 
 
+class ExtensionEnabledRequest(BaseModel):
+    enabled: bool
+
+
 def _all_records(scope: str | None = None) -> list[dict[str, Any]]:
     """Load learning records: canonical JSONL store first, L3 memory fallback."""
     try:
@@ -88,6 +92,39 @@ async def report_summary() -> dict[str, Any]:
         "text": text,
         "quality_warnings": audit_learning_copy(text, kind="report", summary=summary),
     }
+
+
+@router.get("/extensions/catalog")
+async def extension_catalog() -> dict[str, Any]:
+    from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+    return {"extensions": ExtensionMarketplaceService().catalog()}
+
+
+@router.post("/extensions/{extension_id}/install")
+async def install_extension(extension_id: str) -> dict[str, Any]:
+    from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+    try:
+        return {"extension": ExtensionMarketplaceService().install(extension_id)}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/extensions/{extension_id}")
+async def set_extension_enabled(extension_id: str, request: ExtensionEnabledRequest) -> dict[str, Any]:
+    from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+    try:
+        return {"extension": ExtensionMarketplaceService().set_enabled(extension_id, request.enabled)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/extensions/learning-path")
+async def extension_learning_path() -> dict[str, Any]:
+    from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+    try:
+        return {"diagram": ExtensionMarketplaceService().learning_path()}
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.get("/workspace")

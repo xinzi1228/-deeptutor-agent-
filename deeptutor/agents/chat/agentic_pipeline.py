@@ -677,7 +677,17 @@ class AgenticChatPipeline:
             forced=PARTNER_BUILTIN_TOOL_NAMES if is_partner else (),
             suppressed=_PARTNER_SUPPRESSED_TOOLS if is_partner else (),
         )
-        return _drop_unconfigured_generation_tools(composed)
+        composed = _drop_unconfigured_generation_tools(composed)
+        # Curated learner extensions are opt-in.  Removing the tool before
+        # schemas are built means an uninstalled extension is invisible to the
+        # model as well as unavailable at execution time.
+        try:
+            from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+            if not ExtensionMarketplaceService().is_enabled("learning-path-diagram"):
+                composed = [name for name in composed if name != "render_learning_path"]
+        except Exception:
+            composed = [name for name in composed if name != "render_learning_path"]
+        return composed
 
     def _active_loop_capabilities(self, context: UnifiedContext) -> tuple[LoopCapability, ...]:
         return active_loop_capabilities(context)

@@ -9,6 +9,8 @@ DeepTutor 的 fork，改造为**数据标注教学平台**（讯飞职教竞赛�
 - **竞赛六模块已落地**：学习计划、会话记忆、任务引导、困难检测、学习报告、练习批改。`docs/session-handoff.md` 是完整交接入口。
 - **三模态标注教学已落地**：文本/图像/视频任务可进入标注台；部分任务携带 AI 预标注，学生需要审阅或找错，系统会展示 AI 与学生的双评差异。改这条链时优先查看 `data/user/workspace/task_bank.json`、`web/components/annotation/`、`annotation_check` 与 `PERSONA.md` 的 `pre_annotation` 规则。
 - **报告与提醒已增强**：`services/learning_communication.py` 从落盘学习记录构造只读事实摘要，`/api/v1/profile/report-summary` 提供进度页“本次学习小结”；定时提醒将该摘要交给 Coach，并在 Coach 未返回时使用确定性文本兜底。不要绕过它自行编造 F1、趋势或薄弱点。
+- **受控扩展市场已落地**：`services/extension_marketplace.py` 仅提供代码审核过的扩展；学生只能在进度页安装、启用或停用，不能提交任意 URL、npm 包、命令或 MCP 配置。首个扩展“学习路径图”会按当前用户工作区生成不超过 9 个节点的路径模型；`agentic_pipeline.py` 会在构建工具 schema 前过滤未启用的 `render_learning_path`，因此模型看不到也无法调用未安装扩展。
+- **Excalidraw 接入状态**：借鉴的 Diagram Generator Skill 规定了图表约束，但未提供可审计的 MCP 服务安装源；目前使用本地、渲染器无关的路径图模型。选择可信 MCP 服务并由管理员在 `/settings/mcp` 配置后，可将其作为该扩展的渲染后端，不能让学生自行配置。
 - **表达质量边界**：报告、提醒必须回答“我现在怎样、为什么这样、下一步做什么”；单次错误只能记为 `unconfirmed`，只有已确认模式才能称作稳定薄弱点。离线质检和样本测试在 `tests/services/test_learning_communication.py`，不应为此给每轮聊天额外增加一次 LLM 调用。
 - **当前 HEAD**：`149950ab`（报告与提醒表达优化）；前一提交 `e3bc0fbd` 是对应设计文档。小改动已提交但尚未统一 push。
 

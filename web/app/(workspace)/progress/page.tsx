@@ -6,6 +6,10 @@ import {
   getLearningOverview,
   getLearningReport,
   getWorkspaceViews,
+  getExtensionCatalog,
+  getLearningPathDiagram,
+  installExtension,
+  setExtensionEnabled,
   getRadarDimensions,
   getF1Trend,
   getSkillTree,
@@ -22,6 +26,8 @@ import {
   type ProfileOverview,
   type LearningReport,
   type WorkspaceViews,
+  type LearningExtension,
+  type LearningPathDiagram,
   type RadarDimension,
   type F1Point,
   type SkillTreeNode,
@@ -63,6 +69,8 @@ export default function ProgressPage() {
   const [overview, setOverview] = useState<ProfileOverview | null>(null);
   const [learningReport, setLearningReport] = useState<LearningReport | null>(null);
   const [workspaceViews, setWorkspaceViews] = useState<WorkspaceViews | null>(null);
+  const [extensions, setExtensions] = useState<LearningExtension[]>([]);
+  const [learningPath, setLearningPath] = useState<LearningPathDiagram | null>(null);
   const [dimensions, setDimensions] = useState<RadarDimension[]>([]);
   const [f1Points, setF1Points] = useState<F1Point[]>([]);
   const [skillTree, setSkillTree] = useState<SkillTreeNode | null>(null);
@@ -79,10 +87,11 @@ export default function ProgressPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, report, workspace, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
+        const [ov, report, workspace, extensionData, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
           getLearningOverview(),
           getLearningReport(),
           getWorkspaceViews(),
+          getExtensionCatalog(),
           getRadarDimensions(),
           getF1Trend(),
           getSkillTree(),
@@ -99,6 +108,7 @@ export default function ProgressPage() {
         setOverview(ov.overview);
         setLearningReport(report);
         setWorkspaceViews(workspace.views);
+        setExtensions(extensionData.extensions);
         setDimensions(radar.dimensions);
         setF1Points(f1.points);
         setSkillTree(tree.tree);
@@ -110,6 +120,10 @@ export default function ProgressPage() {
         setCoachMetrics(cm);
         setKnowledgeGraph(kg);
         setTeachingFlow(tf);
+        const pathExtension = extensionData.extensions.find((item) => item.id === "learning-path-diagram");
+        if (pathExtension?.enabled) {
+          getLearningPathDiagram().then((value) => !cancelled && setLearningPath(value.diagram)).catch(() => undefined);
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load");
       } finally {
@@ -216,6 +230,58 @@ export default function ProgressPage() {
                   <p className="mt-2 line-clamp-2 text-xs text-[var(--muted-foreground)]">{detail}</p>
                 </div>
               ))}
+            </section>
+          )}
+
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold">我的扩展</h2>
+              <p className="mt-1 text-xs text-[var(--muted-foreground)]">只提供老师审核过的功能；不会安装外部命令或读取其他同学的数据。</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {extensions.map((extension) => (
+                <div key={extension.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="text-sm font-medium">{extension.name}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{extension.description}</p></div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          if (!extension.installed) await installExtension(extension.id);
+                          else await setExtensionEnabled(extension.id, !extension.enabled);
+                          const refreshed = await getExtensionCatalog();
+                          setExtensions(refreshed.extensions);
+                          if (extension.id === "learning-path-diagram") {
+                            const next = refreshed.extensions.find((item) => item.id === extension.id);
+                            setLearningPath(next?.enabled ? (await getLearningPathDiagram()).diagram : null);
+                          }
+                        } catch (e: any) { setError(e.message || "扩展操作失败"); }
+                      }}
+                      className="shrink-0 rounded-md border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--muted)]"
+                    >
+                      {!extension.installed ? "安装" : extension.enabled ? "停用" : "启用"}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">权限：{extension.permissions.join("、")}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {learningPath && (
+            <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+              <h2 className="text-sm font-semibold">{learningPath.title}</h2>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {learningPath.nodes.map((node, index) => (
+                  <div key={node.id} className="flex items-center gap-2">
+                    {index > 0 && <span className="text-[var(--muted-foreground)]">→</span>}
+                    <span className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs">
+                      {node.status === "done" ? "✓ " : node.status === "attention" ? "! " : node.status === "goal" ? "★ " : "• "}{node.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-[var(--muted-foreground)]">{learningPath.notice}</p>
             </section>
           )}
 
