@@ -722,6 +722,13 @@ export default function ChatPage() {
           const isDoubt = localStorage.getItem("annotation_doubt") === "1";
           localStorage.removeItem("annotation_doubt");
           const finalMsg = isDoubt ? `[学生有疑问，优先回应] ${pendingMsg}` : pendingMsg;
+          if (isDoubt) {
+            void fetch("/api/v1/profile/workspace/inbox", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ raw_text: pendingMsg, source: "annotation", context: { session_id: state.sessionId } }),
+            }).catch(() => undefined);
+          }
           // 评分卡：读最近结果 → 调评分端点 → 渲染
           const rawResult = localStorage.getItem("annotation_last_result");
           localStorage.removeItem("annotation_last_result");
