@@ -35,6 +35,9 @@ class InboxCreateRequest(BaseModel):
     source: str = "chat"
     context: dict[str, Any] = {}
 
+class InboxOrganizeRequest(BaseModel):
+    resolved_to: list[str] = []
+
 
 def _all_records(scope: str | None = None) -> list[dict[str, Any]]:
     """Load learning records: canonical JSONL store first, L3 memory fallback."""
@@ -113,6 +116,12 @@ async def create_workspace_inbox(request: InboxCreateRequest) -> dict[str, Any]:
         return {"item": LearningWorkspaceService().add_inbox(request.raw_text, source=request.source, context=request.context)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@router.post("/workspace/inbox/{item_id}/organize")
+async def organize_workspace_inbox(item_id: str, request: InboxOrganizeRequest) -> dict[str, Any]:
+    from deeptutor.services.learning_workspace import LearningWorkspaceService
+    try: return {"item": LearningWorkspaceService().organize_inbox(item_id, resolved_to=request.resolved_to)}
+    except ValueError as exc: raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/workspace/rebuild")

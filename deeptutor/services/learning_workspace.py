@@ -116,5 +116,16 @@ class LearningWorkspaceService:
         except Exception: pass
         return {"inbox": self.list_inbox(), "mastered": mastered, "confirmed_errors": errors, "next_tasks": next_tasks[:3], "relations": {"inbox_to_task": [{"inbox_id": i["id"], "task_id": i.get("context", {}).get("task_id")} for i in self.list_inbox() if i.get("context", {}).get("task_id")]}}
 
+    def organize_inbox(self, item_id: str, *, resolved_to: list[str]) -> dict[str, Any]:
+        rows = self.list_inbox(status=None)
+        found = False
+        for item in rows:
+            if item.get("id") == item_id:
+                item["status"] = "organized"; item["resolved_to"] = resolved_to; item["organized_at"] = datetime.now(tz=timezone.utc).isoformat(); found = True
+        if not found: raise ValueError("未找到待整理问题")
+        from deeptutor.services.file_io import atomic_write_text
+        atomic_write_text(self.inbox_file, "\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n")
+        return next(item for item in rows if item.get("id") == item_id)
+
 
 __all__ = ["LearningWorkspaceService"]
