@@ -80,12 +80,19 @@ export function ChatChartCard({ chart }: { chart: ChartData }) {
 
 function RadarCard({ labels, values }: { labels: string[]; values: number[] }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  const chartRef = useRef<{ destroy: () => void } | null>(null);
   useEffect(() => {
-    if (!ref.current) return;
-    let chart: any;
+    const canvas = ref.current;
+    if (!canvas) return;
+    let cancelled = false;
     import("chart.js/auto").then(({ default: Chart }) => {
-      if (!ref.current) return;
-      chart = new Chart(ref.current, {
+      if (cancelled || ref.current !== canvas) return;
+      // React dev mode may run an effect twice while the dynamic import is
+      // pending. Destroy both our tracked instance and any orphan attached to
+      // this canvas before constructing a replacement.
+      chartRef.current?.destroy();
+      Chart.getChart(canvas)?.destroy();
+      chartRef.current = new Chart(canvas, {
         type: "radar",
         data: {
           labels,
@@ -94,7 +101,11 @@ function RadarCard({ labels, values }: { labels: string[]; values: number[] }) {
         options: { scales: { r: { min: 0, max: 100 } } },
       });
     });
-    return () => chart?.destroy();
+    return () => {
+      cancelled = true;
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
   }, [labels, values]);
   return (
     <div className="my-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-2">
