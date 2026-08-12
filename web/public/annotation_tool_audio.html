@@ -559,6 +559,16 @@ window.addEventListener('resize', () => {
     drawTimeline();
   }
 });
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin || event.data?.type !== 'load_annotation_task') return;
+  const task = event.data.task;
+  if (!task || typeof task.id !== 'string' || !Array.isArray(task.labels)) return;
+  TASKS[task.id] = { ...task, url: task.media_url, gt: task.ground_truth, desc: task.instruction || task.title };
+  const select = document.getElementById('taskSelect');
+  if (!select.querySelector(`option[value="${CSS.escape(task.id)}"]`)) select.add(new Option(`${task.id}: ${task.title}`, task.id));
+  select.value = task.id;
+  loadTask();
+});
 loadTask();
 checkStoredResult();
 </script>

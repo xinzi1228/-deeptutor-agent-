@@ -153,6 +153,7 @@ export default function ProgressPage() {
   }
 
   return (
+    <div className="h-full overflow-y-auto">
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
       <div className="flex items-center gap-3">
         <TrendingUp className="h-6 w-6 text-blue-500" />
@@ -368,6 +369,7 @@ export default function ProgressPage() {
           <CoachMetricsPanel metrics={coachMetrics} />
         </>
       )}
+    </div>
     </div>
   );
 }

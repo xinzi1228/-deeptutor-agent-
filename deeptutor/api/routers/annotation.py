@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -35,6 +37,21 @@ _REPORTERS = {
     "video_event": annotation_check._video_event_report,
     "ner": annotation_check._ner_report,
 }
+
+
+def _task_bank() -> dict[str, dict[str, Any]]:
+    from deeptutor.services.path_service import get_path_service
+
+    bank_path = get_path_service().get_workspace_dir() / "task_bank.json"
+    if not bank_path.exists():
+        raise HTTPException(status_code=404, detail="task_bank 不存在")
+    try:
+        bank = json.loads(bank_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=500, detail="task_bank 格式错误") from exc
+    if not isinstance(bank, dict):
+        raise HTTPException(status_code=500, detail="task_bank 必须是对象")
+    return {str(key): value for key, value in bank.items() if isinstance(value, dict)}
 
 
 def _load_json_list(raw: Any, field: str) -> list[dict]:
@@ -112,12 +129,43 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
 @router.get("/ground-truth/{task_id}")
 async def ground_truth(task_id: str) -> dict[str, Any]:
     """Look up a task's ground truth by task id (from task_bank.json)."""
-    from deeptutor.services.path_service import get_path_service
-
-    bank_path = get_path_service().get_workspace_dir() / "task_bank.json"
-    if not bank_path.exists():
-        raise HTTPException(status_code=404, detail="task_bank 不存在")
-    bank = json.loads(bank_path.read_text(encoding="utf-8"))
+    bank = _task_bank()
     if task_id in bank:
         return {"task_id": task_id, "ground_truth": bank[task_id].get("ground_truth", [])}
     raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")
+
+
+@router.get("/tasks")
+async def list_annotation_tasks() -> dict[str, Any]:
+    """Return safe task summaries for the learner-owned annotation workbench."""
+    tasks = []
+    for task_id, task in _task_bank().items():
+        tasks.append({
+            "id": task_id,
+            "title": task.get("title", task_id),
+            "type": task.get("type", "bbox"),
+            "modal": task.get("modal", "image"),
+            "difficulty": task.get("difficulty", ""),
+            "instruction": task.get("instruction", ""),
+        })
+    return {"tasks": tasks}
+
+
+@router.get("/tasks/{task_id}")
+async def get_annotation_task(task_id: str) -> dict[str, Any]:
+    task = _task_bank().get(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")
+    return {"task": {"id": task_id, **task}}
+
+
+@router.get("/label-studio-status")
+async def label_studio_status() -> dict[str, Any]:
+    """Probe the local optional service so the UI can explain an unavailable iframe."""
+    url = "http://127.0.0.1:8080/"
+    try:
+        with urlopen(Request(url, method="HEAD"), timeout=2) as response:
+            available = 200 <= response.status < 500
+            return {"available": available, "url": url, "status": response.status}
+    except (URLError, OSError, TimeoutError) as exc:
+        return {"available": False, "url": url, "detail": str(exc.reason) if isinstance(exc, URLError) else "服务未启动"}

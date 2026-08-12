@@ -14,14 +14,13 @@ import {
   ChatChartCard,
   type ChartData,
 } from "@/components/chat/home/ChatChartCard";
-import {
-  readStoredActiveSessionId,
-  readStoredLanguage,
-} from "@/context/app-shell-storage";
+import { readStoredLanguage } from "@/context/app-shell-storage";
 
 const STRUGGLE_POLL_MS = 30_000;
 const STRUGGLE_WINDOW_MS = 60_000;
 const SHORTCUT_DISMISS_KEY = "annotation.coach.shortcuts.dismissed";
+const COACH_SESSION_KEY = "annotation.coach.session_id";
+const COACH_POSITION_KEY = "annotation.coach.position";
 
 interface CoachMessage {
   role: "user" | "coach";
@@ -226,9 +225,59 @@ export default function AnnotationCoach({
   }, [quickUses]);
 
   const clientRef = useRef<UnifiedWSClient | null>(null);
-  const sessionIdRef = useRef<string>(sessionId || readStoredActiveSessionId() || "");
+  const sessionIdRef = useRef<string>(sessionId);
   const shownStrugglesRef = useRef<Set<string>>(new Set());
   const listEndRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState({ right: 20, bottom: 20 });
+  const dragRef = useRef<{ startX: number; startY: number; right: number; bottom: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  useEffect(() => {
+    if (!sessionIdRef.current) {
+      try {
+        const stored = window.localStorage.getItem(COACH_SESSION_KEY);
+        sessionIdRef.current = stored || `annotation-coach-${crypto.randomUUID()}`;
+        window.localStorage.setItem(COACH_SESSION_KEY, sessionIdRef.current);
+      } catch {
+        sessionIdRef.current = `annotation-coach-${Date.now()}`;
+      }
+    }
+    try {
+      const raw = window.localStorage.getItem(COACH_POSITION_KEY);
+      if (raw) {
+        const stored = JSON.parse(raw) as { right?: number; bottom?: number };
+        if (Number.isFinite(stored.right) && Number.isFinite(stored.bottom)) {
+          setPosition({ right: Math.max(12, Number(stored.right)), bottom: Math.max(12, Number(stored.bottom)) });
+        }
+      }
+    } catch { /* use default */ }
+  }, []);
+
+  const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    dragRef.current = { startX: event.clientX, startY: event.clientY, right: position.right, bottom: position.bottom, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    const next = {
+      right: Math.min(Math.max(12, drag.right - dx), Math.max(12, window.innerWidth - 70)),
+      bottom: Math.min(Math.max(12, drag.bottom - dy), Math.max(12, window.innerHeight - 70)),
+    };
+    setPosition(next);
+  };
+
+  const onPointerUp = () => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (!drag) return;
+    suppressClickRef.current = drag.moved;
+    try { window.localStorage.setItem(COACH_POSITION_KEY, JSON.stringify(position)); } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     try {
@@ -468,7 +517,7 @@ export default function AnnotationCoach({
   const ringClass = flashActive ? STATUS_RING.flash : STATUS_RING[coachStatus];
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+    <div className="fixed z-50 flex flex-col items-end gap-3" style={{ right: position.right, bottom: position.bottom }}>
       {hint && (
         <div className="relative max-w-[260px] rounded-2xl rounded-br-sm border border-[var(--border)] bg-[var(--card)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--foreground)] shadow-lg">
           <button
@@ -639,7 +688,16 @@ export default function AnnotationCoach({
 
       <button
         aria-label="toggle annotation coach"
-        onClick={() => setOpen((v) => !v)}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onClick={() => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+          }
+          setOpen((v) => !v);
+        }}
         className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 ${ringClass} bg-[var(--primary)] text-2xl shadow-lg transition-transform hover:scale-105`}
       >
         <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-[var(--primary)] opacity-30" />

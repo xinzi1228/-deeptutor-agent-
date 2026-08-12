@@ -517,6 +517,21 @@ async function initTasks() {
 }
 
 initTasks();
+
+// The surrounding annotation page can also select a task from the shared
+// task bank and send it to this already-loaded iframe.
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin || event.data?.type !== 'load_annotation_task') return;
+  const task = event.data.task;
+  if (!task || typeof task.id !== 'string' || !Array.isArray(task.labels)) return;
+  const typeMap = { classification: 'text_classification', judgment: 'text_judgment', error_case: 'text_error_case' };
+  TASKS[task.id] = { ...task, type: typeMap[task.type] || task.type, gt: task.ground_truth, desc: task.instruction || task.title };
+  const select = document.getElementById('taskSelect');
+  if (!select.querySelector(`option[value="${CSS.escape(task.id)}"]`)) select.add(new Option(`${task.id}: ${task.title}`, task.id));
+  select.value = task.id;
+  loadTask();
+});
+loadTask();
 </script>
 </body>
 </html>

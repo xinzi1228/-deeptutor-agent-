@@ -73,6 +73,24 @@ def test_check_bbox_pre_annotation_double_scoring(client: TestClient) -> None:
     assert data["improvement"] < 0  # 学生多画一个多余框, F1 < AI 预标注
 
 
+def test_task_catalog_exposes_summaries_without_answers(client: TestClient) -> None:
+    res = client.get(f"{API}/tasks")
+
+    assert res.status_code == 200
+    tasks = res.json()["tasks"]
+    assert tasks
+    assert {"id", "title", "type", "modal"} <= set(tasks[0])
+    assert "ground_truth" not in tasks[0]
+
+
+def test_task_detail_exposes_a_selected_task(client: TestClient) -> None:
+    res = client.get(f"{API}/tasks/task1")
+
+    assert res.status_code == 200
+    assert res.json()["task"]["id"] == "task1"
+    assert "ground_truth" in res.json()["task"]
+
+
 def test_check_bbox_pre_annotation_malformed_ignored(client: TestClient) -> None:
     """pre_annotation 格式错误时忽略, 不阻塞正常评分."""
     res = client.post(
