@@ -5,10 +5,15 @@ from __future__ import annotations
 from contextvars import ContextVar, Token
 from typing import Any
 
+from deeptutor.services.learning_profiles.models import ProfileAccessContext
+
 from .models import CurrentUser
 from .paths import local_admin_user, scope_for_user
 
 _current_user: ContextVar[CurrentUser | None] = ContextVar("deeptutor_current_user", default=None)
+_current_learning_profile: ContextVar[ProfileAccessContext | None] = ContextVar(
+    "deeptutor_current_learning_profile", default=None
+)
 
 
 def set_current_user(user: CurrentUser) -> Token[CurrentUser | None]:
@@ -25,6 +30,20 @@ def get_current_user() -> CurrentUser:
 
 def get_current_user_or_none() -> CurrentUser | None:
     return _current_user.get()
+
+
+def set_current_learning_profile(
+    profile: ProfileAccessContext | None,
+) -> Token[ProfileAccessContext | None]:
+    return _current_learning_profile.set(profile)
+
+
+def reset_current_learning_profile(token: Token[ProfileAccessContext | None]) -> None:
+    _current_learning_profile.reset(token)
+
+
+def get_current_learning_profile() -> ProfileAccessContext | None:
+    return _current_learning_profile.get()
 
 
 def user_from_token_payload(payload: Any | None) -> CurrentUser:

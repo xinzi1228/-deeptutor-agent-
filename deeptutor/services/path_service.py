@@ -127,7 +127,20 @@ class PathService:
         return self._workspace_root / "parse_cache"
 
     def get_chat_history_db(self) -> Path:
+        profile_root = self._active_learning_profile_root()
+        if profile_root is not None:
+            return profile_root / "sessions" / "chat_history.db"
         return self._user_data_dir / "chat_history.db"
+
+    @staticmethod
+    def _active_learning_profile_root() -> Path | None:
+        """Resolve profile-private data lazily to avoid service import cycles."""
+        try:
+            from deeptutor.multi_user.paths import get_current_learning_profile_root
+
+            return get_current_learning_profile_root(require_unlocked=False)
+        except (ImportError, PermissionError, RuntimeError):
+            return None
 
     def get_public_outputs_root(self) -> Path:
         return self._user_data_dir
@@ -259,6 +272,9 @@ class PathService:
         return self.get_notebook_dir() / "notebooks_index.json"
 
     def get_memory_dir(self) -> Path:
+        profile_root = self._active_learning_profile_root()
+        if profile_root is not None:
+            return profile_root / "memory"
         new_dir = self.workspace_root / "memory"
         old_dir = self.get_workspace_feature_dir("memory")
         if self.workspace_root == (self.project_root / "data").resolve() and old_dir.exists():

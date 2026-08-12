@@ -52,9 +52,15 @@ class LearningRecordStore:
     """Append-only JSONL store for structured learning records."""
 
     def __init__(self) -> None:
+        from deeptutor.multi_user.paths import get_current_learning_profile_root
         from deeptutor.services.path_service import get_path_service
 
-        self._root = get_path_service().get_workspace_dir() / "learning"
+        profile_root = get_current_learning_profile_root(require_unlocked=False)
+        self._root = (
+            profile_root / "learning"
+            if profile_root is not None
+            else get_path_service().get_workspace_dir() / "learning"
+        )
         self._file = self._root / "records.jsonl"
 
     @property

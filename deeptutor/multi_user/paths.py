@@ -151,6 +151,26 @@ def get_current_path_service() -> PathService:
     return get_path_service_for_scope(user.scope)
 
 
+def get_current_learning_profile_root(*, require_unlocked: bool = True) -> Path | None:
+    """Return the active profile's private root without moving account settings.
+
+    Knowledge bases, model/MCP/Skill configuration and other account assets
+    continue to use :func:`get_current_path_service`; only learning data should
+    call this function.
+    """
+    from .context import get_current_learning_profile
+
+    access = get_current_learning_profile()
+    if access is None:
+        if require_unlocked:
+            raise PermissionError("请先解锁学习档案")
+        return None
+    account_workspace = get_current_path_service().get_workspace_dir()
+    from deeptutor.services.learning_profiles.store import LearningProfileStore
+
+    return LearningProfileStore(account_workspace).ensure_profile_dirs(access.profile_id)
+
+
 def get_owner_path_service() -> PathService:
     """Resolve to the root of the human account that owns the current scope.
 

@@ -29,7 +29,7 @@ from deeptutor.services.config import load_auth_settings
 _SECURE = bool(load_auth_settings()["cookie_secure"])
 _SAMESITE = "none" if _SECURE else "lax"
 
-from deeptutor.multi_user.context import set_current_user, user_from_token_payload
+from deeptutor.multi_user.context import get_current_user, set_current_user, user_from_token_payload
 from deeptutor.multi_user.paths import local_admin_user
 from deeptutor.services.auth import (
     AUTH_ENABLED,
@@ -237,6 +237,7 @@ def _install_current_user(payload: TokenPayload | None) -> _CtxToken:
 async def require_auth(
     authorization: str | None = Header(default=None, alias="Authorization"),
     dt_token: str | None = Cookie(default=None),
+    dt_learning_profile: str | None = Cookie(default=None),
 ) -> TokenPayload | None:
     """
     FastAPI dependency that enforces authentication when AUTH_ENABLED=true.
@@ -262,6 +263,7 @@ async def require_auth(
     """
     if not AUTH_ENABLED:
         _install_current_user(None)
+        _install_learning_profile(dt_learning_profile)
         return None
 
     token = _extract_token(authorization, dt_token)
@@ -281,7 +283,23 @@ async def require_auth(
         )
 
     _install_current_user(payload)
+    _install_learning_profile(dt_learning_profile)
     return payload
+
+
+def _install_learning_profile(raw_grant: str | None) -> None:
+    """Resolve the revocable profile cookie after account auth is installed."""
+    from deeptutor.multi_user.context import set_current_learning_profile
+    from deeptutor.multi_user.paths import get_current_path_service
+    from deeptutor.services.learning_profiles.grants import ProfileGrantStore
+
+    if not raw_grant:
+        set_current_learning_profile(None)
+        return
+    user = get_current_user()
+    workspace = get_current_path_service().get_workspace_dir()
+    access = ProfileGrantStore(workspace).validate(raw_grant, user.id)
+    set_current_learning_profile(access)
 
 
 class _WsAuthFailed:
@@ -313,7 +331,9 @@ async def ws_require_auth(ws: WebSocket) -> _CtxToken | _WsAuthFailed:
             reset_current_user(user_token)
     """
     if not AUTH_ENABLED:
-        return _install_current_user(None)
+        token = _install_current_user(None)
+        _install_learning_profile(ws.cookies.get("dt_learning_profile"))
+        return token
 
     token = ws.query_params.get("token") or ws.cookies.get(_COOKIE_NAME)
     payload = decode_token(token) if token else None
@@ -321,7 +341,9 @@ async def ws_require_auth(ws: WebSocket) -> _CtxToken | _WsAuthFailed:
         await ws.close(code=4001)
         return ws_auth_failed
 
-    return _install_current_user(payload)
+    user_token = _install_current_user(payload)
+    _install_learning_profile(ws.cookies.get("dt_learning_profile"))
+    return user_token
 
 
 async def require_admin(
@@ -488,6 +510,8 @@ async def logout(response: Response) -> dict:
     (see the rationale there and #623).
     """
     response.delete_cookie(**_cookie_attrs())
+    from deeptutor.api.routers.learning_profiles import COOKIE_NAME as profile_cookie
+    response.delete_cookie(key=profile_cookie, path="/", samesite=_SAMESITE, secure=_SECURE, httponly=True)
     return {"ok": True}
 
 

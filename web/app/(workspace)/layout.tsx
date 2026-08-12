@@ -2,6 +2,8 @@ import WorkspaceSidebar from "@/components/sidebar/WorkspaceSidebar";
 import { CapabilityAccessProvider } from "@/components/access/CapabilityAccessContext";
 import CapabilityGate from "@/components/access/CapabilityGate";
 import { UnifiedChatProvider } from "@/context/UnifiedChatContext";
+import { LearningProfileProvider } from "@/components/learning-profiles/LearningProfileContext";
+import { ProfileLockBanner } from "@/components/learning-profiles/ProfileLockBanner";
 
 export default function WorkspaceLayout({
   children,
@@ -10,14 +12,16 @@ export default function WorkspaceLayout({
 }>) {
   return (
     <CapabilityAccessProvider>
-      <UnifiedChatProvider>
+      <LearningProfileProvider>
+        <UnifiedChatProvider>
         <div className="flex h-screen overflow-hidden">
           <WorkspaceSidebar />
           <main className="flex-1 overflow-hidden bg-[var(--background)]">
-            <CapabilityGate>{children}</CapabilityGate>
+            <CapabilityGate><ProfileLockBanner>{children}</ProfileLockBanner></CapabilityGate>
           </main>
         </div>
-      </UnifiedChatProvider>
+        </UnifiedChatProvider>
+      </LearningProfileProvider>
     </CapabilityAccessProvider>
   );
 }

@@ -8,6 +8,7 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import { AdminLink } from "@/components/auth/AdminLink";
 import { ProfileLink } from "@/components/auth/ProfileLink";
 import { useUnifiedChat } from "@/context/UnifiedChatContext";
+import { ProfileSwitcher } from "@/components/learning-profiles/ProfileSwitcher";
 import {
   deleteSession,
   listSessions,
@@ -51,6 +52,17 @@ export default function WorkspaceSidebar() {
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions, sidebarRefreshToken]);
+
+  useEffect(() => {
+    const handleProfileChange = () => {
+      cancelStreamingTurn();
+      newSession();
+      void refreshSessions();
+      router.push("/home");
+    };
+    window.addEventListener("deeptutor:learning-profile-changed", handleProfileChange);
+    return () => window.removeEventListener("deeptutor:learning-profile-changed", handleProfileChange);
+  }, [cancelStreamingTurn, newSession, refreshSessions, router]);
 
   const orderedSessions = sessions
     .map((session, index) => {
@@ -135,6 +147,7 @@ export default function WorkspaceSidebar() {
       onDeleteSession={handleDeleteSession}
       footerSlot={(collapsed) => (
         <>
+          <ProfileSwitcher collapsed={collapsed} />
           <ProfileLink collapsed={collapsed} />
           <AdminLink collapsed={collapsed} />
           <LogoutButton collapsed={collapsed} />
