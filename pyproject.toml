@@ -419,6 +419,7 @@ testpaths = ["tests", "deeptutor/learning/tests"]
 pythonpath = ["."]
 markers = [
     "asyncio: mark async tests that require pytest-asyncio",
+    "integration: mark tests that require explicitly started external services",
 ]
 asyncio_default_fixture_loop_scope = "function"
 addopts = [

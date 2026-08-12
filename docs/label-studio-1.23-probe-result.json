@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-12T17:23:21.989712+00:00",
+  "target": {
+    "origin": "http://127.0.0.1:18080",
+    "version": {
+      "release": "1.23.0",
+      "label-studio-os-package": {
+        "version": "1.23.0",
+        "short_version": "1.23",
+        "latest_version_from_pypi": "1.23.0",
+        "latest_version_upload_time": "2026-03-13T08:20:25",
+        "current_version_is_outdated": false
+      },
+      "label-studio-os-backend": {
+        "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+        "commit": "2a9bfbcbf0a844b999de97e601d16050a893f5fb",
+        "date": "2026/03/11 10:45:12",
+        "branch": "",
+        "version": "1.23.0+0.g2a9bfbc"
+      },
+      "label-studio-frontend": {
+        "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+        "commit": "2a9bfb",
+        "date": "2026-03-11T14:45:12.000Z",
+        "branch": "develop"
+      },
+      "dm2": {
+        "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+        "commit": "2a9bfb",
+        "date": "2026-03-11T14:45:12.000Z",
+        "branch": "develop"
+      },
+      "label-studio-converter": {
+        "version": "2.0.18"
+      },
+      "edition": "Community",
+      "lsf": {
+        "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+        "commit": "2a9bfb",
+        "date": "2026-03-11T14:45:12.000Z",
+        "branch": "develop"
+      },
+      "backend": {
+        "commit": "2a9bfb"
+      }
+    }
+  },
+  "live": true,
+  "checks": [
+    {
+      "id": "health",
+      "status": "supported",
+      "summary": "服务健康检查",
+      "evidence": {
+        "http_status": 200
+      }
+    },
+    {
+      "id": "version",
+      "status": "supported",
+      "summary": "版本接口",
+      "evidence": {
+        "http_status": 200,
+        "response": {
+          "release": "1.23.0",
+          "label-studio-os-package": {
+            "version": "1.23.0",
+            "short_version": "1.23",
+            "latest_version_from_pypi": "1.23.0",
+            "latest_version_upload_time": "2026-03-13T08:20:25",
+            "current_version_is_outdated": false
+          },
+          "label-studio-os-backend": {
+            "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+            "commit": "2a9bfbcbf0a844b999de97e601d16050a893f5fb",
+            "date": "2026/03/11 10:45:12",
+            "branch": "",
+            "version": "1.23.0+0.g2a9bfbc"
+          },
+          "label-studio-frontend": {
+            "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+            "commit": "2a9bfb",
+            "date": "2026-03-11T14:45:12.000Z",
+            "branch": "develop"
+          },
+          "dm2": {
+            "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+            "commit": "2a9bfb",
+            "date": "2026-03-11T14:45:12.000Z",
+            "branch": "develop"
+          },
+          "label-studio-converter": {
+            "version": "2.0.18"
+          },
+          "edition": "Community",
+          "lsf": {
+            "message": "fix: BROS-847: Disable Submit/Update/Fix & Accept button when polygon  ...",
+            "commit": "2a9bfb",
+            "date": "2026-03-11T14:45:12.000Z",
+            "branch": "develop"
+          },
+          "backend": {
+            "commit": "2a9bfb"
+          }
+        }
+      }
+    },
+    {
+      "id": "service_token",
+      "status": "supported",
+      "summary": "服务 Token 认证",
+      "evidence": {
+        "http_status": 200
+      }
+    },
+    {
+      "id": "iframe_headers",
+      "status": "supported",
+      "summary": "网页嵌入响应头检查（仍需浏览器 E2E 验证 Cookie）",
+      "evidence": {
+        "http_status": 200,
+        "headers": {
+          "x-frame-options": "",
+          "content-security-policy": ""
+        }
+      }
+    },
+    {
+      "id": "service_project_task_api",
+      "status": "supported",
+      "summary": "服务账号创建项目并导入任务",
+      "evidence": {
+        "project_create_statuses": [
+          201,
+          201
+        ],
+        "import_status": 201,
+        "imported_task_count": 2
+      }
+    },
+    {
+      "id": "user_creation_api",
+      "status": "limited",
+      "summary": "用户 API 可创建组织成员，但官方序列化器不接收密码，不能直接建立隐藏网页登录身份。",
+      "evidence": {
+        "http_status": 201,
+        "password_field_supported": false
+      }
+    },
+    {
+      "id": "web_sessions",
+      "status": "limited",
+      "summary": "网页表单可建立独立 Cookie 会话，但不是稳定的后端身份 API，跨源 iframe 还受 SameSite/CSRF 约束。",
+      "evidence": {
+        "signup_statuses": [
+          302,
+          302
+        ],
+        "whoami_statuses": [
+          200,
+          200
+        ],
+        "direct_task_statuses": [
+          200,
+          200
+        ]
+      }
+    },
+    {
+      "id": "project_isolation",
+      "status": "unsupported",
+      "summary": "同一组织的身份可发现或直接访问其他身份项目，社区版原生权限不能承担学生隔离。",
+      "evidence": {
+        "list_status": 200,
+        "owner_project_visible": true,
+        "direct_access_status": 200
+      }
+    },
+    {
+      "id": "annotation_attribution",
+      "status": "supported",
+      "summary": "两个网页登录身份提交标注并检查 annotator 可追溯性。",
+      "evidence": {
+        "http_statuses": [
+          201,
+          201
+        ],
+        "distinct_annotators": true
+      }
+    }
+  ],
+  "decision": {
+    "strategy": "per_profile_project_with_same_origin_gateway",
+    "summary": "Label Studio CE 不能直接承担档案隔离；必须由标注星图后端白名单网关限制项目/任务，且不可暴露管理页。"
+  }
+}
