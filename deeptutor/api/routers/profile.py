@@ -313,3 +313,14 @@ async def teaching_changes(limit: int = 20) -> dict[str, Any]:
 
     rows = TeachingChangelog().list_changes(limit=max(1, min(limit, 100)))
     return {"changes": rows}
+
+
+@router.get("/competency-tree")
+async def competency_tree() -> dict[str, Any]:
+    """Full competency tree from data/user/workspace/competency_tree.json."""
+    from pathlib import Path
+
+    tree_path = Path(__file__).parent.parent.parent.parent / "data" / "user" / "workspace" / "competency_tree.json"
+    if not tree_path.exists():
+        return {"tree": None, "error": "competency_tree.json not found"}
+    return json.loads(tree_path.read_text(encoding="utf-8"))

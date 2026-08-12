@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Clock,
   Github,
+  GitBranch,
   House,
   Lock,
   PanelLeftClose,

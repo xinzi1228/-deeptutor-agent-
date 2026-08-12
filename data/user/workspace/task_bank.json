@@ -1181,5 +1181,3365 @@
         "text": "标注结果中的实体应按文本中出现的顺序排列，同类型实体可合并。"
       }
     ]
+  },
+  "task23": {
+    "title": "模糊无法辨认图片如何处理？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "模糊无法辨认图片如何处理？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "模糊无法辨认图片如何处理？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "图像分类/判断"
+    ],
+    "explanation": "标\"不确定\"是标准处理随意分类污染数据。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 标注为\"不确定\"类别"
+      },
+      {
+        "id": "B",
+        "text": "B. 随意选一个类别"
+      },
+      {
+        "id": "C",
+        "text": "C. 跳过不标注"
+      },
+      {
+        "id": "D",
+        "text": "D. 询问同事后再标"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task24"
+  },
+  "task24": {
+    "title": "矩形框边缘应？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "矩形框边缘应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "矩形框边缘应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "矩形框标注"
+    ],
+    "explanation": "紧贴外轮廓最大化IoU留边距降低精度。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 紧贴目标外轮廓"
+      },
+      {
+        "id": "B",
+        "text": "B. 留出10px边距"
+      },
+      {
+        "id": "C",
+        "text": "C. 包含部分背景区域"
+      },
+      {
+        "id": "D",
+        "text": "D. 框越大越好"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task25"
+  },
+  "task25": {
+    "title": "哪个目标应标注？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "哪个目标应标注？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "哪个目标应标注？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "图像检测(目标检测)"
+    ],
+    "explanation": "遮挡<50%正常标50-70%标部分遮挡>70%跳过。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 遮挡<50%正常标可见部分"
+      },
+      {
+        "id": "B",
+        "text": "B. 遮挡<30%正常标"
+      },
+      {
+        "id": "C",
+        "text": "C. 所有遮挡都跳过"
+      },
+      {
+        "id": "D",
+        "text": "D. 遮挡标完整轮廓含遮挡"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task26"
+  },
+  "task26": {
+    "title": "stuff类别(天空/道路)实例ID应？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "stuff类别(天空/道路)实例ID应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "stuff类别(天空/道路)实例ID应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "矩形框标注"
+    ],
+    "explanation": "stuff不需区分实例ID=0;things需独立ID。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 实例ID统一为0"
+      },
+      {
+        "id": "B",
+        "text": "B. 实例ID从1递增"
+      },
+      {
+        "id": "C",
+        "text": "C. 不分配实例ID"
+      },
+      {
+        "id": "D",
+        "text": "D. 与things共用ID"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task27"
+  },
+  "task27": {
+    "title": "数字\"123\"应转写为？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "数字\"123\"应转写为？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "数字\"123\"应转写为？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "土地覆盖分类标注"
+    ],
+    "explanation": "中文ASR规范数字转中文小写\"一百二十三\"。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 一百二十三"
+      },
+      {
+        "id": "B",
+        "text": "B. 123"
+      },
+      {
+        "id": "C",
+        "text": "C. 一二三"
+      },
+      {
+        "id": "D",
+        "text": "D. 壹佰贰拾叁"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task28"
+  },
+  "task28": {
+    "title": "情绪判定主要依据？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "情绪判定主要依据？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "情绪判定主要依据？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "文本检测OCR进阶(挑战)"
+    ],
+    "explanation": "声音特征(音高/语速/音量/音色)非内容。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 声音特征(音高/语速/音量/音色)"
+      },
+      {
+        "id": "B",
+        "text": "B. 说话的内容语义"
+      },
+      {
+        "id": "C",
+        "text": "C. 说话人面部表情"
+      },
+      {
+        "id": "D",
+        "text": "D. 对话的主题"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task29"
+  },
+  "task29": {
+    "title": "目标遮挡<30帧恢复应？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "目标遮挡<30帧恢复应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "目标遮挡<30帧恢复应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "语种识别基础"
+    ],
+    "explanation": "保持原ID不变追踪标注核心要求。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 保持原ID不变"
+      },
+      {
+        "id": "B",
+        "text": "B. 分配新ID重新追踪"
+      },
+      {
+        "id": "C",
+        "text": "C. 标记为消失"
+      },
+      {
+        "id": "D",
+        "text": "D. 等待审核决定"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task30"
+  },
+  "task30": {
+    "title": "密集描述每片段长度？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "密集描述每片段长度？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "密集描述每片段长度？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "语音分割"
+    ],
+    "explanation": "1-2句话片段3-30秒保持粒度均衡。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 1-2句话片段3-30秒"
+      },
+      {
+        "id": "B",
+        "text": "B. 3-5句话片段1-2分钟"
+      },
+      {
+        "id": "C",
+        "text": "C. 一句片段时长任意"
+      },
+      {
+        "id": "D",
+        "text": "D. 越多越详细越好"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task31"
+  },
+  "task31": {
+    "title": "BIO中B代表？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "BIO中B代表？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "BIO中B代表？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "声纹识别"
+    ],
+    "explanation": "B=Begin实体开始I=Inside实体内部O=Outside非实体。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. Begin(实体开始)"
+      },
+      {
+        "id": "B",
+        "text": "B. Background(背景)"
+      },
+      {
+        "id": "C",
+        "text": "C. Between(中间)"
+      },
+      {
+        "id": "D",
+        "text": "D. Bracket(括号)"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task32"
+  },
+  "task32": {
+    "title": "\"马云创立阿里巴巴\"正确三元组？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "\"马云创立阿里巴巴\"正确三元组？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "\"马云创立阿里巴巴\"正确三元组？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "标注质量与准确率标准"
+    ],
+    "explanation": "(马云,founder_of,阿里巴巴)注意方向。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. (马云,founder_of,阿里巴巴)"
+      },
+      {
+        "id": "B",
+        "text": "B. (阿里巴巴,founder_of,马云)"
+      },
+      {
+        "id": "C",
+        "text": "C. (马云,阿里巴巴)"
+      },
+      {
+        "id": "D",
+        "text": "D. (马云,work_at,阿里巴巴)"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task33"
+  },
+  "task33": {
+    "title": "3D框几个自由度？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "3D框几个自由度？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "3D框几个自由度？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "鸡尾酒会问题标注(挑战)"
+    ],
+    "explanation": "7个:位置xyz+尺寸长宽高+偏航yaw。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 7个(位置xyz+尺寸长宽高+偏航yaw)"
+      },
+      {
+        "id": "B",
+        "text": "B. 4个(x,y,宽,高)"
+      },
+      {
+        "id": "C",
+        "text": "C. 6个(位置xyz+尺寸长宽高)"
+      },
+      {
+        "id": "D",
+        "text": "D. 9个(位置/尺寸/3角度)"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task34"
+  },
+  "task34": {
+    "title": "切分点精度标准？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "切分点精度标准？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "切分点精度标准？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "语义分割"
+    ],
+    "explanation": "<=50ms入门<=30ms进阶选静音中心。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. <=50ms选择静音中心点"
+      },
+      {
+        "id": "B",
+        "text": "B. <=100ms任意位置"
+      },
+      {
+        "id": "C",
+        "text": "C. <=10ms波形过零点"
+      },
+      {
+        "id": "D",
+        "text": "D. <=20ms能量最高点"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task35"
+  },
+  "task35": {
+    "title": "关键帧+插值目的？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "关键帧+插值目的？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "关键帧+插值目的？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "TTS数据标注基础"
+    ],
+    "explanation": "关键帧保证精度插值提高效率。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 关键帧人工保障精度插值提高效率"
+      },
+      {
+        "id": "B",
+        "text": "B. 全自动标注无需人工"
+      },
+      {
+        "id": "C",
+        "text": "C. 逐帧人工标注"
+      },
+      {
+        "id": "D",
+        "text": "D. 只标注首尾帧"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task36"
+  },
+  "task36": {
+    "title": "持续空调运行声归类？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "持续空调运行声归类？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "持续空调运行声归类？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "ASR语音转写"
+    ],
+    "explanation": "背景持续噪声与突发声音事件分别标注。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 背景持续噪声"
+      },
+      {
+        "id": "B",
+        "text": "B. 突发声音事件"
+      },
+      {
+        "id": "C",
+        "text": "C. 间歇性噪声"
+      },
+      {
+        "id": "D",
+        "text": "D. 设备故障声"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task37"
+  },
+  "task37": {
+    "title": "反语\"服务太棒了\"(实际很差)？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "反语\"服务太棒了\"(实际很差)？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "反语\"服务太棒了\"(实际很差)？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "语种识别进阶"
+    ],
+    "explanation": "真实语义(负向)+反语标记非字面。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 负向情感+反语标记"
+      },
+      {
+        "id": "B",
+        "text": "B. 正向情感"
+      },
+      {
+        "id": "C",
+        "text": "C. 中性情感"
+      },
+      {
+        "id": "D",
+        "text": "D. 混合情感"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task38"
+  },
+  "task38": {
+    "title": "CT窗宽窗位作用？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "CT窗宽窗位作用？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "CT窗宽窗位作用？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "标注准确性与一致性要求"
+    ],
+    "explanation": "不同窗宽窗位显示不同组织密度范围。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 不同窗宽窗位显示不同组织密度范围"
+      },
+      {
+        "id": "B",
+        "text": "B. 改变色彩映射"
+      },
+      {
+        "id": "C",
+        "text": "C. 决定保存格式"
+      },
+      {
+        "id": "D",
+        "text": "D. 控制工具操作权限"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task39"
+  },
+  "task39": {
+    "title": "最易被误标为缺陷的？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "最易被误标为缺陷的？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "最易被误标为缺陷的？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "区域标注"
+    ],
+    "explanation": "正常加工纹理(拉丝/纹路)有规律缺陷随机。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 正常加工纹理(金属拉丝)"
+      },
+      {
+        "id": "B",
+        "text": "B. 真实划痕"
+      },
+      {
+        "id": "C",
+        "text": "C. 破损孔洞"
+      },
+      {
+        "id": "D",
+        "text": "D. 真实裂纹"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task40"
+  },
+  "task40": {
+    "title": "不应标注的场景图三元组？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "不应标注的场景图三元组？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "不应标注的场景图三元组？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "表情/行为标注"
+    ],
+    "explanation": "\"将要喝\"是推测关系不可标空间/动作关系可标。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. (女人,将要喝,水)推测性关系"
+      },
+      {
+        "id": "B",
+        "text": "B. (男人,坐在,椅子)空间关系"
+      },
+      {
+        "id": "C",
+        "text": "C. (男人,阅读,书)动作关系"
+      },
+      {
+        "id": "D",
+        "text": "D. (书,在,桌子上)空间关系"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task41"
+  },
+  "task41": {
+    "title": "\"帮我查下明天天气\"正确意图？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "\"帮我查下明天天气\"正确意图？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "\"帮我查下明天天气\"正确意图？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "语音分割"
+    ],
+    "explanation": "查询-天气&槽位(时间:明天)。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 查询-天气&槽位(时间:明天)"
+      },
+      {
+        "id": "B",
+        "text": "B. 查询-机票"
+      },
+      {
+        "id": "C",
+        "text": "C. 闲聊-问候"
+      },
+      {
+        "id": "D",
+        "text": "D. 预订-服务"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task42"
+  },
+  "task42": {
+    "title": "不应标为病灶的是？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "不应标为病灶的是？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "不应标为病灶的是？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "场景分割认知"
+    ],
+    "explanation": "声影是超声伪影非真实病灶需多切面确认。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 声影(超声伪影)"
+      },
+      {
+        "id": "B",
+        "text": "B. 低回声结节"
+      },
+      {
+        "id": "C",
+        "text": "C. 高回声血管瘤"
+      },
+      {
+        "id": "D",
+        "text": "D. 无回声囊肿"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task43"
+  },
+  "task43": {
+    "title": "语义分割中图像边界标注要求？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "语义分割中图像边界标注要求？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "语义分割中图像边界标注要求？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "遥感图像标注基础"
+    ],
+    "explanation": "相邻区域无缝贴合无空隙无重叠无未标区域。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 相邻区域边界无缝贴合无空隙"
+      },
+      {
+        "id": "B",
+        "text": "B. 允许1-2px空隙"
+      },
+      {
+        "id": "C",
+        "text": "C. 空隙用背景色填充"
+      },
+      {
+        "id": "D",
+        "text": "D. 边界可重叠"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task44"
+  },
+  "task44": {
+    "title": "深度估计近/远处深度值关系？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "深度估计近/远处深度值关系？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "深度估计近/远处深度值关系？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "深度估计标注"
+    ],
+    "explanation": "近处高/浅远处低/深。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 近处高远处低"
+      },
+      {
+        "id": "B",
+        "text": "B. 近低远高"
+      },
+      {
+        "id": "C",
+        "text": "C. 统一深度值"
+      },
+      {
+        "id": "D",
+        "text": "D. 仅标物体不标背景"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task45"
+  },
+  "task45": {
+    "title": ">70%遮挡的人应如何处理？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": ">70%遮挡的人应如何处理？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": ">70%遮挡的人应如何处理？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "人群计数标注"
+    ],
+    "explanation": "跳过不标注以头部中心点为标注单位。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 跳过不标注"
+      },
+      {
+        "id": "B",
+        "text": "B. 随意推断位置"
+      },
+      {
+        "id": "C",
+        "text": "C. 标为\"不确定\""
+      },
+      {
+        "id": "D",
+        "text": "D. 必须精确标注"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task46"
+  },
+  "task46": {
+    "title": "小目标(<16×16px)应？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "小目标(<16×16px)应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "小目标(<16×16px)应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "图像检测(目标检测)"
+    ],
+    "explanation": "放大标注确保框>=10×10px不遗漏。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 放大标注确保框>=10×10px"
+      },
+      {
+        "id": "B",
+        "text": "B. 正常大小标注"
+      },
+      {
+        "id": "C",
+        "text": "C. 跳过不标"
+      },
+      {
+        "id": "D",
+        "text": "D. 标为不确定目标"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task47"
+  },
+  "task47": {
+    "title": "被遮挡关节点应如何处理？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "被遮挡关节点应如何处理？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "被遮挡关节点应如何处理？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "关键点标注"
+    ],
+    "explanation": "标为遮挡/不可见正确标记可见性状态。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 标为遮挡/不可见"
+      },
+      {
+        "id": "B",
+        "text": "B. 跳过该点"
+      },
+      {
+        "id": "C",
+        "text": "C. 随意推断位置"
+      },
+      {
+        "id": "D",
+        "text": "D. 标在近似位置"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task48"
+  },
+  "task48": {
+    "title": "实例与语义分割核心区别？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "实例与语义分割核心区别？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "实例与语义分割核心区别？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "语义分割"
+    ],
+    "explanation": "实例分割区分同类不同个体语义不区分。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 实例分割区分同类不同个体"
+      },
+      {
+        "id": "B",
+        "text": "B. 实例分割速度更快"
+      },
+      {
+        "id": "C",
+        "text": "C. 语义分割精度更高"
+      },
+      {
+        "id": "D",
+        "text": "D. 二者完全相同"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task49"
+  },
+  "task49": {
+    "title": "密集人群实例分割要求？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "密集人群实例分割要求？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "密集人群实例分割要求？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "实例分割"
+    ],
+    "explanation": "每人独立掩膜+独立ID逐一标记不粘连。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 每人独立掩膜+独立ID"
+      },
+      {
+        "id": "B",
+        "text": "B. 所有人共享掩膜"
+      },
+      {
+        "id": "C",
+        "text": "C. 按性别分组"
+      },
+      {
+        "id": "D",
+        "text": "D. 只标最近的人"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task50"
+  },
+  "task50": {
+    "title": "变化检测最重要注意事项？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "变化检测最重要注意事项？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "变化检测最重要注意事项？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "变化检测标注"
+    ],
+    "explanation": "排除季节/光照等物候变化仅标永久性变化。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 排除季节/光照因素"
+      },
+      {
+        "id": "B",
+        "text": "B. 所有差异都标"
+      },
+      {
+        "id": "C",
+        "text": "C. 只标新增变化"
+      },
+      {
+        "id": "D",
+        "text": "D. 只标植被变化"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task51"
+  },
+  "task51": {
+    "title": "场景图关系标注必须满足？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "场景图关系标注必须满足？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "场景图关系标注必须满足？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "场景图生成标注(挑战)"
+    ],
+    "explanation": "关系必须有视觉证据仅标可观察关系。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 必须有视觉证据"
+      },
+      {
+        "id": "B",
+        "text": "B. 可推测隐含关系"
+      },
+      {
+        "id": "C",
+        "text": "C. 按常识推断"
+      },
+      {
+        "id": "D",
+        "text": "D. 只标一个关系"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task52"
+  },
+  "task52": {
+    "title": "VAD工具的作用是？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "VAD工具的作用是？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "VAD工具的作用是？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "语音分割"
+    ],
+    "explanation": "自动检测语音区辅助预分割仍需人工校验。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 自动检测语音区辅助预分割"
+      },
+      {
+        "id": "B",
+        "text": "B. 直接替代人工标注"
+      },
+      {
+        "id": "C",
+        "text": "C. 去除所有静音"
+      },
+      {
+        "id": "D",
+        "text": "D. 判断情绪"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task53"
+  },
+  "task53": {
+    "title": "TTS单句时长推荐范围？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "TTS单句时长推荐范围？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "TTS单句时长推荐范围？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "TTS数据标注基础"
+    ],
+    "explanation": "1-15秒过短缺上下文过长难对齐。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 1-15秒"
+      },
+      {
+        "id": "B",
+        "text": "B. 越长越好"
+      },
+      {
+        "id": "C",
+        "text": "C. <1秒片段"
+      },
+      {
+        "id": "D",
+        "text": "D. >30秒长句"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task54"
+  },
+  "task54": {
+    "title": "重叠语音应如何处理？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "重叠语音应如何处理？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "重叠语音应如何处理？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "情绪判定"
+    ],
+    "explanation": ">=2人同时说话分别标注所有ID和起止时间。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. >=2人同时标"
+      },
+      {
+        "id": "B",
+        "text": "B. 只标声音最大的人"
+      },
+      {
+        "id": "C",
+        "text": "C. 跳过重叠段"
+      },
+      {
+        "id": "D",
+        "text": "D. 合并为一个ID"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task55"
+  },
+  "task55": {
+    "title": "说话人日志核心回答？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "说话人日志核心回答？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "说话人日志核心回答？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "说话人日志基础"
+    ],
+    "explanation": "谁在什么时候说话标注每个说话人时间区间。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. \"谁在什么时候说话\""
+      },
+      {
+        "id": "B",
+        "text": "B. 说了什么内容"
+      },
+      {
+        "id": "C",
+        "text": "C. 音量大小"
+      },
+      {
+        "id": "D",
+        "text": "D. 语种类别"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task56"
+  },
+  "task56": {
+    "title": "SVS与普通TTS主要区别？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "SVS与普通TTS主要区别？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "SVS与普通TTS主要区别？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "歌声合成标注"
+    ],
+    "explanation": "SVS需额外标音高颤音气息等演唱技巧。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 需额外标音高颤音气息等"
+      },
+      {
+        "id": "B",
+        "text": "B. 完全相同"
+      },
+      {
+        "id": "C",
+        "text": "C. 仅歌词不同"
+      },
+      {
+        "id": "D",
+        "text": "D. 不需标时长"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task57"
+  },
+  "task57": {
+    "title": "音素标注精度要求？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "音素标注精度要求？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "音素标注精度要求？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "音素标注"
+    ],
+    "explanation": "边界偏差<=20ms类别准确率>=90%。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. <=20ms类别>=90%"
+      },
+      {
+        "id": "B",
+        "text": "B. <=50ms类别>=80%"
+      },
+      {
+        "id": "C",
+        "text": "C. <=100ms类别>=70%"
+      },
+      {
+        "id": "D",
+        "text": "D. <=5ms类别>=95%"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task58"
+  },
+  "task58": {
+    "title": "韵律标注停顿层级分？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "韵律标注停顿层级分？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "韵律标注停顿层级分？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "韵律标注"
+    ],
+    "explanation": "词间/短语间/句间至少三级。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 词间/短语间/句间"
+      },
+      {
+        "id": "B",
+        "text": "B. 长/中/短"
+      },
+      {
+        "id": "C",
+        "text": "C. 大声/小声/无声"
+      },
+      {
+        "id": "D",
+        "text": "D. 快速/中速/慢速"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task59"
+  },
+  "task59": {
+    "title": "鸡尾酒会问题核心挑战？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "鸡尾酒会问题核心挑战？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "鸡尾酒会问题核心挑战？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "鸡尾酒会问题标注(挑战)"
+    ],
+    "explanation": "多人同时说话分离并分别标注各声源内容。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 多人同时说话时分离标注各声源"
+      },
+      {
+        "id": "B",
+        "text": "B. 过滤背景噪音"
+      },
+      {
+        "id": "C",
+        "text": "C. 识别鸡尾酒音乐"
+      },
+      {
+        "id": "D",
+        "text": "D. 检测说话人性别"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task60"
+  },
+  "task60": {
+    "title": "视频与图像最关键的差异？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "视频与图像最关键的差异？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "视频与图像最关键的差异？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "视频与图像标注差异"
+    ],
+    "explanation": "视频有时序连续性需保持帧间标注一致。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 有时序连续性需帧间一致"
+      },
+      {
+        "id": "B",
+        "text": "B. 文件更大"
+      },
+      {
+        "id": "C",
+        "text": "C. 工具不同"
+      },
+      {
+        "id": "D",
+        "text": "D. 标注速度更慢"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task61"
+  },
+  "task61": {
+    "title": "持续事件应如何打点？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "持续事件应如何打点？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "持续事件应如何打点？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "视频打点标注"
+    ],
+    "explanation": "标起止帧精确到帧使用预定义标签集。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 标起止帧精确到帧"
+      },
+      {
+        "id": "B",
+        "text": "B. 只标起始帧"
+      },
+      {
+        "id": "C",
+        "text": "C. 只标结束帧"
+      },
+      {
+        "id": "D",
+        "text": "D. 只标中间帧"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task62"
+  },
+  "task62": {
+    "title": "自动打点工具结果应？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "自动打点工具结果应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "自动打点工具结果应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "视频打点标注"
+    ],
+    "explanation": "100%人工校验确保精度和召回率。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 100%人工校验"
+      },
+      {
+        "id": "B",
+        "text": "B. 抽样10%校验"
+      },
+      {
+        "id": "C",
+        "text": "C. 直接使用不校验"
+      },
+      {
+        "id": "D",
+        "text": "D. AI校验"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task63"
+  },
+  "task63": {
+    "title": "片段间应保持什么关系？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "片段间应保持什么关系？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "片段间应保持什么关系？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "密集视频描述"
+    ],
+    "explanation": "逻辑连贯性边界在事件转换点。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 逻辑连贯性边界在事件转换点"
+      },
+      {
+        "id": "B",
+        "text": "B. 完全独立不关联"
+      },
+      {
+        "id": "C",
+        "text": "C. 随机排序"
+      },
+      {
+        "id": "D",
+        "text": "D. 按时间均匀切分"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task64"
+  },
+  "task64": {
+    "title": "动作质量多标注者一致性指标？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "动作质量多标注者一致性指标？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "动作质量多标注者一致性指标？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "动作质量评估标注"
+    ],
+    "explanation": "ICC组内相关系数评判标签偏差一致性。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. ICC(组内相关系数)"
+      },
+      {
+        "id": "B",
+        "text": "B. MAE"
+      },
+      {
+        "id": "C",
+        "text": "C. mAP"
+      },
+      {
+        "id": "D",
+        "text": "D. WER"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task65"
+  },
+  "task65": {
+    "title": "视频异常检测正常行为应？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "视频异常检测正常行为应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "视频异常检测正常行为应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "视频异常检测标注(挑战)"
+    ],
+    "explanation": "标为normal类别异常标事件+等级。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 异常标事件+等级正常标normal"
+      },
+      {
+        "id": "B",
+        "text": "B. 全部标为异常"
+      },
+      {
+        "id": "C",
+        "text": "C. 只标异常不标正常"
+      },
+      {
+        "id": "D",
+        "text": "D. 标为不确定"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task66"
+  },
+  "task66": {
+    "title": "地面物体交界处应？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "地面物体交界处应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "地面物体交界处应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "点云语义分割基础"
+    ],
+    "explanation": "精确到单个点使用法向量辅助判断。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 精确到单个点"
+      },
+      {
+        "id": "B",
+        "text": "B. 大致区域即可"
+      },
+      {
+        "id": "C",
+        "text": "C. 自动分割"
+      },
+      {
+        "id": "D",
+        "text": "D. 不标边界"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task67"
+  },
+  "task67": {
+    "title": "补全推测形状依据？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "补全推测形状依据？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "补全推测形状依据？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "点云补全标注"
+    ],
+    "explanation": "可见部分+对称性推断标置信度(高/中/低)。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 可见部分+对称性推断"
+      },
+      {
+        "id": "B",
+        "text": "B. 随机补全"
+      },
+      {
+        "id": "C",
+        "text": "C. 全部标为已知"
+      },
+      {
+        "id": "D",
+        "text": "D. AI自动推断"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task68"
+  },
+  "task68": {
+    "title": "传感器冲突时应？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "传感器冲突时应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "传感器冲突时应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "多传感器融合标注"
+    ],
+    "explanation": "以点云为准因点云3D几何精度更高。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 以点云为准"
+      },
+      {
+        "id": "B",
+        "text": "B. 以图像为准"
+      },
+      {
+        "id": "C",
+        "text": "C. 随机选择"
+      },
+      {
+        "id": "D",
+        "text": "D. 平均融合"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task69"
+  },
+  "task69": {
+    "title": "多标签场景应？",
+    "type": "classification",
+    "modal": "text",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "多标签场景应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "多标签场景应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "文本分类标注"
+    ],
+    "explanation": "标注所有相关类别用分隔符保证完整性。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 标注所有相关类别用分隔符"
+      },
+      {
+        "id": "B",
+        "text": "B. 只标最相关的一个"
+      },
+      {
+        "id": "C",
+        "text": "C. 随机标几个"
+      },
+      {
+        "id": "D",
+        "text": "D. 不标多标签"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task70"
+  },
+  "task70": {
+    "title": "实体对有且仅有？",
+    "type": "classification",
+    "modal": "text",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "实体对有且仅有？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "实体对有且仅有？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "关系抽取标注"
+    ],
+    "explanation": "一种确定关系取最主要不强制每对都标。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 一种确定关系取最主要"
+      },
+      {
+        "id": "B",
+        "text": "B. 多种关系"
+      },
+      {
+        "id": "C",
+        "text": "C. 不标关系"
+      },
+      {
+        "id": "D",
+        "text": "D. 随机标关系"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task71"
+  },
+  "task71": {
+    "title": "摘要核心要求不包括？",
+    "type": "classification",
+    "modal": "text",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "摘要核心要求不包括？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "摘要核心要求不包括？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "文本摘要标注"
+    ],
+    "explanation": "不添加原文中没的信息不含主观评价。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 不添加新信息"
+      },
+      {
+        "id": "B",
+        "text": "B. 添加背景信息"
+      },
+      {
+        "id": "C",
+        "text": "C. 添加个人观点"
+      },
+      {
+        "id": "D",
+        "text": "D. 越长越好"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task72"
+  },
+  "task72": {
+    "title": "多轮对话意图可能？",
+    "type": "classification",
+    "modal": "text",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "多轮对话意图可能？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "多轮对话意图可能？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "对话意图标注"
+    ],
+    "explanation": "随对话进展转移需全程追踪意图序列。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 随对话进展转移"
+      },
+      {
+        "id": "B",
+        "text": "B. 始终不变"
+      },
+      {
+        "id": "C",
+        "text": "C. 仅第一轮有效"
+      },
+      {
+        "id": "D",
+        "text": "D. 随机变化"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task73"
+  },
+  "task73": {
+    "title": "跨句指代应如何处理？",
+    "type": "classification",
+    "modal": "text",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "跨句指代应如何处理？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "跨句指代应如何处理？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "指代消解标注"
+    ],
+    "explanation": "全文范围建立共指链跨段落地回溯前指。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 全文范围跨段落回溯"
+      },
+      {
+        "id": "B",
+        "text": "B. 仅限当前句"
+      },
+      {
+        "id": "C",
+        "text": "C. 仅限当前段落"
+      },
+      {
+        "id": "D",
+        "text": "D. 只回溯一句"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task74"
+  },
+  "task74": {
+    "title": "DICOM窗宽窗位的作用？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "DICOM窗宽窗位的作用？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "DICOM窗宽窗位的作用？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "DICOM格式与影像认知"
+    ],
+    "explanation": "控制显示组织密度范围不同组织用不同设置。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 控制显示组织密度范围"
+      },
+      {
+        "id": "B",
+        "text": "B. 控制图像大小"
+      },
+      {
+        "id": "C",
+        "text": "C. 控制传输速度"
+      },
+      {
+        "id": "D",
+        "text": "D. 控制打印质量"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task75"
+  },
+  "task75": {
+    "title": "CT中层间边界要求？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "CT中层间边界要求？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "CT中层间边界要求？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "CT/MRI语义分割标注"
+    ],
+    "explanation": "平滑连续不突变3D重建验证Dice>=0.9。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 平滑连续不突变"
+      },
+      {
+        "id": "B",
+        "text": "B. 允许突变"
+      },
+      {
+        "id": "C",
+        "text": "C. 不需检查"
+      },
+      {
+        "id": "D",
+        "text": "D. AI自动处理"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task76"
+  },
+  "task76": {
+    "title": "细胞级特征应在何放大倍数？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "细胞级特征应在何放大倍数？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "细胞级特征应在何放大倍数？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "病理切片标注"
+    ],
+    "explanation": "40x精度±1μm需病理医生复核。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 40x精度±1μm需医师复核"
+      },
+      {
+        "id": "B",
+        "text": "B. 10x精度±10μm"
+      },
+      {
+        "id": "C",
+        "text": "C. 20x精度±5μm"
+      },
+      {
+        "id": "D",
+        "text": "D. 100x精度±0.1μm"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task77"
+  },
+  "task77": {
+    "title": "PET主要提供什么信息？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "PET主要提供什么信息？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "PET主要提供什么信息？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "多模态医学影像融合标注(挑战)"
+    ],
+    "explanation": "代谢活动信息肿瘤高代谢区(SUV值高)。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 代谢活动信息"
+      },
+      {
+        "id": "B",
+        "text": "B. 解剖结构信息"
+      },
+      {
+        "id": "C",
+        "text": "C. 血流速度"
+      },
+      {
+        "id": "D",
+        "text": "D. 骨密度"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task78"
+  },
+  "task78": {
+    "title": "人脸标注中遮挡>50%应？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "人脸标注中遮挡>50%应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "人脸标注中遮挡>50%应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "人脸/行人/物品标注"
+    ],
+    "explanation": "标为\"遮挡\"不跳过因可能仍有可见特征。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 标为\"遮挡\""
+      },
+      {
+        "id": "B",
+        "text": "B. 直接跳过"
+      },
+      {
+        "id": "C",
+        "text": "C. 标为\"不确定\""
+      },
+      {
+        "id": "D",
+        "text": "D. 标注推测位置"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task79"
+  },
+  "task79": {
+    "title": "OCR中弯曲文字应用什么方式标注？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "OCR中弯曲文字应用什么方式标注？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "OCR中弯曲文字应用什么方式标注？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "文本检测OCR基础"
+    ],
+    "explanation": "多边形贴合弯曲文字矩形/四边形不适合弯曲。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 多边形标注贴合弯曲"
+      },
+      {
+        "id": "B",
+        "text": "B. 矩形框"
+      },
+      {
+        "id": "C",
+        "text": "C. 圆形标注"
+      },
+      {
+        "id": "D",
+        "text": "D. 点标注"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task80"
+  },
+  "task80": {
+    "title": "车道线标注中虚线段应？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "车道线标注中虚线段应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "车道线标注中虚线段应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "线标注/车道线基础"
+    ],
+    "explanation": "每个虚线段独立标注不连接为一条。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 每个虚线段独立标注"
+      },
+      {
+        "id": "B",
+        "text": "B. 连接为一条长线"
+      },
+      {
+        "id": "C",
+        "text": "C. 跳过虚线不标"
+      },
+      {
+        "id": "D",
+        "text": "D. 合并为实线"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task81"
+  },
+  "task81": {
+    "title": "项目实战评分的主要构成？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "项目实战评分的主要构成？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "项目实战评分的主要构成？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "图片标注项目实战"
+    ],
+    "explanation": "标注质量60%流程规范20%效率20%。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 标注质量60%+流程20%+效率20%"
+      },
+      {
+        "id": "B",
+        "text": "B. 质量100%"
+      },
+      {
+        "id": "C",
+        "text": "C. 速度100%"
+      },
+      {
+        "id": "D",
+        "text": "D. 各占33%"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task82"
+  },
+  "task82": {
+    "title": "表情标注的核心判据是？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "表情标注的核心判据是？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "表情标注的核心判据是？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "表情/行为标注"
+    ],
+    "explanation": "面部肌肉动作非场景上下文非话语内容。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 面部肌肉动作"
+      },
+      {
+        "id": "B",
+        "text": "B. 穿着打扮"
+      },
+      {
+        "id": "C",
+        "text": "C. 场景背景"
+      },
+      {
+        "id": "D",
+        "text": "D. 他人评价"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task83"
+  },
+  "task83": {
+    "title": "全景分割中PQ全称含义？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "全景分割中PQ全称含义？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "全景分割中PQ全称含义？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "全景分割概念"
+    ],
+    "explanation": "Panoptic Quality = SQ(RQ)统一评价stuff和things。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. Panoptic Quality统一评价stuff+things"
+      },
+      {
+        "id": "B",
+        "text": "B. Picture Quality图像质量"
+      },
+      {
+        "id": "C",
+        "text": "C. Prediction Quality预测质量"
+      },
+      {
+        "id": "D",
+        "text": "D. Pixel Quality像素质量"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task84"
+  },
+  "task84": {
+    "title": "工业缺陷标注误报率应<=？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "工业缺陷标注误报率应<=？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "工业缺陷标注误报率应<=？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "工业缺陷检测标注"
+    ],
+    "explanation": "<=3%过高误报影响产品质量判定。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. <=3%"
+      },
+      {
+        "id": "B",
+        "text": "B. <=1%"
+      },
+      {
+        "id": "C",
+        "text": "C. <=5%"
+      },
+      {
+        "id": "D",
+        "text": "D. <=10%"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task85"
+  },
+  "task85": {
+    "title": "区域挑战标注软边界用于？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "区域挑战标注软边界用于？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "区域挑战标注软边界用于？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "区域标注"
+    ],
+    "explanation": "毛发/透明/网孔等无法精确标注的复杂边界。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 毛发/透明/网孔等复杂边界"
+      },
+      {
+        "id": "B",
+        "text": "B. 直线边界"
+      },
+      {
+        "id": "C",
+        "text": "C. 简单形状"
+      },
+      {
+        "id": "D",
+        "text": "D. 所有边界"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task86"
+  },
+  "task86": {
+    "title": "遥感多光谱标注NDWI用于？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "遥感多光谱标注NDWI用于？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "遥感多光谱标注NDWI用于？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "遥感多光谱标注(挑战)"
+    ],
+    "explanation": "归一化水体指数辅助水体提取。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 归一化水体指数辅助水体提取"
+      },
+      {
+        "id": "B",
+        "text": "B. 归一化植被指数"
+      },
+      {
+        "id": "C",
+        "text": "C. 归一化建筑指数"
+      },
+      {
+        "id": "D",
+        "text": "D. 归一化雪盖指数"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task87"
+  },
+  "task87": {
+    "title": "方言片段中方言特有词汇应？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "方言片段中方言特有词汇应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "方言片段中方言特有词汇应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "方言片段截取案例"
+    ],
+    "explanation": "转写为方言词+标注普通话释义。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 转写方言词+标注普通话释义"
+      },
+      {
+        "id": "B",
+        "text": "B. 直接转写为普通话"
+      },
+      {
+        "id": "C",
+        "text": "C. 只标方言种类不转写"
+      },
+      {
+        "id": "D",
+        "text": "D. 忽略方言统一转写"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task88"
+  },
+  "task88": {
+    "title": "音乐节拍点应参考什么？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "音乐节拍点应参考什么？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "音乐节拍点应参考什么？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "音乐节拍标注"
+    ],
+    "explanation": "打击乐/强拍为主要参考BPM精确±1。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 打击乐/强拍为主要参考"
+      },
+      {
+        "id": "B",
+        "text": "B. 旋律线为主要参考"
+      },
+      {
+        "id": "C",
+        "text": "C. 人声为主要参考"
+      },
+      {
+        "id": "D",
+        "text": "D. 随意判断"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task89"
+  },
+  "task89": {
+    "title": "声纹挑战中短片段(<2s)应？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "声纹挑战中短片段(<2s)应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "声纹挑战中短片段(<2s)应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "声纹识别"
+    ],
+    "explanation": "结合上下文判断可标注为不确定。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 结合上下文判断可标不确定"
+      },
+      {
+        "id": "B",
+        "text": "B. 必须精确标注"
+      },
+      {
+        "id": "C",
+        "text": "C. 直接跳过"
+      },
+      {
+        "id": "D",
+        "text": "D. 随机标注"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task90"
+  },
+  "task90": {
+    "title": "多风格TTS情感强度分几级？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "多风格TTS情感强度分几级？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "多风格TTS情感强度分几级？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "多风格TTS数据标注(挑战)"
+    ],
+    "explanation": "分5级等级越高情感表现越强。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 5级"
+      },
+      {
+        "id": "B",
+        "text": "B. 3级"
+      },
+      {
+        "id": "C",
+        "text": "C. 7级"
+      },
+      {
+        "id": "D",
+        "text": "D. 10级"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task91"
+  },
+  "task91": {
+    "title": "环境声音挑战中最多同时标注多少个事件？",
+    "type": "classification",
+    "modal": "audio",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "环境声音挑战中最多同时标注多少个事件？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "环境声音挑战中最多同时标注多少个事件？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "环境声音事件检测(挑战)"
+    ],
+    "explanation": "最多5个同时事件。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 最多5个"
+      },
+      {
+        "id": "B",
+        "text": "B. 最多3个"
+      },
+      {
+        "id": "C",
+        "text": "C. 最多10个"
+      },
+      {
+        "id": "D",
+        "text": "D. 不做限制"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task92"
+  },
+  "task92": {
+    "title": "视频追踪中ID不变的目的是？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "视频追踪中ID不变的目的是？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "视频追踪中ID不变的目的是？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "视频追踪标注"
+    ],
+    "explanation": "保证目标全程可追踪维持MOTA指标。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 保证目标全程可追踪"
+      },
+      {
+        "id": "B",
+        "text": "B. 提高标注速度"
+      },
+      {
+        "id": "C",
+        "text": "C. 减少存储量"
+      },
+      {
+        "id": "D",
+        "text": "D. 美观排序"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task93"
+  },
+  "task93": {
+    "title": "行为识别核心判据是？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "行为识别核心判据是？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "行为识别核心判据是？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "行为识别基础"
+    ],
+    "explanation": "以动作意图为准则非外观/衣着。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 以动作意图为准则"
+      },
+      {
+        "id": "B",
+        "text": "B. 以外观服装为准则"
+      },
+      {
+        "id": "C",
+        "text": "C. 以场景为准"
+      },
+      {
+        "id": "D",
+        "text": "D. 以时间为准"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task94"
+  },
+  "task94": {
+    "title": "视频进阶中关键帧间距如何确定？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "视频进阶中关键帧间距如何确定？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "视频进阶中关键帧间距如何确定？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "视频与图像标注差异"
+    ],
+    "explanation": "按目标运动速度动态调整快动密集慢动稀疏。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 按目标运动速度动态调整"
+      },
+      {
+        "id": "B",
+        "text": "B. 固定每5帧"
+      },
+      {
+        "id": "C",
+        "text": "C. 固定每10帧"
+      },
+      {
+        "id": "D",
+        "text": "D. 仅首尾帧"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task95"
+  },
+  "task95": {
+    "title": "事件检测中触发条件包括？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "事件检测中触发条件包括？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "事件检测中触发条件包括？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "事件检测基础"
+    ],
+    "explanation": "触发条件+终止条件两者缺一不可。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 触发条件+终止条件"
+      },
+      {
+        "id": "B",
+        "text": "B. 仅触发条件"
+      },
+      {
+        "id": "C",
+        "text": "C. 仅终止条件"
+      },
+      {
+        "id": "D",
+        "text": "D. 无需条件"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task96"
+  },
+  "task96": {
+    "title": "交叉剪辑场景应如何分割？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "交叉剪辑场景应如何分割？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "交叉剪辑场景应如何分割？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "场景分割进阶(挑战)"
+    ],
+    "explanation": "分别标注各自时间线使用父子ID体系。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 分别标各自时间线父子ID"
+      },
+      {
+        "id": "B",
+        "text": "B. 混合标注"
+      },
+      {
+        "id": "C",
+        "text": "C. 只标一条时间线"
+      },
+      {
+        "id": "D",
+        "text": "D. 跳过交叉部分"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task97"
+  },
+  "task97": {
+    "title": "视频描述+定位中粒度应？",
+    "type": "classification",
+    "modal": "video",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "视频描述+定位中粒度应？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "视频描述+定位中粒度应？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "视频描述+时序定位(挑战)"
+    ],
+    "explanation": "自适应:简单事件短描述复杂事件长描述。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 自适应:简单短复杂长"
+      },
+      {
+        "id": "B",
+        "text": "B. 统一长度"
+      },
+      {
+        "id": "C",
+        "text": "C. 越长越好"
+      },
+      {
+        "id": "D",
+        "text": "D. 越短越好"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task98"
+  },
+  "task98": {
+    "title": "3D点云标注使用什么单位？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "3D点云标注使用什么单位？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "3D点云标注使用什么单位？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "3D点云标注基础概念"
+    ],
+    "explanation": "米制世界坐标系为参考。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 米制"
+      },
+      {
+        "id": "B",
+        "text": "B. 英制"
+      },
+      {
+        "id": "C",
+        "text": "C. 像素制"
+      },
+      {
+        "id": "D",
+        "text": "D. 角度制"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task99"
+  },
+  "task99": {
+    "title": "点云格式检查最重要的是？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "点云格式检查最重要的是？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "点云格式检查最重要的是？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "点云数据格式认知"
+    ],
+    "explanation": "完整性检查:点数/范围/属性识别异常点。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 完整性:点数/范围/属性"
+      },
+      {
+        "id": "B",
+        "text": "B. 文件名"
+      },
+      {
+        "id": "C",
+        "text": "C. 文件大小"
+      },
+      {
+        "id": "D",
+        "text": "D. 创建日期"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task100"
+  },
+  "task100": {
+    "title": "粘连实例应如何分割？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "粘连实例应如何分割？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "粘连实例应如何分割？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "点云实例分割进阶(挑战)"
+    ],
+    "explanation": "寻找最小凹点分割实例边界>=10cm(车辆)。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 最小凹点分割"
+      },
+      {
+        "id": "B",
+        "text": "B. 随机分割"
+      },
+      {
+        "id": "C",
+        "text": "C. 平均分割"
+      },
+      {
+        "id": "D",
+        "text": "D. 不分割"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task101"
+  },
+  "task101": {
+    "title": "NER中标注实体完整名称举例？",
+    "type": "classification",
+    "modal": "text",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "NER中标注实体完整名称举例？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "NER中标注实体完整名称举例？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "命名实体识别(NER)基础"
+    ],
+    "explanation": "\"北京海淀区中关村\"整体标为一个LOC实体。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. \"北京海淀区中关村\"整体LOC"
+      },
+      {
+        "id": "B",
+        "text": "B. 只标\"海淀\""
+      },
+      {
+        "id": "C",
+        "text": "C. 只标\"中关村\""
+      },
+      {
+        "id": "D",
+        "text": "D. 分词逐一标"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task102"
+  },
+  "task102": {
+    "title": "医学影像标注最特殊要求？",
+    "type": "classification",
+    "modal": "image",
+    "difficulty": "easy",
+    "object_count": 1,
+    "text": "医学影像标注最特殊要求？",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "instruction": "医学影像标注最特殊要求？",
+    "ground_truth": {
+      "label": "A"
+    },
+    "knowledge_points": [
+      "医学影像标注基础概念"
+    ],
+    "explanation": "需医学专家审核任何误标可能影响诊断。",
+    "items": [
+      {
+        "id": "A",
+        "text": "A. 需医学专家审核"
+      },
+      {
+        "id": "B",
+        "text": "B. 标注速度最快"
+      },
+      {
+        "id": "C",
+        "text": "C. 数据量最大"
+      },
+      {
+        "id": "D",
+        "text": "D. 格式最简单"
+      }
+    ],
+    "source": "data_annotation_kb.db",
+    "next_task": "task1"
   }
 }

@@ -538,6 +538,939 @@
             ]
           }
         ]
+      },
+      {
+        "id": "task-group-kb-1",
+        "name": "图像标注进阶(知识库)",
+        "level": 2,
+        "description": "从知识库导入的图像标注知识点",
+        "children": [
+          {
+            "id": "task-group-kb-1-入门级",
+            "name": "入门级知识点",
+            "level": 3,
+            "description": "图像标注进阶(知识库)的入门级内容",
+            "skills": [
+              {
+                "id": "skill-kb-1-1",
+                "name": "图像分类/判断",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-2",
+                "name": "图像检测(目标检测)",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-3",
+                "name": "矩形框标注",
+                "level": 4,
+                "description": "基础单类别",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-4",
+                "name": "人脸/行人/物品标注",
+                "level": 4,
+                "description": "简单单类别",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-5",
+                "name": "文本检测OCR基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-6",
+                "name": "线标注/车道线基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-7",
+                "name": "遥感图像标注基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-8",
+                "name": "图片标注项目实战",
+                "level": 4,
+                "description": "综合实操",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-9",
+                "name": "深度估计标注",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-10",
+                "name": "人群计数标注",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-1-进阶级",
+            "name": "进阶级知识点",
+            "level": 3,
+            "description": "图像标注进阶(知识库)的进阶级内容",
+            "skills": [
+              {
+                "id": "skill-kb-1-11",
+                "name": "图像检测(目标检测)",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-12",
+                "name": "语义分割",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-13",
+                "name": "矩形框标注",
+                "level": 4,
+                "description": "多类别+规范",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-14",
+                "name": "关键点标注",
+                "level": 4,
+                "description": "基础入门",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-15",
+                "name": "区域标注",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-16",
+                "name": "人脸/行人/物品",
+                "level": 4,
+                "description": "多类别综合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-17",
+                "name": "表情/行为标注",
+                "level": 4,
+                "description": "简单分类",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-18",
+                "name": "文本检测OCR进阶",
+                "level": 4,
+                "description": "多方向文本",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-19",
+                "name": "姿态估计基础",
+                "level": 4,
+                "description": "基础入门",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-20",
+                "name": "全景分割概念",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-21",
+                "name": "建筑物提取标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-22",
+                "name": "土地覆盖分类标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-23",
+                "name": "工业缺陷检测标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-1-挑战级",
+            "name": "挑战级知识点",
+            "level": 3,
+            "description": "图像标注进阶(知识库)的挑战级内容",
+            "skills": [
+              {
+                "id": "skill-kb-1-24",
+                "name": "语义分割",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-25",
+                "name": "实例分割",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-26",
+                "name": "关键点标注",
+                "level": 4,
+                "description": "拓展提升",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-27",
+                "name": "区域标注",
+                "level": 4,
+                "description": "多边形精细",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-28",
+                "name": "3D点云标注",
+                "level": 4,
+                "description": "概念认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-29",
+                "name": "表情/行为标注",
+                "level": 4,
+                "description": "复杂场景综合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-30",
+                "name": "文本检测OCR进阶(挑战)",
+                "level": 4,
+                "description": "复杂场景综合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-31",
+                "name": "姿态估计进阶(挑战)",
+                "level": 4,
+                "description": "复杂场景综合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-32",
+                "name": "线标注/车道线进阶(挑战)",
+                "level": 4,
+                "description": "复杂道路场景",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-33",
+                "name": "全景分割标注(挑战)",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-34",
+                "name": "变化检测标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-35",
+                "name": "遥感多光谱标注(挑战)",
+                "level": 4,
+                "description": "扩展高级",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-1-36",
+                "name": "场景图生成标注(挑战)",
+                "level": 4,
+                "description": "高级视觉理解",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "task-group-kb-2",
+        "name": "音频标注进阶(知识库)",
+        "level": 2,
+        "description": "从知识库导入的音频标注知识点",
+        "children": [
+          {
+            "id": "task-group-kb-2-入门级",
+            "name": "入门级知识点",
+            "level": 3,
+            "description": "音频标注进阶(知识库)的入门级内容",
+            "skills": [
+              {
+                "id": "skill-kb-2-37",
+                "name": "语音标注基础概念",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-38",
+                "name": "ASR语音转写",
+                "level": 4,
+                "description": "基础短句转写",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-39",
+                "name": "语音分割",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-40",
+                "name": "语音清洗",
+                "level": 4,
+                "description": "基础概念",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-41",
+                "name": "标注质量与准确率标准",
+                "level": 4,
+                "description": "基础要求",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-42",
+                "name": "语种识别基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-43",
+                "name": "关键词唤醒基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-44",
+                "name": "TTS数据标注基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-45",
+                "name": "环境声音分类基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-46",
+                "name": "音频标注项目实战",
+                "level": 4,
+                "description": "综合实操",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-2-进阶级",
+            "name": "进阶级知识点",
+            "level": 3,
+            "description": "音频标注进阶(知识库)的进阶级内容",
+            "skills": [
+              {
+                "id": "skill-kb-2-47",
+                "name": "ASR语音转写",
+                "level": 4,
+                "description": "进阶转写规则",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-48",
+                "name": "语音分割",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-49",
+                "name": "语音清洗",
+                "level": 4,
+                "description": "进阶校验规则",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-50",
+                "name": "情绪判定",
+                "level": 4,
+                "description": "基础三类情绪",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-51",
+                "name": "声纹识别",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-52",
+                "name": "方言片段截取案例",
+                "level": 4,
+                "description": "全流程实操",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-53",
+                "name": "标注质量与准确率标准",
+                "level": 4,
+                "description": "完整标准",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-54",
+                "name": "语种识别进阶",
+                "level": 4,
+                "description": "多语种混合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-55",
+                "name": "说话人日志基础",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-56",
+                "name": "音素时长标注(TTS)",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-57",
+                "name": "音乐节拍标注",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-58",
+                "name": "和弦/乐器识别标注",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-59",
+                "name": "歌声合成标注",
+                "level": 4,
+                "description": "基础入门",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-2-挑战级",
+            "name": "挑战级知识点",
+            "level": 3,
+            "description": "音频标注进阶(知识库)的挑战级内容",
+            "skills": [
+              {
+                "id": "skill-kb-2-60",
+                "name": "语音分割",
+                "level": 4,
+                "description": "复杂场景进阶",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-61",
+                "name": "语音清洗",
+                "level": 4,
+                "description": "复杂噪音处理",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-62",
+                "name": "情绪判定",
+                "level": 4,
+                "description": "细分8类情绪",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-63",
+                "name": "声纹识别",
+                "level": 4,
+                "description": "分段标注实操",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-64",
+                "name": "音素标注",
+                "level": 4,
+                "description": "基础标音练习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-65",
+                "name": "韵律标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-66",
+                "name": "方言片段截取案例",
+                "level": 4,
+                "description": "复杂场景拓展",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-67",
+                "name": "标注质量与准确率标准",
+                "level": 4,
+                "description": "高阶精度要求",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-68",
+                "name": "关键词唤醒进阶(挑战)",
+                "level": 4,
+                "description": "复杂场景综合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-69",
+                "name": "说话人日志进阶(挑战)",
+                "level": 4,
+                "description": "多人复杂场景",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-70",
+                "name": "多风格TTS数据标注(挑战)",
+                "level": 4,
+                "description": "风格化语音合成",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-71",
+                "name": "环境声音事件检测(挑战)",
+                "level": 4,
+                "description": "复杂声学场景",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-2-72",
+                "name": "鸡尾酒会问题标注(挑战)",
+                "level": 4,
+                "description": "高阶听觉场景分析",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "task-group-kb-3",
+        "name": "视频标注进阶(知识库)",
+        "level": 2,
+        "description": "从知识库导入的视频标注知识点",
+        "children": [
+          {
+            "id": "task-group-kb-3-入门级",
+            "name": "入门级知识点",
+            "level": 3,
+            "description": "视频标注进阶(知识库)的入门级内容",
+            "skills": [
+              {
+                "id": "skill-kb-3-73",
+                "name": "视频标注基础概念",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-74",
+                "name": "视频与图像标注差异",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-75",
+                "name": "视频分类标注",
+                "level": 4,
+                "description": "核心实操",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-76",
+                "name": "视频打点标注",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-77",
+                "name": "视频追踪标注",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-78",
+                "name": "标注准确性与一致性要求",
+                "level": 4,
+                "description": "基础标准",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-79",
+                "name": "行为识别基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-80",
+                "name": "场景分割认知",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-81",
+                "name": "视频描述标注基础",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-82",
+                "name": "视频标注项目实战",
+                "level": 4,
+                "description": "综合实操",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-3-进阶级",
+            "name": "进阶级知识点",
+            "level": 3,
+            "description": "视频标注进阶(知识库)的进阶级内容",
+            "skills": [
+              {
+                "id": "skill-kb-3-83",
+                "name": "视频与图像标注差异",
+                "level": 4,
+                "description": "深度理解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-84",
+                "name": "视频打点标注",
+                "level": 4,
+                "description": "核心实操",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-85",
+                "name": "视频追踪标注",
+                "level": 4,
+                "description": "单目标基础追踪",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-86",
+                "name": "视频信息提取",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-87",
+                "name": "标注过程与效率规范",
+                "level": 4,
+                "description": "基础流程规范",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-88",
+                "name": "标注准确性与一致性要求",
+                "level": 4,
+                "description": "单目标一致性",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-89",
+                "name": "行为识别进阶",
+                "level": 4,
+                "description": "复杂行为分类",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-90",
+                "name": "事件检测基础",
+                "level": 4,
+                "description": "概念了解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-91",
+                "name": "密集视频描述",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-92",
+                "name": "动作质量评估标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-3-挑战级",
+            "name": "挑战级知识点",
+            "level": 3,
+            "description": "视频标注进阶(知识库)的挑战级内容",
+            "skills": [
+              {
+                "id": "skill-kb-3-93",
+                "name": "视频与图像标注差异",
+                "level": 4,
+                "description": "综合应用",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-94",
+                "name": "视频打点标注",
+                "level": 4,
+                "description": "复杂场景拓展",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-95",
+                "name": "视频追踪标注",
+                "level": 4,
+                "description": "多目标复杂场景",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-96",
+                "name": "视频信息提取",
+                "level": 4,
+                "description": "多模态综合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-97",
+                "name": "标注过程与效率规范",
+                "level": 4,
+                "description": "AI辅助半自动化",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-98",
+                "name": "标注准确性与一致性要求",
+                "level": 4,
+                "description": "多目标ID连续性",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-99",
+                "name": "事件检测进阶(挑战)",
+                "level": 4,
+                "description": "复杂事件体系",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-100",
+                "name": "场景分割进阶(挑战)",
+                "level": 4,
+                "description": "复杂场景理解",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-101",
+                "name": "视频描述+时序定位(挑战)",
+                "level": 4,
+                "description": "多模态综合",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-3-102",
+                "name": "视频异常检测标注(挑战)",
+                "level": 4,
+                "description": "复杂安全场景",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "task-group-kb-4",
+        "name": "文本标注进阶(知识库)",
+        "level": 2,
+        "description": "从知识库导入的文本标注知识点",
+        "children": [
+          {
+            "id": "task-group-kb-4-入门级",
+            "name": "入门级知识点",
+            "level": 3,
+            "description": "文本标注进阶(知识库)的入门级内容",
+            "skills": [
+              {
+                "id": "skill-kb-5-115",
+                "name": "文本标注基础概念",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-116",
+                "name": "文本分类标注",
+                "level": 4,
+                "description": "核心实操",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-117",
+                "name": "命名实体识别(NER)基础",
+                "level": 4,
+                "description": "核心实操",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-4-进阶级",
+            "name": "进阶级知识点",
+            "level": 3,
+            "description": "文本标注进阶(知识库)的进阶级内容",
+            "skills": [
+              {
+                "id": "skill-kb-5-118",
+                "name": "NER进阶",
+                "level": 4,
+                "description": "复杂实体类型",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-119",
+                "name": "关系抽取标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-120",
+                "name": "情感分析标注",
+                "level": 4,
+                "description": "细粒度情感",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-121",
+                "name": "文本摘要标注",
+                "level": 4,
+                "description": "基础认知",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-122",
+                "name": "对话意图标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          },
+          {
+            "id": "task-group-kb-4-挑战级",
+            "name": "挑战级知识点",
+            "level": 3,
+            "description": "文本标注进阶(知识库)的挑战级内容",
+            "skills": [
+              {
+                "id": "skill-kb-5-123",
+                "name": "事件抽取标注",
+                "level": 4,
+                "description": "复杂结构化标注",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-124",
+                "name": "指代消解标注",
+                "level": 4,
+                "description": "核心学习",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-125",
+                "name": "嵌套NER标注",
+                "level": 4,
+                "description": "高难度序列",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-126",
+                "name": "多标签文本分类(挑战)",
+                "level": 4,
+                "description": "大规模多标签",
+                "source": "data_annotation_kb.db"
+              },
+              {
+                "id": "skill-kb-5-127",
+                "name": "知识图谱构建标注(挑战)",
+                "level": 4,
+                "description": "结构化知识抽取",
+                "source": "data_annotation_kb.db"
+              }
+            ]
+          }
+        ]
       }
     ]
   }

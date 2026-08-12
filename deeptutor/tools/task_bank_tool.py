@@ -25,18 +25,18 @@ class GetAnnotationTaskTool(BaseTool):
             name="get_annotation_task",
             description=(
                 "Get a REAL annotation practice task with ground truth from the course dataset. "
-                "18 tasks across 3 difficulty levels, 3 modalities (image/text/video) and 10 types. "
+                "102 tasks across 3 difficulty levels, multiple modalities (image/text/audio/video) and 10 types. "
                 "task1-4: bbox detection, task5/9: classification, task6-8: advanced bbox, "
                 "task10: judgment, task11: standard, task12: error_case, "
                 "task13-14: audio, task15-16: video tracking, task17-18: video events, "
-                "task19-22: text annotation (NER/classification/judgment/error_case)."
+                "task19-22: text annotation, task23+: quiz questions from knowledge base."
             ),
             parameters=[
                 ToolParameter(
                     name="task_id",
                     type="string",
-                    description="task1-task22. Available tasks across image/text/video modalities.",
-                    enum=["task1", "task2", "task3", "task4", "task5", "task6", "task7", "task8", "task9", "task10", "task11", "task12", "task13", "task14", "task15", "task16", "task17", "task18", "task19", "task20", "task21", "task22"],
+                    description="task1-task102. Available tasks across all modalities.",
+                    enum=[f"task{i}" for i in range(1, 103)],
                 ),
             ],
         )
