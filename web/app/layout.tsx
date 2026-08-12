@@ -21,8 +21,8 @@ const fontSerif = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "标注星图",
-  description: "Agent-native intelligent learning companion",
+  title: "标注星图｜智标数据·点亮学习",
+  description: "面向数据标注学习的智能陪练与实训平台。",
   icons: {
     icon: [
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },

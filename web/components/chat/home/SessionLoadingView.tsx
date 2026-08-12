@@ -48,11 +48,11 @@ export default function SessionLoadingView({
       {/* Logo + spinner */}
       <div className="flex items-center gap-3">
         <img
-          src="/logo_black.png"
+          src="/brand-mark.png"
           alt="标注星图"
           width={32}
           height={32}
-          className="h-8 w-8 select-none"
+          className="h-8 w-8 rounded-md select-none"
           draggable={false}
         />
         <Loader2 className="h-5 w-5 animate-spin text-[var(--primary)]" />

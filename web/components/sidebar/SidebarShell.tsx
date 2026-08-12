@@ -156,7 +156,7 @@ export function SidebarShell({
             className="flex items-center justify-center transition-opacity duration-150 group-hover/sb:opacity-0"
           >
             <Image
-              src="/logo.png"
+              src="/brand-mark.png"
               alt="标注星图"
               width={22}
               height={22}
@@ -283,22 +283,17 @@ export function SidebarShell({
     <aside className="flex w-[220px] h-screen shrink-0 flex-col bg-[var(--secondary)] transition-all duration-200">
       {/* Header: logo + collapse toggle */}
       <div className="flex h-14 items-center justify-between px-4">
-        <Link href="/" className="group flex items-center gap-1.5">
+        <Link href="/" className="group flex items-center gap-2">
+          <span className="h-[28px] w-[28px] overflow-hidden rounded-md">
           <Image
-            src="/logo.png"
+            src="/brand-mark.png"
             alt="标注星图"
-            width={22}
-            height={22}
-            className="h-[22px] w-[22px] transition-transform duration-200 group-hover:scale-105"
+            width={28}
+            height={28}
+            className="h-[28px] w-[28px] transition-transform duration-200 group-hover:scale-105"
           />
-          <Image
-            src="/banner.png"
-            alt="标注星图"
-            width={897}
-            height={236}
-            priority
-            className="h-[22px] w-auto transition-transform duration-200 group-hover:scale-105"
-          />
+          </span>
+          <span className="text-sm font-semibold tracking-tight text-[var(--foreground)]">标注星图</span>
         </Link>
         <button
           onClick={() => setCollapsed(true)}
