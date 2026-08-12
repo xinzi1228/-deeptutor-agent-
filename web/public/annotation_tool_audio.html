@@ -55,6 +55,7 @@ body { font-family: system-ui; background:#1a1a2e; color:#eee; display:flex; hei
 <div class="sidebar">
   <h2>选择任务</h2>
   <select id="taskSelect" onchange="loadTask()">
+    <option value="xiaoginge">任务: 小情歌音频标注</option>
     <option value="task13">任务13: 音频事件检测 (★简单)</option>
     <option value="task14">任务14: 语音转录 (★★中等)</option>
   </select>
@@ -93,6 +94,16 @@ body { font-family: system-ui; background:#1a1a2e; color:#eee; display:flex; hei
 
 <script>
 const TASKS = {
+  xiaoginge: {
+    url: '/audio/小情歌.m4a', labels: ['music','vocal','instrumental'], duration: 180.0,
+    desc: '小情歌 — 标注音乐段落', difficulty: '简单',
+    type: 'audio_event',
+    gt: [
+      {"start_time":0.0,"end_time":30.0,"label":"vocal"},
+      {"start_time":30.0,"end_time":60.0,"label":"instrumental"},
+      {"start_time":60.0,"end_time":90.0,"label":"music"}
+    ]
+  },
   task13: {
     url: '/audio/sample1.mp3', labels: ['speech','music','noise'], duration: 10.0,
     desc: '音频事件检测 — 标出每种声音的起止时间 (3个事件)', difficulty: '简单',
@@ -111,8 +122,8 @@ const TASKS = {
   }
 };
 
-const LABEL_COLORS = { speech:'#E74C3C', music:'#8E44AD', noise:'#95A5A6', text:'#4fc3f7' };
-const LABEL_CN = { speech:'人声', music:'音乐', noise:'噪音', text:'文字' };
+const LABEL_COLORS = { speech:'#E74C3C', music:'#8E44AD', noise:'#95A5A6', text:'#4fc3f7', vocal:'#E74C3C', instrumental:'#22C55E' };
+const LABEL_CN = { speech:'人声', music:'音乐', noise:'噪音', text:'文字', vocal:'人声', instrumental:'纯器乐' };
 
 let currentTask = 'task13', selectedLabel = '', segments = [], checkResult = null;
 let audio = new Audio();

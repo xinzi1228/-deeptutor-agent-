@@ -324,3 +324,57 @@ async def competency_tree() -> dict[str, Any]:
     if not tree_path.exists():
         return {"tree": None, "error": "competency_tree.json not found"}
     return json.loads(tree_path.read_text(encoding="utf-8"))
+
+
+@router.get("/annotation-tasks")
+async def get_annotation_tasks(modal: str = "") -> dict[str, Any]:
+    """Return annotation tasks from the knowledge base DB, optionally filtered by modality."""
+    import sqlite3
+    from pathlib import Path
+
+    db_path = Path(__file__).parent.parent.parent.parent / "data" / "data_annotation_kb.db"
+    if not db_path.exists():
+        return {"tasks": {}, "error": "Database not found"}
+
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+
+    modal_map_reverse = {"image": 1, "audio": 2, "video": 3, "text": 5}
+    mod_id = modal_map_reverse.get(modal) if modal else None
+
+    quizzes = conn.execute("""
+        SELECT q.*, kp.point_name FROM quiz q
+        JOIN knowledge_point kp ON q.point_id = kp.id
+        WHERE q.is_deleted = 0
+        """ + ("AND kp.modality_id = ?" if mod_id else "") + """
+        ORDER BY q.sort
+    """, ((mod_id,) if mod_id else ())).fetchall()
+
+    tasks = {}
+    idx = 1
+    for q in quizzes:
+        options = conn.execute(
+            "SELECT * FROM quiz_option WHERE quiz_id = ? ORDER BY sort", (q["id"],)
+        ).fetchall()
+        if len(options) < 2:
+            continue
+
+        letters = [chr(65 + i) for i in range(len(options))]
+        correct_idx = next((i for i, o in enumerate(options) if o["is_correct"]), 0)
+        correct_label = letters[correct_idx] if correct_idx < len(letters) else "A"
+
+        tid = f"task_q{idx}"
+        tasks[tid] = {
+            "question": q["question_text"],
+            "labels": letters,
+            "type": "classification",
+            "difficulty": "easy",
+            "ground_truth": {"label": correct_label},
+            "options": [{"id": letters[i], "text": options[i]["option_text"]} for i in range(len(options))],
+            "explanation": q["explanation"] or "",
+            "knowledge_point": q["point_name"] or "",
+        }
+        idx += 1
+
+    conn.close()
+    return {"tasks": tasks, "count": len(tasks)}

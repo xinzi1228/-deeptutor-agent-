@@ -250,17 +250,17 @@ function renderEntityList() {
 let textClassifyAnswer = null;
 function loadTextClassifyTask(t) {
   const main = document.querySelector('.main-area');
-  const labelsHtml = t.labels.map(l => {
-    const cn = LABEL_CN[l] || l;
-    return `<button class="classify-btn" onclick="selectClassify('${l}', this)">${cn}</button>`;
+  const items = t.items || [];
+  const labelsHtml = items.map((it, i) => {
+    return `<button class="classify-btn" onclick="selectClassify('${it.id}', this)" style="display:block;width:100%;text-align:left">${it.text}</button>`;
   }).join('');
 
   main.innerHTML = `
-    <div class="classification-area" style="text-align:center">
-      <p style="font-size:15px;line-height:1.8;margin-bottom:20px;color:#ccc">${t.text}</p>
-      <p style="color:#888;font-size:12px;margin-bottom:12px">选择质量等级：</p>
-      <div id="classifyBtns">${labelsHtml}</div>
-      <button class="primary" onclick="checkClassify()" style="margin-top:20px;padding:10px 32px;border-radius:8px;background:#2563eb;color:#eee;border:none;cursor:pointer;font-size:14px">提交分类</button>
+    <div class="classification-area" style="text-align:left;padding:24px">
+      <p style="font-size:15px;line-height:1.8;margin-bottom:20px;color:#ccc;text-align:center">${t.text}</p>
+      <div id="classifyBtns" style="display:flex;flex-direction:column;gap:8px">${labelsHtml}</div>
+      ${t.explanation ? `<p style="color:#888;font-size:11px;margin-top:12px">${t.explanation}</p>` : ''}
+      <button class="primary" onclick="checkClassify()" style="margin-top:20px;padding:10px 32px;border-radius:8px;background:#2563eb;color:#eee;border:none;cursor:pointer;font-size:14px;display:block;margin-left:auto;margin-right:auto">提交分类</button>
       <div id="classifyResult" style="margin-top:12px"></div>
     </div>
   `;
@@ -473,7 +473,50 @@ function askDoubt() {
   try { window.parent.location.href = '/home'; } catch(e) { window.top.location.href = '/home'; }
 }
 
-loadTask();
+// Dynamic task loading from knowledge base API
+let allTasks = {};
+let taskIds = [];
+
+async function initTasks() {
+  try {
+    const resp = await fetch('/api/v1/profile/annotation-tasks');
+    const data = await resp.json();
+    allTasks = data.tasks || {};
+    taskIds = Object.keys(allTasks);
+    
+    // Populate dropdown
+    const sel = document.getElementById('taskSelect');
+    sel.innerHTML = taskIds.map((tid, i) => {
+      const t = allTasks[tid];
+      return `<option value="${tid}">题${i+1}: ${(t.question||'').substring(0,20)}</option>`;
+    }).join('');
+    
+    // Merge into TASKS
+    taskIds.forEach(tid => {
+      const t = allTasks[tid];
+      TASKS[tid] = {
+        text: t.question,
+        labels: t.labels,
+        desc: t.question.substring(0,30),
+        difficulty: t.difficulty || '简单',
+        type: 'text_classification',
+        gt: t.ground_truth,
+        explanation: t.explanation || '',
+        items: (t.options || []).map(o => ({id: o.id, text: `${o.id}. ${o.text}`}))
+      };
+    });
+    
+    // Refresh current task display
+    if (taskIds.length > 0) {
+      document.getElementById('taskSelect').value = taskIds[0];
+      loadTask();
+    }
+  } catch(e) {
+    console.error('Failed to load tasks from API', e);
+  }
+}
+
+initTasks();
 </script>
 </body>
 </html>
