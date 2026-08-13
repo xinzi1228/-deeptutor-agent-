@@ -1,5 +1,5 @@
 {
-  "_note": "教学专家角色索引（Source of truth）。coordinator + 6 experts。每个条目 file 指向角色文件。pytest 校验目录与索引双向一致 + frontmatter 完整。",
+  "_note": "教学与可视化专家角色索引（Source of truth）。coordinator + 9 experts。每个条目 file 指向角色文件。pytest 校验目录与索引双向一致 + frontmatter 完整。",
   "coordinator": {
     "id": "annotation-coach",
     "label": "标注教练",
@@ -13,6 +13,9 @@
     {"id": "task_guide", "label": "任务引导师", "icon": "🧭", "color": "#F59E0B", "file": "references/experts/task_guide.md"},
     {"id": "struggle_detective", "label": "困难检测师", "icon": "🕵️", "color": "#EF4444", "file": "references/experts/struggle_detective.md"},
     {"id": "report_analyst", "label": "学习报告师", "icon": "📊", "color": "#8B5CF6", "file": "references/experts/report_analyst.md"},
-    {"id": "grading_expert", "label": "练习批改师", "icon": "✅", "color": "#06B6D4", "file": "references/experts/grading_expert.md"}
+    {"id": "grading_expert", "label": "练习批改师", "icon": "✅", "color": "#06B6D4", "file": "references/experts/grading_expert.md"},
+    {"id": "chart_designer", "label": "数据图表师", "icon": "📈", "color": "#0EA5E9", "file": "references/experts/chart_designer.md"},
+    {"id": "diagram_designer", "label": "概念图解师", "icon": "🧩", "color": "#14B8A6", "file": "references/experts/diagram_designer.md"},
+    {"id": "illustration_designer", "label": "学习插画师", "icon": "🎨", "color": "#EC4899", "file": "references/experts/illustration_designer.md"}
   ]
 }

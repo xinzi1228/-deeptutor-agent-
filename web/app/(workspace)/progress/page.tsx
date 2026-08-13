@@ -42,6 +42,8 @@ import {
   type TeachingFlowState,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
+import { apiFetch, apiUrl } from "@/lib/api";
+import type { VisualizationArtifact } from "@/components/chat/home/VisualizationArtifactCard";
 
 const RadarChart = dynamic(() => import("@/components/learning-stats/RadarChart").then((module) => module.RadarChart), { ssr: false });
 const F1Curve = dynamic(() => import("@/components/learning-stats/F1Curve").then((module) => module.F1Curve), { ssr: false });
@@ -54,6 +56,7 @@ const CoachMetricsPanel = dynamic(() => import("@/components/learning-stats/Coac
 const KnowledgeGraphPanel = dynamic(() => import("@/components/learning-stats/KnowledgeGraphPanel").then((module) => module.KnowledgeGraphPanel), { ssr: false });
 const CheckinCalendar = dynamic(() => import("@/components/learning-stats/CheckinCalendar").then((module) => module.CheckinCalendar));
 const BadgeWall = dynamic(() => import("@/components/learning-stats/BadgeWall").then((module) => module.BadgeWall));
+const VisualizationArtifactCard = dynamic(() => import("@/components/chat/home/VisualizationArtifactCard").then((module) => module.VisualizationArtifactCard), { ssr: false });
 
 type Tab = "overview" | "records" | "achievements" | "graph";
 
@@ -85,12 +88,13 @@ export default function ProgressPage() {
   const [coachMetrics, setCoachMetrics] = useState<CoachMetrics | null>(null);
   const [knowledgeGraph, setKnowledgeGraph] = useState<KnowledgeGraphData | null>(null);
   const [teachingFlow, setTeachingFlow] = useState<TeachingFlowState | null>(null);
+  const [visualizations, setVisualizations] = useState<VisualizationArtifact[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, report, workspace, extensionData, radar, f1, tree, fs] = await Promise.all([
+        const [ov, report, workspace, extensionData, radar, f1, tree, fs, artwork] = await Promise.all([
           getLearningOverview(),
           getLearningReport(),
           getWorkspaceViews(),
@@ -99,6 +103,7 @@ export default function ProgressPage() {
           getF1Trend(),
           getSkillTree(),
           getForesightStats(),
+          apiFetch(apiUrl("/api/v1/profile/visualizations?limit=6"), { cache: "no-store" }).then((response) => response.ok ? response.json() : { artifacts: [] }),
         ]);
         if (cancelled) return;
         setOverview(ov.overview);
@@ -109,6 +114,7 @@ export default function ProgressPage() {
         setF1Points(f1.points);
         setSkillTree(tree.tree);
         setForesight(fs);
+        setVisualizations(artwork.artifacts || []);
         const pathExtension = extensionData.extensions.find((item) => item.id === "learning-path-diagram");
         if (pathExtension?.enabled) {
           getLearningPathDiagram().then((value) => !cancelled && setLearningPath(value.diagram)).catch(() => undefined);
@@ -233,6 +239,8 @@ export default function ProgressPage() {
               </div>
             </section>
           )}
+
+          {visualizations.length > 0 && <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5"><div className="mb-3"><h2 className="text-sm font-semibold">学习可视化作品</h2><p className="mt-1 text-xs text-[var(--muted-foreground)]">主对话、标注教练和报告共享的已校验作品</p></div><div className="grid gap-4 lg:grid-cols-2">{visualizations.map((artifact) => <VisualizationArtifactCard key={artifact.id} artifact={artifact} />)}</div></section>}
 
           {workspaceViews && (
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

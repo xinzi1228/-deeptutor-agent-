@@ -14,13 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from deeptutor.api.routers.auth import TokenPayload, require_admin
-
-from deeptutor.services.learning_records import LearningStats
 from deeptutor.services.learning_communication import (
     audit_learning_copy,
     build_learning_communication_summary,
     render_learning_report,
 )
+from deeptutor.services.learning_records import LearningStats
 
 router = APIRouter()
 
@@ -94,6 +93,17 @@ async def report_summary() -> dict[str, Any]:
     }
 
 
+@router.get("/visualizations")
+async def profile_visualizations(limit: int = 12) -> dict[str, Any]:
+    from deeptutor.multi_user.paths import get_current_learning_profile_root
+    from deeptutor.services.visualization_artifacts import VisualizationArtifactStore
+
+    root = get_current_learning_profile_root(require_unlocked=True)
+    if root is None:
+        raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    return {"artifacts": VisualizationArtifactStore(root).list(limit=max(1, min(limit, 30)))}
+
+
 @router.get("/extensions/catalog")
 async def extension_catalog() -> dict[str, Any]:
     from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
@@ -157,8 +167,14 @@ async def create_workspace_inbox(request: InboxCreateRequest) -> dict[str, Any]:
 @router.post("/workspace/inbox/{item_id}/organize")
 async def organize_workspace_inbox(item_id: str, request: InboxOrganizeRequest) -> dict[str, Any]:
     from deeptutor.services.learning_workspace import LearningWorkspaceService
-    try: return {"item": LearningWorkspaceService().organize_inbox(item_id, resolved_to=request.resolved_to)}
-    except ValueError as exc: raise HTTPException(status_code=404, detail=str(exc)) from exc
+    try:
+        return {
+            "item": LearningWorkspaceService().organize_inbox(
+                item_id, resolved_to=request.resolved_to
+            )
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/workspace/rebuild")
@@ -443,8 +459,8 @@ async def competency_tree() -> dict[str, Any]:
 @router.get("/annotation-tasks")
 async def get_annotation_tasks(modal: str = "") -> dict[str, Any]:
     """Return annotation tasks from the knowledge base DB, optionally filtered by modality."""
-    import sqlite3
     from pathlib import Path
+    import sqlite3
 
     db_path = Path(__file__).parent.parent.parent.parent / "data" / "data_annotation_kb.db"
     if not db_path.exists():

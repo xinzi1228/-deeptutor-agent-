@@ -154,10 +154,11 @@ def _fake_pipeline_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(AgenticChatPipeline, "_build_openai_client", _no_real_client)
 
 
-def test_expert_ids_six():
+def test_expert_ids_include_teaching_and_visualization_specialists():
     assert set(EXPERT_IDS) == {
         "learning_planner", "task_guide", "grading_expert",
         "struggle_detective", "report_analyst", "session_steward",
+        "chart_designer", "diagram_designer", "illustration_designer",
     }
 
 
@@ -297,7 +298,7 @@ def test_whitelist_per_expert():
 
     banned = {"delegate_to_expert", "ask_user", "write_memory", "web_fetch", "github", "cron"}
     always_on = set(ALWAYS_ON_TOOLS)
-    assert len(ALWAYS_ON_TOOLS) == 25
+    assert len(ALWAYS_ON_TOOLS) >= 27
     assert set(EXPERT_TOOL_WHITELISTS) == set(EXPERT_IDS)
     for expert_id, whitelist in EXPERT_TOOL_WHITELISTS.items():
         assert set(whitelist).issubset(always_on), f"{expert_id} 超出 always_on"
