@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
-import AnnotationCoach from "@/components/annotation/AnnotationCoach";
 import AnnotationProgress from "@/components/annotation/AnnotationProgress";
 import { apiFetch, apiUrl } from "@/lib/api";
 
@@ -13,6 +13,11 @@ type WorkbenchEvent = {
   taskId?: string;
   payload: unknown;
 };
+
+const AnnotationCoach = dynamic(
+  () => import("@/components/annotation/AnnotationCoach"),
+  { ssr: false, loading: () => null },
+);
 
 export default function AnnotationPage() {
   const { t } = useTranslation();

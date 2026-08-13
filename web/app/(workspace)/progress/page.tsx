@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import {
   getLearningOverview,
@@ -41,17 +42,18 @@ import {
   type TeachingFlowState,
 } from "@/lib/learning-stats-api";
 import { StatCards } from "@/components/learning-stats/StatCards";
-import { RadarChart } from "@/components/learning-stats/RadarChart";
-import { F1Curve } from "@/components/learning-stats/F1Curve";
-import { SkillTree } from "@/components/learning-stats/SkillTree";
-import { DecisionLog as DecisionLogPanel } from "@/components/learning-stats/DecisionLog";
-import { EvaluationPanel } from "@/components/learning-stats/EvaluationPanel";
-import { Timeline } from "@/components/learning-stats/Timeline";
-import { TeachingFlowPanel } from "@/components/learning-stats/TeachingFlowPanel";
-import { CoachMetricsPanel } from "@/components/learning-stats/CoachMetrics";
-import { KnowledgeGraphPanel } from "@/components/learning-stats/KnowledgeGraphPanel";
-import { CheckinCalendar } from "@/components/learning-stats/CheckinCalendar";
-import { BadgeWall } from "@/components/learning-stats/BadgeWall";
+
+const RadarChart = dynamic(() => import("@/components/learning-stats/RadarChart").then((module) => module.RadarChart), { ssr: false });
+const F1Curve = dynamic(() => import("@/components/learning-stats/F1Curve").then((module) => module.F1Curve), { ssr: false });
+const SkillTree = dynamic(() => import("@/components/learning-stats/SkillTree").then((module) => module.SkillTree), { ssr: false });
+const DecisionLogPanel = dynamic(() => import("@/components/learning-stats/DecisionLog").then((module) => module.DecisionLog));
+const EvaluationPanel = dynamic(() => import("@/components/learning-stats/EvaluationPanel").then((module) => module.EvaluationPanel));
+const Timeline = dynamic(() => import("@/components/learning-stats/Timeline").then((module) => module.Timeline));
+const TeachingFlowPanel = dynamic(() => import("@/components/learning-stats/TeachingFlowPanel").then((module) => module.TeachingFlowPanel));
+const CoachMetricsPanel = dynamic(() => import("@/components/learning-stats/CoachMetrics").then((module) => module.CoachMetricsPanel));
+const KnowledgeGraphPanel = dynamic(() => import("@/components/learning-stats/KnowledgeGraphPanel").then((module) => module.KnowledgeGraphPanel), { ssr: false });
+const CheckinCalendar = dynamic(() => import("@/components/learning-stats/CheckinCalendar").then((module) => module.CheckinCalendar));
+const BadgeWall = dynamic(() => import("@/components/learning-stats/BadgeWall").then((module) => module.BadgeWall));
 
 type Tab = "overview" | "records" | "achievements" | "graph";
 
@@ -63,6 +65,7 @@ const TABS: Array<{ key: Tab; label: string }> = [
 ];
 
 export default function ProgressPage() {
+  const loadedTabs = useRef(new Set<Tab>(["overview"]));
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +90,7 @@ export default function ProgressPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, report, workspace, extensionData, radar, f1, tree, dec, ev, plan, tr, fs, cm, kg, tf] = await Promise.all([
+        const [ov, report, workspace, extensionData, radar, f1, tree, fs] = await Promise.all([
           getLearningOverview(),
           getLearningReport(),
           getWorkspaceViews(),
@@ -95,14 +98,7 @@ export default function ProgressPage() {
           getRadarDimensions(),
           getF1Trend(),
           getSkillTree(),
-          getDecisions(),
-          getEvaluations(),
-          getCoursePlan().catch(() => ({ plan: null as any })),
-          getTraceLog().catch(() => ({ traces: [] as TraceItem[] })),
           getForesightStats(),
-          getCoachMetrics(),
-          getKnowledgeGraph().catch(() => null),
-          getTeachingFlow().catch(() => null),
         ]);
         if (cancelled) return;
         setOverview(ov.overview);
@@ -112,14 +108,7 @@ export default function ProgressPage() {
         setDimensions(radar.dimensions);
         setF1Points(f1.points);
         setSkillTree(tree.tree);
-        setDecisions(dec.decisions);
-        setEvaluations(ev.evaluations);
-        setCoursePlan(plan.plan || null);
-        setTraces(tr.traces);
         setForesight(fs);
-        setCoachMetrics(cm);
-        setKnowledgeGraph(kg);
-        setTeachingFlow(tf);
         const pathExtension = extensionData.extensions.find((item) => item.id === "learning-path-diagram");
         if (pathExtension?.enabled) {
           getLearningPathDiagram().then((value) => !cancelled && setLearningPath(value.diagram)).catch(() => undefined);
@@ -133,6 +122,34 @@ export default function ProgressPage() {
     load();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (tab === "overview" || tab === "achievements" || loadedTabs.current.has(tab)) return;
+    loadedTabs.current.add(tab);
+    if (tab === "records") {
+      void Promise.all([
+        getDecisions(),
+        getCoursePlan().catch(() => ({ plan: null as CoursePlan | null })),
+        getTraceLog().catch(() => ({ traces: [] as TraceItem[] })),
+        getTeachingFlow().catch(() => null),
+      ]).then(([dec, plan, tr, flow]) => {
+        setDecisions(dec.decisions);
+        setCoursePlan(plan.plan || null);
+        setTraces(tr.traces);
+        setTeachingFlow(flow);
+      }).catch((reason) => setError(reason instanceof Error ? reason.message : "记录加载失败"));
+    } else if (tab === "graph") {
+      void Promise.all([
+        getEvaluations(),
+        getCoachMetrics(),
+        getKnowledgeGraph().catch(() => null),
+      ]).then(([ev, cm, graph]) => {
+        setEvaluations(ev.evaluations);
+        setCoachMetrics(cm);
+        setKnowledgeGraph(graph);
+      }).catch((reason) => setError(reason instanceof Error ? reason.message : "图谱加载失败"));
+    }
+  }, [tab]);
 
   if (loading) {
     return (

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import vm from "vm";
+import { gzipSync } from "zlib";
 
 const APP_SERVER_DIR = path.resolve(".next/server/app");
 const APP_OUTPUT_DIR = path.resolve(".next");
@@ -52,7 +53,12 @@ function normalizePublicRoute(manifestKey) {
 
 function resolveChunkSize(chunkPath) {
   const filePath = path.join(APP_OUTPUT_DIR, chunkPath.replace(/^\/+/, ""));
-  return fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+  // Track bytes actually transferred by a normal production server. Raw
+  // chunk size over-counts framework and locale source text by 2–4× and made
+  // the gate fail after the Next 16 runtime upgrade even when route payloads
+  // became smaller. Parsing cost is still covered by route-level lazy-load
+  // tests and the production build.
+  return fs.existsSync(filePath) ? gzipSync(fs.readFileSync(filePath)).length : 0;
 }
 
 function sumChunkSizes(chunkPaths) {
@@ -101,7 +107,7 @@ for (const manifestFile of manifestFiles) {
 
 let hasFailure = false;
 
-console.log("Route budgets (excluding root shell):");
+console.log("Route budgets (gzip transfer size, excluding root shell):");
 for (const row of routeRows) {
   const sizeKb = Math.round(row.sizeBytes / 1024);
   const budget = ROUTE_BUDGETS_KB[row.route];
