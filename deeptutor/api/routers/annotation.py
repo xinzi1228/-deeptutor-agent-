@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from deeptutor.multi_user.context import require_learning_profile_write_access
 from deeptutor.multi_user.paths import get_current_learning_profile_root
 from deeptutor.services.annotation_attempts import AnnotationAttemptStore
 from deeptutor.services.coach_context import build_annotation_coach_context
@@ -67,7 +68,12 @@ class AttemptRequest(BaseModel):
     grade: bool = True
 
 
-def _private_store() -> AnnotationAttemptStore:
+def _private_store(*, write: bool = False) -> AnnotationAttemptStore:
+    if write:
+        try:
+            require_learning_profile_write_access()
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
     try:
         root = get_current_learning_profile_root(require_unlocked=True)
     except PermissionError as exc:
@@ -165,7 +171,7 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
 async def update_annotation_activity(body: ActivityRequest) -> dict[str, Any]:
     """Record what the learner is doing so the coach can offer timely help."""
     try:
-        current = _private_store().set_current(
+        current = _private_store(write=True).set_current(
             task_id=body.task_id, mode=body.mode, stage=body.stage, summary=body.summary
         )
     except ValueError as exc:
@@ -178,7 +184,7 @@ async def save_annotation_draft(task_id: str, body: DraftRequest) -> dict[str, A
     if body.task_id != task_id:
         raise HTTPException(status_code=422, detail="路径任务编号与请求内容不一致")
     try:
-        draft = _private_store().save_draft(task_id, body.mode, body.payload)
+        draft = _private_store(write=True).save_draft(task_id, body.mode, body.payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"draft": draft}
@@ -212,7 +218,7 @@ async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
         metrics = grade_result.get("metrics", {})
         report = str(grade_result.get("report", ""))
     try:
-        attempt, created = _private_store().append_attempt(
+        attempt, created = _private_store(write=True).append_attempt(
             task_id=body.task_id,
             task_type=body.task_type,
             mode=body.mode,

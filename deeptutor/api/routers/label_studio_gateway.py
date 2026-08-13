@@ -6,7 +6,11 @@ import re
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
-from deeptutor.multi_user.context import get_current_learning_profile, get_current_user
+from deeptutor.multi_user.context import (
+    get_current_learning_profile,
+    get_current_user,
+    require_learning_profile_write_access,
+)
 from deeptutor.multi_user.paths import get_current_learning_profile_root
 from deeptutor.services.annotation_attempts import AnnotationAttemptStore
 from deeptutor.services.label_studio_gateway import (
@@ -21,10 +25,15 @@ router = APIRouter()
 PROXY_PREFIX = "/api/v1/label-studio/proxy"
 
 
-def _context() -> tuple[object, object, LabelStudioProfileMap]:
+def _context(*, write: bool = False) -> tuple[object, object, LabelStudioProfileMap]:
     access = get_current_learning_profile()
     if access is None:
         raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    if write:
+        try:
+            access = require_learning_profile_write_access()
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
     try:
         root = get_current_learning_profile_root(require_unlocked=True)
     except PermissionError as exc:
@@ -53,7 +62,7 @@ async def status() -> dict:
 async def prepare(task_id: str) -> dict:
     from deeptutor.api.routers.annotation import _task_bank
 
-    access, root, mapping = _context()
+    access, root, mapping = _context(write=True)
     task = _task_bank().get(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")
@@ -79,7 +88,7 @@ async def prepare(task_id: str) -> dict:
 
 @router.post("/sync/{task_id}")
 async def sync_professional_attempt(task_id: str) -> dict:
-    access, root, mapping = _context()
+    access, root, mapping = _context(write=True)
     ls_task_id = mapping.task_map.get(task_id)
     if not ls_task_id:
         raise HTTPException(status_code=404, detail="该题尚未进入专业模式")
@@ -124,7 +133,9 @@ def _rewrite_text(text: str) -> str:
 
 @router.api_route("/proxy/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 async def proxy(path: str, request: Request) -> Response:
-    access, root, mapping = _context()
+    access, root, mapping = _context(
+        write=request.method not in {"GET", "HEAD", "OPTIONS"}
+    )
     query = request.url.query
     policy = LabelStudioAccessPolicy(mapping)
     if not policy.allows(request.method, path, query):

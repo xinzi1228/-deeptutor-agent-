@@ -46,6 +46,16 @@ def get_current_learning_profile() -> ProfileAccessContext | None:
     return _current_learning_profile.get()
 
 
+def require_learning_profile_write_access() -> ProfileAccessContext:
+    """Return the active profile context only when it permits private-data writes."""
+    profile = get_current_learning_profile()
+    if profile is None:
+        raise PermissionError("请先解锁学习档案")
+    if profile.read_only:
+        raise PermissionError("当前为教师只读视角，不能修改学生学习数据")
+    return profile
+
+
 def user_from_token_payload(payload: Any | None) -> CurrentUser:
     if payload is None:
         return local_admin_user()
