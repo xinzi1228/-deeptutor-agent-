@@ -10,6 +10,7 @@ EXPERT_DIR = Path(__file__).resolve().parents[1] / "deeptutor" / "skills" / "bui
 EXPECTED_EXPERTS = [
     "learning_planner", "session_steward", "task_guide",
     "struggle_detective", "report_analyst", "grading_expert",
+    "chart_designer", "diagram_designer", "illustration_designer",
 ]
 
 REQUIRED_FRONTMATTER = ["name", "description", "color", "emoji", "vibe"]
