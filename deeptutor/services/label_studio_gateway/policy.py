@@ -39,8 +39,9 @@ class LabelStudioAccessPolicy:
         task_annotations = re.fullmatch(r"api/tasks/(\d+)/annotations/?", clean)
         if task_annotations:
             return int(task_annotations.group(1)) in task_ids and method.upper() in {"GET", "POST"}
-        # Annotation IDs are not predictable from the task id. Mutations are
-        # accepted only after the router validates the request's task field.
+        # Annotation URLs do not carry a task id. The router resolves every
+        # annotation with the service credential and verifies its owning task
+        # before the request is forwarded.
         if re.fullmatch(r"api/annotations/\d+/?", clean):
             return method.upper() in {"GET", "PATCH", "DELETE"}
         return False

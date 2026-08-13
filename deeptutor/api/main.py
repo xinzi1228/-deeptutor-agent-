@@ -356,17 +356,18 @@ from deeptutor.api.routers import (
     achievements,
     agent_config,
     annotation,
-    label_studio_gateway,
     attachments,
     auth,
     book,
     capabilities_settings,
+    capability_center,
     chat,
     co_writer,
     cron,
     dashboard,
     imports,
     knowledge,
+    label_studio_gateway,
     learning_profiles,
     mastery_path,
     mcp_settings,
@@ -448,6 +449,12 @@ app.include_router(
     capabilities_settings.router,
     prefix="/api/v1/capabilities",
     tags=["capabilities"],
+    dependencies=_auth,
+)
+app.include_router(
+    capability_center.router,
+    prefix="/api/v1/capability-center",
+    tags=["capability-center"],
     dependencies=_auth,
 )
 app.include_router(

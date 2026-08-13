@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
@@ -127,10 +128,31 @@ async def proxy(path: str, request: Request) -> Response:
     policy = LabelStudioAccessPolicy(mapping)
     if not policy.allows(request.method, path, query):
         raise HTTPException(status_code=403, detail="当前学习档案无权访问该 Label Studio 资源")
+    client = LabelStudioClient()
+    annotation_match = re.fullmatch(r"api/annotations/(\d+)/?", path.lstrip("/"))
+    if annotation_match:
+        # Label Studio's annotation URL does not carry a task id. Resolve it
+        # with the server credential before forwarding so a guessed annotation
+        # id can never expose or modify another learning profile's work.
+        try:
+            annotation = await client.request(
+                "GET", f"/api/annotations/{annotation_match.group(1)}"
+            )
+        except LabelStudioUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        owner = annotation.get("task") if isinstance(annotation, dict) else None
+        if isinstance(owner, dict):
+            owner = owner.get("id")
+        try:
+            owner_id = int(owner)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=403, detail="无法确认该标注所属任务") from None
+        if owner_id not in set(mapping.task_map.values()):
+            raise HTTPException(status_code=403, detail="当前学习档案无权访问该标注")
+
     body = await request.body()
     if request.method not in {"GET", "HEAD", "OPTIONS"} and not policy.validate_mutation_body(path, body):
         raise HTTPException(status_code=403, detail="提交内容包含未分配给当前档案的任务")
-    client = LabelStudioClient()
     bridge = LabelStudioSessionBridge(client.base_url, access.profile_id, mapping.email_alias)
     target = "/" + path.lstrip("/") + (f"?{query}" if query else "")
     try:

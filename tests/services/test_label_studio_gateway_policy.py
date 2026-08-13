@@ -25,3 +25,12 @@ def test_policy_rejects_cross_profile_mutation_body() -> None:
     assert policy.validate_mutation_body("api/tasks/101/annotations", b'{"task":101,"result":[]}')
     assert not policy.validate_mutation_body("api/tasks/101/annotations", b'{"task":999,"result":[]}')
     assert not policy.validate_mutation_body("api/tasks/101/annotations", b"not-json")
+
+
+def test_annotation_id_routes_are_only_candidates_for_router_owner_check() -> None:
+    policy = _policy()
+    assert policy.allows("GET", "/api/annotations/501")
+    assert policy.allows("PATCH", "/api/annotations/501")
+    assert policy.allows("DELETE", "/api/annotations/501")
+    assert not policy.allows("POST", "/api/annotations/501")
+    assert not policy.allows("GET", "/api/annotations/not-a-number")

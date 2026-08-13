@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
+  Sparkles,
   Tag,
   TrendingUp,
   type LucideIcon,
@@ -62,6 +63,7 @@ const PRIMARY_NAV: NavEntry[] = [
 ];
 
 const SECONDARY_NAV: NavEntry[] = [
+  { href: "/capabilities", label: "能力中心", icon: Sparkles },
   { href: "/memory", label: "Memory", icon: Brain, tooltipKey: "Memory tooltip" },
   { href: "/standards", label: "标注规范", icon: BookOpen },
   { href: "/tasks", label: "定时任务", icon: Clock },
