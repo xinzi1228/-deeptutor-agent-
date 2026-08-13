@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+from datetime import datetime, timezone
 from typing import Any
 
 from deeptutor.services.learning_profiles.models import ProfileAccessContext
@@ -53,6 +54,44 @@ def require_learning_profile_write_access() -> ProfileAccessContext:
         raise PermissionError("请先解锁学习档案")
     if profile.read_only:
         raise PermissionError("当前为教师只读视角，不能修改学生学习数据")
+    return profile
+
+
+def authorize_learning_profile_mutation(
+    *, operation: str, path: str = ""
+) -> ProfileAccessContext | None:
+    """Protect profile-private mutations and audit managed writes.
+
+    Account-level routes may be used before a learning profile is unlocked, so
+    the absence of a profile is not an error here.  When a profile context is
+    active, teacher-view grants are strictly read-only.  Impersonated writes
+    are recorded without request bodies or other potentially sensitive data.
+    """
+    profile = get_current_learning_profile()
+    if profile is None:
+        return None
+    if profile.read_only:
+        raise PermissionError("当前为教师只读视角，不能修改学生学习数据")
+    if profile.mode == "impersonate":
+        from deeptutor.multi_user.paths import get_current_path_service
+        from deeptutor.services.learning_profiles.audit import append_audit_event
+        from deeptutor.services.learning_profiles.models import ProfileAuditEvent
+        from deeptutor.services.learning_profiles.store import LearningProfileStore
+
+        workspace = get_current_path_service().get_workspace_dir()
+        store = LearningProfileStore(workspace)
+        append_audit_event(
+            store.audit_file,
+            ProfileAuditEvent(
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                event="impersonated_mutation",
+                owner_user_id=profile.owner_user_id,
+                profile_id=profile.profile_id,
+                actor_user_id=profile.actor_user_id,
+                mode=profile.mode,
+                metadata={"operation": str(operation)[:80], "path": str(path)[:240]},
+            ),
+        )
     return profile
 
 

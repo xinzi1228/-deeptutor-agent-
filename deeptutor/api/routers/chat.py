@@ -89,6 +89,16 @@ async def websocket_chat(websocket: WebSocket):
                 await websocket.send_json({"type": "error", "message": "Message is required"})
                 continue
 
+            from deeptutor.multi_user.context import authorize_learning_profile_mutation
+
+            try:
+                authorize_learning_profile_mutation(
+                    operation="WS:message", path="/api/v1/chat"
+                )
+            except PermissionError as exc:
+                await websocket.send_json({"type": "error", "message": str(exc)})
+                continue
+
             logger.info(
                 f"Chat request: session={session_id}, "
                 f"message={message[:50]}..., rag={enable_rag}, web={enable_web_search}"

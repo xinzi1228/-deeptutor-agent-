@@ -5,6 +5,7 @@ from itertools import combinations
 import pytest
 
 from deeptutor.multi_user.context import (
+    authorize_learning_profile_mutation,
     require_learning_profile_write_access,
     reset_current_learning_profile,
     set_current_learning_profile,
@@ -15,6 +16,7 @@ from deeptutor.services.label_studio_gateway import (
     LabelStudioProfileMap,
 )
 from deeptutor.services.learning_profiles.grants import ProfileGrantStore
+from deeptutor.services.learning_profiles.models import ProfileAccessContext
 from deeptutor.services.learning_profiles.store import LearningProfileStore
 
 
@@ -93,5 +95,40 @@ def test_teacher_grant_cannot_be_used_as_student_write_grant(tmp_path) -> None:
     try:
         with pytest.raises(PermissionError, match="教师只读视角"):
             require_learning_profile_write_access()
+    finally:
+        reset_current_learning_profile(token)
+
+
+def test_teacher_view_blocks_shared_private_mutation_guard() -> None:
+    access = ProfileAccessContext(
+        owner_user_id="owner",
+        profile_id="lp_1234567890abcdef12345678",
+        mode="teacher_view",
+        actor_user_id="teacher",
+        read_only=True,
+    )
+    token = set_current_learning_profile(access)
+    try:
+        with pytest.raises(PermissionError, match="教师只读视角"):
+            authorize_learning_profile_mutation(
+                operation="POST", path="/api/v1/memory/doc/partner/profile"
+            )
+    finally:
+        reset_current_learning_profile(token)
+
+
+def test_student_mutation_guard_allows_normal_profile() -> None:
+    access = ProfileAccessContext(
+        owner_user_id="owner",
+        profile_id="lp_1234567890abcdef12345678",
+        mode="student",
+        actor_user_id="owner",
+        read_only=False,
+    )
+    token = set_current_learning_profile(access)
+    try:
+        assert authorize_learning_profile_mutation(
+            operation="POST", path="/api/v1/sessions"
+        ) == access
     finally:
         reset_current_learning_profile(token)

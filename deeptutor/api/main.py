@@ -400,9 +400,14 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 
 # All other routers require a valid session when AUTH_ENABLED=true.
 # require_auth is a no-op when AUTH_ENABLED=false, so this is safe for local use.
-from deeptutor.api.routers.auth import require_admin, require_auth  # noqa: E402
+from deeptutor.api.routers.auth import (  # noqa: E402
+    require_admin,
+    require_auth,
+    require_profile_mutation,
+)
 
 _auth = [Depends(require_auth)]
+_profile_private = [Depends(require_profile_mutation)]
 # Partner data is anchored at the admin workspace (data/partners) and shared
 # process-wide, so management is admin-gated in multi-user deployments
 # (single-user local runs are implicitly admin — no behaviour change there).
@@ -435,16 +440,16 @@ app.include_router(
     mastery_path.router,
     prefix="/api/v1/learning",
     tags=["mastery-path"],
-    dependencies=_auth,
+    dependencies=_profile_private,
 )
 app.include_router(
-    co_writer.router, prefix="/api/v1/co_writer", tags=["co_writer"], dependencies=_auth
+    co_writer.router, prefix="/api/v1/co_writer", tags=["co_writer"], dependencies=_profile_private
 )
 app.include_router(
-    notebook.router, prefix="/api/v1/notebook", tags=["notebook"], dependencies=_auth
+    notebook.router, prefix="/api/v1/notebook", tags=["notebook"], dependencies=_profile_private
 )
 app.include_router(book.router, prefix="/api/v1/book", tags=["book"], dependencies=_auth)
-app.include_router(memory.router, prefix="/api/v1/memory", tags=["memory"], dependencies=_auth)
+app.include_router(memory.router, prefix="/api/v1/memory", tags=["memory"], dependencies=_profile_private)
 app.include_router(
     capabilities_settings.router,
     prefix="/api/v1/capabilities",
@@ -458,13 +463,13 @@ app.include_router(
     dependencies=_auth,
 )
 app.include_router(
-    sessions.router, prefix="/api/v1/sessions", tags=["sessions"], dependencies=_auth
+    sessions.router, prefix="/api/v1/sessions", tags=["sessions"], dependencies=_profile_private
 )
 app.include_router(
     question_notebook.router,
     prefix="/api/v1/question-notebook",
     tags=["question-notebook"],
-    dependencies=_auth,
+    dependencies=_profile_private,
 )
 app.include_router(
     settings.router, prefix="/api/v1/settings", tags=["settings"], dependencies=_auth
@@ -490,7 +495,7 @@ app.include_router(
     personas.router, prefix="/api/v1/personas", tags=["personas"], dependencies=_auth
 )
 app.include_router(
-    profile.router, prefix="/api/v1/profile", tags=["profile"], dependencies=_auth
+    profile.router, prefix="/api/v1/profile", tags=["profile"], dependencies=_profile_private
 )
 app.include_router(
     annotation.router,
@@ -508,7 +513,7 @@ app.include_router(tools_router.router, prefix="/api/v1/tools", tags=["tools"], 
 app.include_router(system.router, prefix="/api/v1/system", tags=["system"], dependencies=_auth)
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"], dependencies=_auth)
 app.include_router(
-    plugins_api.router, prefix="/api/v1/plugins", tags=["plugins"], dependencies=_auth
+    plugins_api.router, prefix="/api/v1/plugins", tags=["plugins"], dependencies=_profile_private
 )
 app.include_router(
     agent_config.router, prefix="/api/v1/agent-config", tags=["agent-config"], dependencies=_auth

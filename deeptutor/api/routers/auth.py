@@ -29,7 +29,12 @@ from deeptutor.services.config import load_auth_settings
 _SECURE = bool(load_auth_settings()["cookie_secure"])
 _SAMESITE = "none" if _SECURE else "lax"
 
-from deeptutor.multi_user.context import get_current_user, set_current_user, user_from_token_payload
+from deeptutor.multi_user.context import (
+    authorize_learning_profile_mutation,
+    get_current_user,
+    set_current_user,
+    user_from_token_payload,
+)
 from deeptutor.multi_user.paths import local_admin_user
 from deeptutor.services.auth import (
     AUTH_ENABLED,
@@ -368,6 +373,27 @@ async def require_admin(
             detail="Admin access required",
         )
     return payload
+
+
+async def require_profile_mutation(
+    request: Request,
+    _: TokenPayload | None = Depends(require_auth),
+) -> None:
+    """Reject writes made through a teacher-view learning-profile grant.
+
+    This dependency is attached only to routers that own student-private
+    state. Safe HTTP methods remain readable. Impersonated writes are audited
+    by the shared context helper without recording bodies or secret values.
+    """
+    operation = request.method.upper()
+    if operation in {"GET", "HEAD", "OPTIONS"}:
+        return
+    try:
+        authorize_learning_profile_mutation(
+            operation=operation, path=request.url.path
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
 
 def _local_admin_token_payload() -> TokenPayload:

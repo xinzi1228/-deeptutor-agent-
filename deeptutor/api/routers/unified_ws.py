@@ -143,6 +143,31 @@ async def unified_websocket(ws: WebSocket) -> None:
 
             msg_type = msg.get("type")
 
+            if msg_type in {
+                "message",
+                "start_turn",
+                "regenerate",
+                "cancel_turn",
+                "submit_user_reply",
+                "user_input",
+            }:
+                from deeptutor.multi_user.context import authorize_learning_profile_mutation
+
+                try:
+                    authorize_learning_profile_mutation(
+                        operation=f"WS:{msg_type}", path="/api/v1/ws"
+                    )
+                except PermissionError as exc:
+                    await safe_send(
+                        {
+                            "type": "error",
+                            "source": "learning_profile_access",
+                            "content": str(exc),
+                            "metadata": {"status": "read_only"},
+                        }
+                    )
+                    continue
+
             if msg_type in {"message", "start_turn"}:
                 from deeptutor.services.session import get_turn_runtime_manager
 
