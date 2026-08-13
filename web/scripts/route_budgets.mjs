@@ -14,6 +14,9 @@ const ROUTE_BUDGETS_KB = {
   "/knowledge": 450,
   "/memory": 450,
   "/settings": 180,
+  "/annotation": 160,
+  "/progress": 180,
+  "/capabilities": 160,
 };
 
 const ROOT_SHELL_BUDGET_KB = 220;

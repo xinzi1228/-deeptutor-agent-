@@ -70,16 +70,43 @@ def _model_status() -> tuple[dict[str, Any], dict[str, Any]]:
 
 def _knowledge_status() -> dict[str, Any]:
     from deeptutor.multi_user.knowledge_access import current_kb_manager
+    from deeptutor.services.config import get_model_catalog_service
 
     try:
-        names = current_kb_manager().list_knowledge_bases()
+        manager = current_kb_manager()
+        names = manager.list_knowledge_bases()
     except Exception:
+        manager = None
         names = []
+    catalog_service = get_model_catalog_service()
+    catalog = catalog_service.load()
+    embedding = catalog_service.get_active_model(catalog, "embedding") or {}
+    embedding_name = str(embedding.get("name") or embedding.get("model") or "")
+    rows = []
+    if manager is not None:
+        for name in names:
+            item = (manager.config.get("knowledge_bases", {}) or {}).get(name, {})
+            rows.append({
+                "name": name,
+                "status": item.get("status", "unknown"),
+                "progress": item.get("progress", {}),
+            })
+    ready_count = sum(1 for item in rows if item["status"] == "ready")
+    failed_count = sum(1 for item in rows if item["status"] == "error")
+    state: Status = "normal" if ready_count and embedding_name else "fault" if names and not embedding_name else "limited"
+    if names and not embedding_name:
+        summary = f"已有 {len(names)} 个资料库文件，但尚未配置 Embedding 模型，不能检索"
+    elif names:
+        summary = f"已有 {len(names)} 个知识库，{ready_count} 个可检索"
+    else:
+        summary = "还没有导入知识资料"
     return _card(
-        "knowledge", "知识与资料", "normal" if names else "limited",
-        f"已有 {len(names)} 个知识库" if names else "还没有导入知识资料",
-        "没有知识库时仍可聊天，但回答无法引用你们的课程资料。",
-        "/capabilities#quick-knowledge", knowledge_base_count=len(names),
+        "knowledge", "知识与资料", state, summary,
+        "资料文件与可检索索引是两回事；导入后必须等待索引完成，并用带引用的示例问题验收。",
+        "/settings/embedding" if names and not embedding_name else "/capabilities#quick-knowledge",
+        knowledge_base_count=len(names), ready_count=ready_count,
+        failed_count=failed_count, embedding_model=embedding_name or None,
+        imports=rows,
     )
 
 
