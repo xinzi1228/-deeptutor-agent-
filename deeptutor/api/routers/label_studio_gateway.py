@@ -183,6 +183,55 @@ def _rewrite_text(text: str) -> str:
     return text
 
 
+_REALTIME_BRIDGE = r"""
+<script data-deeptutor-label-studio-bridge="1">
+(() => {
+  if (window.__deeptutorLsBridge) return;
+  window.__deeptutorLsBridge = true;
+  const send = (event, extra = {}) => window.parent.postMessage({
+    type: "label_studio_workbench_event", event,
+    taskId: new URLSearchParams(location.search).get("task") || "", ...extra
+  }, location.origin);
+  const countRegions = () => {
+    const selectors = [".lsf-region", ".htx-region", "[data-testid*='region']", "[class*='Region']"];
+    return Math.max(0, ...selectors.map((selector) => document.querySelectorAll(selector).length));
+  };
+  let lastCount = -1;
+  let timer = 0;
+  const inspect = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const count = countRegions();
+      if (count !== lastCount) { lastCount = count; send("draft_changed", { annotationCount: count }); }
+    }, 180);
+  };
+  new MutationObserver(inspect).observe(document.documentElement, { subtree: true, childList: true, attributes: true });
+  document.addEventListener("click", (event) => {
+    const target = event.target && event.target.closest ? event.target.closest("button,[role='button']") : null;
+    if (!target) return;
+    const text = `${target.getAttribute("aria-label") || ""} ${target.getAttribute("title") || ""} ${target.textContent || ""}`.toLowerCase();
+    if (/undo|撤销/.test(text)) send("undo", { annotationCount: countRegions() });
+    if (/submit|update|save|保存|提交/.test(text)) send("save", { annotationCount: countRegions() });
+    const label = target.getAttribute("data-label") || target.getAttribute("aria-label") || "";
+    if (label && /label|标签/i.test(text)) send("label_changed", { label: String(label).slice(0, 80) });
+  }, true);
+  window.addEventListener("popstate", () => send("task_changed"));
+  send("bridge_ready", { annotationCount: countRegions(), bridgeVersion: 1 });
+  inspect();
+})();
+</script>
+"""
+
+
+def _inject_realtime_bridge(text: str, path: str) -> str:
+    """Inject the optional, data-minimal LS workbench bridge into HTML only."""
+    if "text/html" not in text[:500].lower() and "</body>" not in text.lower():
+        return text
+    if not path.lstrip("/").startswith("projects/") or "data-deeptutor-label-studio-bridge" in text:
+        return text
+    return re.sub(r"</body\s*>", _REALTIME_BRIDGE + "</body>", text, count=1, flags=re.I)
+
+
 @router.api_route("/proxy/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 async def proxy(path: str, request: Request) -> Response:
     access, root, mapping = _context(
@@ -239,7 +288,10 @@ async def proxy(path: str, request: Request) -> Response:
         except (ValueError, json.JSONDecodeError):
             pass
     if any(kind in content_type for kind in ("text/html", "text/css", "javascript")):
-        content = _rewrite_text(upstream.text).encode("utf-8")
+        rewritten = _rewrite_text(upstream.text)
+        if "text/html" in content_type:
+            rewritten = _inject_realtime_bridge(rewritten, path)
+        content = rewritten.encode("utf-8")
     headers: dict[str, str] = {"Cache-Control": upstream.headers.get("cache-control", "no-store")}
     location = upstream.headers.get("location")
     if location and location.startswith("/"):

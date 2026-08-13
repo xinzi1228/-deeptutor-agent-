@@ -1,3 +1,4 @@
+from deeptutor.api.routers.label_studio_gateway import _inject_realtime_bridge
 from deeptutor.services.label_studio_gateway import LabelStudioAccessPolicy, LabelStudioProfileMap
 
 
@@ -8,6 +9,16 @@ def test_profile_map_uses_small_starter_assignment_then_explicit_assignments(tmp
     mapping.save(tmp_path)
     restored = LabelStudioProfileMap.load(tmp_path, mapping.profile_id)
     assert restored.assigned(["task1"]) == ["task4", "task2"]
+
+
+def test_realtime_bridge_only_injects_into_project_workbench_html() -> None:
+    html = "<html><body><main>Label Studio</main></body></html>"
+    injected = _inject_realtime_bridge(html, "projects/11/data")
+    assert "data-deeptutor-label-studio-bridge" in injected
+    assert "annotationCount" in injected
+    assert "clientX" not in injected
+    assert _inject_realtime_bridge(html, "user/login") == html
+    assert _inject_realtime_bridge(injected, "projects/11/data") == injected
 
 
 def _policy() -> LabelStudioAccessPolicy:

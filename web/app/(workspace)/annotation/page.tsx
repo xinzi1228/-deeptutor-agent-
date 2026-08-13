@@ -95,6 +95,22 @@ export default function AnnotationPage() {
     }).catch(() => undefined);
   }, [selectedTask]);
 
+  useEffect(() => {
+    const onProfessionalEvent = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "label_studio_workbench_event") return;
+      reportLiveState({
+        task_id: selectedTask,
+        mode: "professional",
+        stage: String(event.data.event || "editing"),
+        annotation_count: Number(event.data.annotationCount || 0),
+        current_label: String(event.data.label || "").slice(0, 80),
+        realtime_bridge: true,
+      });
+    };
+    window.addEventListener("message", onProfessionalEvent);
+    return () => window.removeEventListener("message", onProfessionalEvent);
+  }, [reportLiveState, selectedTask]);
+
   return (
     <div className="flex h-full flex-col bg-[var(--background)]">
       <header className="flex items-center justify-between border-b border-[var(--border)] px-6 py-3">
