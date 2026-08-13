@@ -452,6 +452,7 @@ workspace/learning_profiles/<learning_profile_id>/
 - 所有路由 gzip 性能预算通过，`/annotation` 41KB、`/progress` 42KB、`/capabilities` 27KB、root shell 141KB；
 - 前端 Node 测试 285 项通过；
 - 学习档案、标注、Label Studio、可视化、生图、扩展、报告与能力中心核心后端回归 64 项通过；
+- 后端其余全量测试在排除缺失 Telegram 可选依赖的收集文件后为 3503 通过、12 跳过；37 项失败主要来自 Windows/Linux 路径与权限差异、GBK 默认编码、缺失 Slack/Telegram 可选依赖和 Linux-only `resource`。其中三项新增专家契约回归已随后修复并单独 30 项通过；
 - Playwright 技能的服务器自动探测在系统授权审查阶段被拒绝，未绕过执行；已有 Label Studio 隔离 E2E 报告仍有效。
 
 当前环境未配置 Embedding 和 imagegen 模型。所以下列事项属于外部配置门槛，而不是继续在代码里伪造完成：管理员提供模型/密钥并通过连接测试后，创建标注知识库、索引 60 篇资料并做带引用问答；配置生图模型后执行一次真实、可能计费的 smoke。能力中心在此之前应保持受限状态。
