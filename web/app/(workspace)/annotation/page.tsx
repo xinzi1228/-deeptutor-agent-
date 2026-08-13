@@ -22,6 +22,7 @@ export default function AnnotationPage() {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"image" | "text" | "audio" | "video" | "pro">("image");
   const [tasks, setTasks] = useState<Array<{ id: string; title: string; type: string; modal: "image" | "text" | "audio" | "video"; difficulty: string }>>([]);
+  const [professionalTasks, setProfessionalTasks] = useState<typeof tasks>([]);
   const [selectedTask, setSelectedTask] = useState("");
   const [selectedTaskData, setSelectedTaskData] = useState<AnnotationTask | null>(null);
   const [labelStudio, setLabelStudio] = useState<{ available: boolean; configured?: boolean; management_url?: string | null; detail?: string } | null>(null);
@@ -36,9 +37,11 @@ export default function AnnotationPage() {
 
   useEffect(() => {
     if (mode !== "pro") return;
-    fetch("/api/v1/label-studio/status", { cache: "no-store" })
-      .then((res) => res.ok ? res.json() : Promise.reject())
-      .then(setLabelStudio)
+    Promise.all([
+      fetch("/api/v1/label-studio/status", { cache: "no-store" }).then((res) => res.ok ? res.json() : Promise.reject()),
+      fetch("/api/v1/label-studio/professional/tasks", { cache: "no-store" }).then((res) => res.ok ? res.json() : { tasks: [] }),
+    ])
+      .then(([status, assigned]) => { setLabelStudio(status); setProfessionalTasks(assigned.tasks || []); })
       .catch(() => setLabelStudio({ available: false, detail: "无法连接本地服务，或学习档案尚未解锁" }));
   }, [mode]);
 
@@ -80,7 +83,7 @@ export default function AnnotationPage() {
     }
   };
 
-  const filteredTasks = tasks.filter((task) => mode === "pro" ? ["image", "text"].includes(task.modal) : task.modal === mode);
+  const filteredTasks = mode === "pro" ? professionalTasks : tasks.filter((task) => task.modal === mode);
   const selectedIndex = filteredTasks.findIndex((task) => task.id === selectedTask);
   const reportLiveState = useCallback((state: Record<string, unknown>) => {
     const taskId = String(state.task_id || selectedTask);

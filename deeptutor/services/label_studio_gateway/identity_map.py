@@ -14,6 +14,7 @@ class LabelStudioProfileMap:
     email_alias: str
     project_id: int | None = None
     task_map: dict[str, int] = field(default_factory=dict)
+    assigned_task_ids: list[str] = field(default_factory=list)
     schema_version: int = 1
 
     @classmethod
@@ -34,4 +35,15 @@ class LabelStudioProfileMap:
         atomic_write_json(path, asdict(self))
 
     def public_dict(self) -> dict[str, Any]:
-        return {"project_id": self.project_id, "task_ids": list(self.task_map), "ready": bool(self.project_id)}
+        return {
+            "project_id": self.project_id,
+            "task_ids": list(self.task_map),
+            "assigned_task_ids": list(self.assigned_task_ids),
+            "ready": bool(self.project_id),
+        }
+
+    def assigned(self, fallback_ids: list[str]) -> list[str]:
+        """Return explicit assignments or the safe first-run starter set."""
+        if self.assigned_task_ids:
+            return list(dict.fromkeys(self.assigned_task_ids))
+        return list(dict.fromkeys(fallback_ids[:3]))

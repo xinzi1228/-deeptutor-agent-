@@ -1,6 +1,15 @@
 from deeptutor.services.label_studio_gateway import LabelStudioAccessPolicy, LabelStudioProfileMap
 
 
+def test_profile_map_uses_small_starter_assignment_then_explicit_assignments(tmp_path) -> None:
+    mapping = LabelStudioProfileMap.load(tmp_path, "lp_1234567890abcdef12345678")
+    assert mapping.assigned(["task1", "task2", "task3", "task4"]) == ["task1", "task2", "task3"]
+    mapping.assigned_task_ids = ["task4", "task2", "task4"]
+    mapping.save(tmp_path)
+    restored = LabelStudioProfileMap.load(tmp_path, mapping.profile_id)
+    assert restored.assigned(["task1"]) == ["task4", "task2"]
+
+
 def _policy() -> LabelStudioAccessPolicy:
     return LabelStudioAccessPolicy(
         LabelStudioProfileMap(

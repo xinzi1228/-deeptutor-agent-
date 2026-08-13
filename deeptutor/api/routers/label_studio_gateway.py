@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import re
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, Field
+
+from deeptutor.api.routers.auth import TokenPayload, require_admin
 
 from deeptutor.multi_user.context import (
     get_current_learning_profile,
@@ -23,6 +26,10 @@ from deeptutor.services.label_studio_gateway import (
 
 router = APIRouter()
 PROXY_PREFIX = "/api/v1/label-studio/proxy"
+
+
+class ProfessionalTaskAssignments(BaseModel):
+    task_ids: list[str] = Field(min_length=1, max_length=100)
 
 
 def _context(*, write: bool = False) -> tuple[object, object, LabelStudioProfileMap]:
@@ -66,6 +73,11 @@ async def prepare(task_id: str) -> dict:
     task = _task_bank().get(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")
+    allowed = mapping.assigned([
+        key for key, value in _task_bank().items() if value.get("modal") in {"image", "text"}
+    ])
+    if task_id not in allowed:
+        raise HTTPException(status_code=403, detail="这项专业任务尚未分配给当前学习档案")
     client = LabelStudioClient()
     try:
         project_id, ls_task_id = await client.ensure_task(mapping, task_id, task, root)
@@ -84,6 +96,47 @@ async def prepare(task_id: str) -> dict:
         "workbench_url": f"{PROXY_PREFIX}/projects/{project_id}/data?task={ls_task_id}",
         "task_list_url": f"{PROXY_PREFIX}/projects/{project_id}/data",
     }
+
+
+@router.get("/professional/tasks")
+async def professional_tasks() -> dict:
+    from deeptutor.api.routers.annotation import _task_bank
+
+    _access, _root, mapping = _context()
+    bank = _task_bank()
+    starter = [key for key, value in bank.items() if value.get("modal") in {"image", "text"}]
+    assigned = mapping.assigned(starter)
+    return {
+        "tasks": [
+            {
+                "id": task_id,
+                "title": bank[task_id].get("title", task_id),
+                "type": bank[task_id].get("type", "bbox"),
+                "modal": bank[task_id].get("modal", "image"),
+                "difficulty": bank[task_id].get("difficulty", ""),
+            }
+            for task_id in assigned
+            if task_id in bank
+        ],
+        "assignment_mode": "explicit" if mapping.assigned_task_ids else "starter_set",
+    }
+
+
+@router.put("/professional/tasks")
+async def assign_professional_tasks(
+    body: ProfessionalTaskAssignments,
+    _: TokenPayload = Depends(require_admin),
+) -> dict:
+    from deeptutor.api.routers.annotation import _task_bank
+
+    _access, root, mapping = _context(write=True)
+    bank = _task_bank()
+    invalid = [task_id for task_id in body.task_ids if task_id not in bank or bank[task_id].get("modal") not in {"image", "text"}]
+    if invalid:
+        raise HTTPException(status_code=422, detail=f"无效专业任务：{', '.join(invalid[:5])}")
+    mapping.assigned_task_ids = list(dict.fromkeys(body.task_ids))
+    mapping.save(root)
+    return {"assigned_task_ids": mapping.assigned_task_ids}
 
 
 @router.post("/sync/{task_id}")
