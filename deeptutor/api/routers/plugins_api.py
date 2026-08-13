@@ -14,10 +14,11 @@ import re
 import time
 from typing import Any, AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from deeptutor.api.routers.auth import TokenPayload, require_admin
 from deeptutor.core.i18n import t
 from deeptutor.i18n.metadata_i18n import tool_description_i18n
 from deeptutor.logging import (
@@ -112,7 +113,11 @@ async def list_plugins():
 
 
 @router.post("/tools/{tool_name}/execute")
-async def execute_tool(tool_name: str, body: ToolExecuteRequest):
+async def execute_tool(
+    tool_name: str,
+    body: ToolExecuteRequest,
+    _: TokenPayload = Depends(require_admin),
+):
     """Execute a single tool with explicit parameters (for Playground testing)."""
     registry = get_tool_registry()
     tool = registry.get(tool_name)
@@ -279,7 +284,11 @@ async def _execute_stream(tool_name: str, params: dict[str, Any]) -> AsyncGenera
 
 
 @router.post("/tools/{tool_name}/execute-stream")
-async def execute_tool_stream(tool_name: str, body: ToolExecuteRequest):
+async def execute_tool_stream(
+    tool_name: str,
+    body: ToolExecuteRequest,
+    _: TokenPayload = Depends(require_admin),
+):
     """Execute a tool and stream process logs + result as SSE."""
     return StreamingResponse(
         _execute_stream(tool_name, body.params),

@@ -10,9 +10,10 @@ Mounted at ``/api/v1/skills``.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from deeptutor.api.routers.auth import TokenPayload, require_admin
 from deeptutor.multi_user.context import get_current_user
 from deeptutor.multi_user.skill_access import (
     assigned_skill_detail,
@@ -212,7 +213,9 @@ async def get_skill(name: str) -> dict[str, object]:
 
 
 @router.post("/create")
-async def create_skill(payload: CreateSkillRequest) -> dict[str, object]:
+async def create_skill(
+    payload: CreateSkillRequest, _: TokenPayload = Depends(require_admin)
+) -> dict[str, object]:
     service = get_skill_service()
     try:
         info = service.create(
@@ -231,7 +234,9 @@ async def create_skill(payload: CreateSkillRequest) -> dict[str, object]:
 
 
 @router.post("/install")
-async def install_skill(payload: InstallSkillRequest) -> dict[str, object]:
+async def install_skill(
+    payload: InstallSkillRequest, _: TokenPayload = Depends(require_admin)
+) -> dict[str, object]:
     """Import a hub skill (e.g. from EduHub) into the caller's own skill layer.
 
     Lands the package in the same per-user dir that ``/create`` writes to, so
@@ -268,7 +273,9 @@ async def install_skill(payload: InstallSkillRequest) -> dict[str, object]:
 
 
 @router.put("/{name}")
-async def update_skill(name: str, payload: UpdateSkillRequest) -> dict[str, object]:
+async def update_skill(
+    name: str, payload: UpdateSkillRequest, _: TokenPayload = Depends(require_admin)
+) -> dict[str, object]:
     service = get_skill_service()
     try:
         info = service.update(
@@ -292,7 +299,9 @@ async def update_skill(name: str, payload: UpdateSkillRequest) -> dict[str, obje
 
 
 @router.delete("/{name}")
-async def delete_skill(name: str) -> dict[str, str]:
+async def delete_skill(
+    name: str, _: TokenPayload = Depends(require_admin)
+) -> dict[str, str]:
     service = get_skill_service()
     try:
         service.delete(name)
