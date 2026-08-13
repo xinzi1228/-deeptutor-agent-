@@ -38,6 +38,9 @@ EXPERT_IDS: tuple[str, ...] = (
     "struggle_detective",
     "report_analyst",
     "session_steward",
+    "chart_designer",
+    "diagram_designer",
+    "illustration_designer",
 )
 
 # Every whitelist is a subset of the always-on tool set (ALWAYS_ON_TOOLS in
@@ -89,6 +92,11 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
         "graph_query",
         "render_ui",
     ),
+    "chart_designer": ("create_visualization",),
+    "diagram_designer": ("create_visualization",),
+    # Image generation remains a user-configured, user-toggleable capability.
+    # This specialist only produces a safe prompt; the master invokes imagegen.
+    "illustration_designer": (),
 }
 
 
@@ -121,9 +129,10 @@ class DelegateExpertTool(BaseTool):
         return ToolDefinition(
             name="delegate_to_expert",
             description=(
-                "Delegate a focused sub-task to a specialist expert (6 experts: "
+                "Delegate a focused sub-task to a specialist expert (9 experts: "
                 "learning_planner / task_guide / grading_expert / struggle_detective / "
-                "report_analyst / session_steward). The expert runs as an isolated "
+                "report_analyst / session_steward / chart_designer / diagram_designer / "
+                "illustration_designer). The expert runs as an isolated "
                 "AgentLoop (≤5 rounds) with a restricted tool whitelist (专人专事) and "
                 "does NOT inherit the conversation history. Provide a SELF-CONTAINED "
                 "brief + task_data. The expert returns its conclusion for the master "

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { VisualizationArtifactCard, type VisualizationArtifact } from "./VisualizationArtifactCard";
 
 export type ChartData =
   | { type: "scorecard"; data: { f1: number; precision: number; recall: number; passed: boolean } }
@@ -8,9 +9,11 @@ export type ChartData =
   | { type: "progress"; data: { completed: number; total: number; modules: { name: string; done: number; total: number }[] } }
   | { type: "graph"; data: { nodes: { id: string; label: string; status: string }[]; edges: { source: string; target: string }[] } }
   | { type: "quiz_card"; data: { question: string; options: string[]; answer_index: number; explanation?: string | null; knowledge_point?: string | null } }
-  | { type: "ls_task_card"; data: { project_id: number; task_index: number; title: string; task_type: string; instructions?: string | null; url: string } };
+  | { type: "ls_task_card"; data: { project_id: number; task_index: number; title: string; task_type: string; instructions?: string | null; url: string } }
+  | { type: "visualization"; data: VisualizationArtifact };
 
 export function ChatChartCard({ chart }: { chart: ChartData }) {
+  if (chart.type === "visualization") return <VisualizationArtifactCard artifact={chart.data} />;
   if (chart.type === "scorecard") {
     const { f1, precision, recall, passed } = chart.data;
     return (

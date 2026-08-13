@@ -75,6 +75,7 @@ ALWAYS_ON_TOOLS: tuple[str, ...] = (
     "struggle_detect",
     "teaching_flow",
     "render_ui",
+    "create_visualization",
     "route_input",
     "verify_output",
     "kb_search",

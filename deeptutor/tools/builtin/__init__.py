@@ -16,6 +16,7 @@ from deeptutor.knowledge.manifest import KB_FILES_DEFAULT_LIMIT, KB_FILES_MAX_LI
 from deeptutor.tools.ability_radar_tool import AbilityRadarTool
 from deeptutor.tools.annotation_check import AnnotationCheckTool
 from deeptutor.tools.competency_tool import CompetencyMapTool
+from deeptutor.tools.delegate_expert_tool import DelegateExpertTool
 from deeptutor.tools.evaluate_teaching_plan_tool import EvaluateTeachingPlanTool
 from deeptutor.tools.exec_tool import ExecTool
 from deeptutor.tools.finalize_diagnosis_tool import FinalizeDiagnosisTool
@@ -23,11 +24,13 @@ from deeptutor.tools.graph_tool import GraphQueryTool
 from deeptutor.tools.improve_teaching_flow_tool import ImproveTeachingFlowTool
 from deeptutor.tools.iou_demo_tool import GenerateIouDemoTool
 from deeptutor.tools.job_analysis_tool import JobAnalysisTool
+from deeptutor.tools.kb_search_tool import KbSearchTool
 from deeptutor.tools.label_studio_tool import (
     LabelStudioCheckTool,
     LabelStudioCreateProjectTool,
     LabelStudioImportTool,
 )
+from deeptutor.tools.learning_path_tool import RenderLearningPathTool
 from deeptutor.tools.log_decision_tool import LogDecisionTool
 from deeptutor.tools.media_gen_tool import ImagegenTool, VideogenTool
 from deeptutor.tools.partner_memory import (
@@ -39,15 +42,13 @@ from deeptutor.tools.partner_memory import (
 from deeptutor.tools.prompting import load_prompt_hints
 from deeptutor.tools.render_ui_tool import RenderUiTool
 from deeptutor.tools.route_input_tool import RouteInputTool
-from deeptutor.tools.verify_output_tool import VerifyOutputTool
-from deeptutor.tools.kb_search_tool import KbSearchTool
-from deeptutor.tools.delegate_expert_tool import DelegateExpertTool
 from deeptutor.tools.struggle_tool import StruggleDetectTool
 from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 from deeptutor.tools.teaching_flow_tool import TeachingFlowTool
 from deeptutor.tools.verify_foresight_tool import VerifyForesightTool
+from deeptutor.tools.verify_output_tool import VerifyOutputTool
+from deeptutor.tools.visualization_artifact_tool import CreateVisualizationTool
 from deeptutor.tools.write_learning_record import WriteLearningRecordTool
-from deeptutor.tools.learning_path_tool import RenderLearningPathTool
 
 logger = logging.getLogger(__name__)
 
@@ -1670,6 +1671,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     StruggleDetectTool,
     TeachingFlowTool,
     RenderUiTool,
+    CreateVisualizationTool,
     RouteInputTool,
     VerifyOutputTool,
     KbSearchTool,
@@ -1784,6 +1786,7 @@ CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
     "struggle_detect",
     "teaching_flow",
     "render_ui",
+    "create_visualization",
     "route_input",
     "verify_output",
     "kb_search",
