@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "isolated": true,
+  "formal_data_touched": false,
+  "label_studio_origin": "loopback-disposable",
+  "profiles_checked": 2,
+  "checks": {
+    "single_sign_on": "passed",
+    "annotation_sync": "passed",
+    "cross_profile_isolation": "passed",
+    "teacher_read_only": "passed"
+  },
+  "result": "passed"
+}

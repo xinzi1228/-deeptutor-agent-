@@ -32,11 +32,12 @@ npm run dev -- --port 3782
 .\start_label_studio.bat
 ```
 
-专业模式需要在后端进程环境中设置：
+专业模式配置规则：
 
 - `LABEL_STUDIO_URL=http://127.0.0.1:8080`
-- `LABEL_STUDIO_API_TOKEN=<管理员服务 Token>`
-- `LABEL_STUDIO_BRIDGE_SECRET=<独立随机长字符串>`
+- 本机环回地址默认只读发现 `data/label-studio/label_studio.sqlite3` 中的有效服务 Token，并在私有设置目录生成桥接密钥，不需要新手手工复制凭据；
+- 远程或正式部署必须显式设置 `LABEL_STUDIO_API_TOKEN` 和 `LABEL_STUDIO_BRIDGE_SECRET`，不会尝试读取本地数据库；
+- 可用 `LABEL_STUDIO_LOCAL_DB` 为隔离测试指定本机数据库，环境变量中的 Token/密钥始终优先。
 
 Label Studio 只作为专业标注引擎和管理员管理台。学生从标注星图专业模式进入，不应看到或输入 Label Studio 账号；不要恢复已归档的 `label-studio-frontend` npm 包。
 
@@ -119,4 +120,4 @@ npm run perf:check
 
 ## 当前交付重点
 
-产品代码四项升级已经实施；后续优先补真实账号与两个学习档案的完整越权矩阵、配置正式 Label Studio Token/Bridge Secret 后的专业模式实机回归，以及竞赛提交材料。不要再按旧文档把专业模式描述为直接 iframe `localhost:8080` 或让学生使用共享管理员账号。
+产品代码四项升级、两账号四档案越权矩阵和隔离 Label Studio 专业模式 E2E 均已完成。专业模式 E2E 可运行 `python scripts/label_studio_gateway_e2e.py`，它会使用一次性数据库验证免二次登录、标注回写、跨档案隔离和教师只读边界，不触碰正式数据。后续优先准备竞赛提交材料和目标用户验证。不要再按旧文档把专业模式描述为直接 iframe `localhost:8080` 或让学生使用共享管理员账号。
