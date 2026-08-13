@@ -121,7 +121,10 @@ def _grade_annotation(body: dict[str, Any]) -> dict[str, Any]:
             detail=f"不支持的 task_type: {task_type}（可选: {', '.join(sorted(_SCORERS))}）",
         )
     predictions = _load_json_list(body.get("predictions"), "predictions")
-    ground_truth = _load_json_list(body.get("ground_truth"), "ground_truth")
+    raw_ground_truth = body.get("ground_truth")
+    if isinstance(raw_ground_truth, dict):
+        raw_ground_truth = [raw_ground_truth]
+    ground_truth = _load_json_list(raw_ground_truth, "ground_truth")
 
     metrics = _SCORERS[task_type](predictions, ground_truth)
 
@@ -211,7 +214,7 @@ async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
                 "predictions": predictions,
                 "ground_truth": task.get("ground_truth", []),
                 "image_size": body.payload.get("image_size", ""),
-                "pre_annotation": body.payload.get("pre_annotation"),
+                "pre_annotation": body.payload.get("pre_annotation", task.get("pre_annotation")),
             })
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=f"标注内容无法评分：{exc}") from exc
@@ -276,7 +279,12 @@ async def get_annotation_task(task_id: str) -> dict[str, Any]:
     task = _task_bank().get(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")
-    return {"task": {"id": task_id, **task}}
+    safe_task = {
+        key: value
+        for key, value in task.items()
+        if key not in {"ground_truth", "pre_annotation", "pre_annotation_note"}
+    }
+    return {"task": {"id": task_id, **safe_task}}
 
 
 @router.get("/label-studio-status")

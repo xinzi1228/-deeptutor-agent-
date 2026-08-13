@@ -88,7 +88,8 @@ def test_task_detail_exposes_a_selected_task(client: TestClient) -> None:
 
     assert res.status_code == 200
     assert res.json()["task"]["id"] == "task1"
-    assert "ground_truth" in res.json()["task"]
+    assert "ground_truth" not in res.json()["task"]
+    assert "pre_annotation" not in res.json()["task"]
 
 
 def test_check_bbox_pre_annotation_malformed_ignored(client: TestClient) -> None:
@@ -139,6 +140,19 @@ def test_check_classification(client: TestClient) -> None:
     assert data["metrics"]["accuracy"] == 0.5
     assert data["metrics"]["correct"] == 1
     assert data["metrics"]["total"] == 2
+
+
+def test_check_classification_accepts_single_object_ground_truth(client: TestClient) -> None:
+    res = client.post(
+        f"{API}/check",
+        json={
+            "task_type": "classification",
+            "predictions": [{"id": 0, "label": "car"}],
+            "ground_truth": {"label": "car"},
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["metrics"]["accuracy"] == 1.0
 
 
 def test_check_ner(client: TestClient) -> None:
@@ -224,6 +238,7 @@ def test_check_other_task_types(client: TestClient, task_type: str, predictions:
 
 def test_get_ground_truth_by_task_id(client: TestClient) -> None:
     import json
+
     from deeptutor.services.path_service import get_path_service
 
     bank_path = get_path_service().get_workspace_dir() / "task_bank.json"

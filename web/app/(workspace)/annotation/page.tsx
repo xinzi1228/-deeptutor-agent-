@@ -1,22 +1,21 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
 import AnnotationProgress from "@/components/annotation/AnnotationProgress";
 import { apiFetch, apiUrl } from "@/lib/api";
-
-type WorkbenchEvent = {
-  type: "annotation_workbench_event";
-  key: "annotation_last_result" | "annotation_pending_message";
-  taskId?: string;
-  payload: unknown;
-};
+import type { AnnotationTask } from "@/components/annotation/UnifiedAnnotationWorkbench";
 
 const AnnotationCoach = dynamic(
   () => import("@/components/annotation/AnnotationCoach"),
   { ssr: false, loading: () => null },
+);
+
+const UnifiedAnnotationWorkbench = dynamic(
+  () => import("@/components/annotation/UnifiedAnnotationWorkbench"),
+  { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-sm text-[var(--muted-foreground)]">正在加载统一标注台…</div> },
 );
 
 export default function AnnotationPage() {
@@ -24,16 +23,10 @@ export default function AnnotationPage() {
   const [mode, setMode] = useState<"image" | "text" | "audio" | "video" | "pro">("image");
   const [tasks, setTasks] = useState<Array<{ id: string; title: string; type: string; modal: "image" | "text" | "audio" | "video"; difficulty: string }>>([]);
   const [selectedTask, setSelectedTask] = useState("");
-  const [selectedTaskData, setSelectedTaskData] = useState<Record<string, unknown> | null>(null);
+  const [selectedTaskData, setSelectedTaskData] = useState<AnnotationTask | null>(null);
   const [labelStudio, setLabelStudio] = useState<{ available: boolean; configured?: boolean; management_url?: string | null; detail?: string } | null>(null);
   const [professionalUrl, setProfessionalUrl] = useState("");
   const [professionalLoading, setProfessionalLoading] = useState(false);
-  const workbenchRef = useRef<HTMLIFrameElement | null>(null);
-  const selectedTaskRef = useRef("");
-  const selectedTaskDataRef = useRef<Record<string, unknown> | null>(null);
-
-  useEffect(() => { selectedTaskRef.current = selectedTask; }, [selectedTask]);
-  useEffect(() => { selectedTaskDataRef.current = selectedTaskData; }, [selectedTaskData]);
 
   useEffect(() => {
     fetch("/api/v1/annotation/tasks").then((res) => res.ok ? res.json() : Promise.reject()).then((data) => {
@@ -49,48 +42,8 @@ export default function AnnotationPage() {
       .catch(() => setLabelStudio({ available: false, detail: "无法连接本地服务，或学习档案尚未解锁" }));
   }, [mode]);
 
-  useEffect(() => {
-    if (!selectedTaskData || mode === "pro") return;
-    workbenchRef.current?.contentWindow?.postMessage(
-      { type: "load_annotation_task", task: selectedTaskData },
-      window.location.origin,
-    );
-  }, [selectedTaskData, mode]);
-
-  useEffect(() => {
-    const onWorkbenchEvent = (event: MessageEvent<WorkbenchEvent>) => {
-      if (event.origin !== window.location.origin || event.data?.type !== "annotation_workbench_event") return;
-      const taskId = event.data.taskId || selectedTaskRef.current;
-      if (!taskId || event.data.key !== "annotation_last_result" || typeof event.data.payload !== "object" || !event.data.payload) return;
-      const payload = event.data.payload as Record<string, unknown>;
-      const task = selectedTaskDataRef.current;
-      const taskType = String(task?.type || payload.type || "bbox");
-      const numericMetrics = Object.fromEntries(
-        ["f1", "precision", "recall", "accuracy", "avgWer"]
-          .filter((key) => typeof payload[key] === "number")
-          .map((key) => [key, payload[key]]),
-      );
-      const clientTime = Number(payload.time || Date.now());
-      void apiFetch(apiUrl("/api/v1/annotation/attempts"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          task_id: taskId,
-          task_type: taskType,
-          mode: "teaching",
-          payload,
-          metrics: numericMetrics,
-          report: String(payload.message || "教学标注台本地评分结果"),
-          idempotency_key: `teaching:${taskId}:${clientTime}`,
-          grade: false,
-        }),
-      }).catch(() => undefined);
-    };
-    window.addEventListener("message", onWorkbenchEvent);
-    return () => window.removeEventListener("message", onWorkbenchEvent);
-  }, []);
-
-  const chooseTask = async (taskId: string) => {
+  const chooseTask = useCallback(async (taskId: string) => {
+    if (!taskId) return;
     setSelectedTask(taskId);
     try {
       const res = await fetch(`/api/v1/annotation/tasks/${encodeURIComponent(taskId)}`);
@@ -106,7 +59,7 @@ export default function AnnotationPage() {
     } catch {
       // 保持当前工作台；选择器仍可重试
     }
-  };
+  }, []);
 
   const chooseProfessionalTask = async (taskId: string) => {
     setSelectedTask(taskId);
@@ -127,7 +80,17 @@ export default function AnnotationPage() {
     }
   };
 
-  const toolSrc = mode === "image" ? "/annotation_tool.html" : mode === "text" ? "/annotation_tool_text.html" : mode === "audio" ? "/annotation_tool_audio.html" : "/annotation_tool_video.html";
+  const filteredTasks = tasks.filter((task) => mode === "pro" ? ["image", "text"].includes(task.modal) : task.modal === mode);
+  const selectedIndex = filteredTasks.findIndex((task) => task.id === selectedTask);
+  const reportLiveState = useCallback((state: Record<string, unknown>) => {
+    const taskId = String(state.task_id || selectedTask);
+    if (!taskId) return;
+    void apiFetch(apiUrl("/api/v1/annotation/activity"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: taskId, mode: String(state.mode || "teaching"), stage: String(state.stage || "editing"), summary: state }),
+    }).catch(() => undefined);
+  }, [selectedTask]);
 
   return (
     <div className="flex h-full flex-col bg-[var(--background)]">
@@ -208,12 +171,12 @@ export default function AnnotationPage() {
           <label className="text-xs text-[var(--muted-foreground)]" htmlFor="task-bank">{mode === "pro" ? "本人专业任务" : "任务库"}</label>
           <select id="task-bank" value={selectedTask} onChange={(event) => void (mode === "pro" ? chooseProfessionalTask(event.target.value) : chooseTask(event.target.value))} className="max-w-md rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs">
             <option value="">{mode === "pro" ? "选择后直接进入 Label Studio 题目" : "选择任务后加载到当前标注台"}</option>
-            {tasks.filter((task) => mode === "pro" ? ["image", "text"].includes(task.modal) : task.modal === mode).map((task) => <option key={task.id} value={task.id}>{task.id} · {task.title}{task.difficulty ? `（${task.difficulty}）` : ""}</option>)}
+            {filteredTasks.map((task) => <option key={task.id} value={task.id}>{task.id} · {task.title}{task.difficulty ? `（${task.difficulty}）` : ""}</option>)}
           </select>
           {mode === "pro" && professionalUrl && <button className="rounded border border-[var(--border)] px-2 py-1 text-xs text-[var(--primary)]" onClick={() => void apiFetch(apiUrl(`/api/v1/label-studio/sync/${encodeURIComponent(selectedTask)}`), { method: "POST" })}>同步已保存标注</button>}
         </div>
       <div className="flex-1">
-        {mode !== "pro" ? <iframe ref={workbenchRef} src={toolSrc} onLoad={() => selectedTaskData && workbenchRef.current?.contentWindow?.postMessage({ type: "load_annotation_task", task: selectedTaskData }, window.location.origin)} className="h-full w-full border-0" title="Annotation Tool" sandbox="allow-scripts allow-same-origin allow-top-navigation allow-popups" /> : labelStudio?.available && professionalUrl ? (
+        {mode !== "pro" ? selectedTaskData ? <UnifiedAnnotationWorkbench key={selectedTask} task={selectedTaskData} previousTaskId={selectedIndex > 0 ? filteredTasks[selectedIndex - 1]?.id : undefined} nextTaskId={selectedIndex >= 0 ? filteredTasks[selectedIndex + 1]?.id : undefined} onSelectTask={(taskId) => void chooseTask(taskId)} onLiveState={reportLiveState} /> : <div className="flex h-full items-center justify-center p-8"><div className="max-w-md rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 text-center"><h2 className="font-semibold">选择一项任务开始练习</h2><p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">统一 React 标注台会自动保存草稿到当前学习档案，并把实时进度提供给标注教练。</p></div></div> : labelStudio?.available && professionalUrl ? (
           <div className="h-full"><iframe src={professionalUrl} className="h-full w-full border-0" title="Label Studio 专业标注台" /></div>
         ) : <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 text-sm"><h2 className="font-semibold">{professionalLoading ? "正在准备你的专业任务…" : labelStudio?.available ? "请选择一项专业任务" : "Label Studio 专业模式尚未就绪"}</h2><p className="mt-2 text-[var(--muted-foreground)]">{labelStudio?.available ? "系统会为当前学习档案准备独立项目，并通过同源网关直接打开，不需要再次登录。" : "请启动本机 8080 服务，并在系统环境中配置 LABEL_STUDIO_API_TOKEN 与 LABEL_STUDIO_BRIDGE_SECRET。教学模式仍可正常使用。"}</p><p className="mt-2 text-xs text-[var(--muted-foreground)]">检测信息：{labelStudio?.detail || (labelStudio?.configured === false ? "服务已连接，但尚未配置 API Token" : "正在检测服务…")}</p>{labelStudio?.management_url && <a className="mt-3 inline-block text-xs text-[var(--primary)] underline" href={labelStudio.management_url} target="_blank" rel="noreferrer">管理员打开 Label Studio 管理台</a>}</div></div>}
       </div>
