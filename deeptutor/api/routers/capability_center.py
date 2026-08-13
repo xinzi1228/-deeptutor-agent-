@@ -118,6 +118,7 @@ async def _annotation_status() -> dict[str, Any]:
         "专业模式是可选项；服务未启动时自研教学标注台仍可正常使用。",
         "/annotation", label_studio_available=available,
         gateway_configured=configured, coach_context_connected=True,
+        credential_mode=("local_auto" if client.token_source == "local_database" else client.token_source),
     )
 
 

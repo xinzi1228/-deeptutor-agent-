@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 
 import httpx
+
+from .local_credentials import resolve_bridge_secret
 
 
 class LabelStudioSessionBridge:
@@ -18,7 +19,7 @@ class LabelStudioSessionBridge:
         self.email = email
 
     def _password(self) -> str:
-        secret = os.environ.get("LABEL_STUDIO_BRIDGE_SECRET") or os.environ.get("LABEL_STUDIO_API_TOKEN")
+        secret, _source = resolve_bridge_secret(self.base_url)
         if not secret:
             raise RuntimeError("需要配置 LABEL_STUDIO_BRIDGE_SECRET")
         digest = hmac.new(secret.encode(), self.profile_id.encode(), hashlib.sha256).hexdigest()

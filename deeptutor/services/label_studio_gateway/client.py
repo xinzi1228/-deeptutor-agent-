@@ -5,6 +5,8 @@ from typing import Any
 
 import httpx
 
+from .local_credentials import resolve_service_token
+
 
 class LabelStudioUnavailable(RuntimeError):
     pass
@@ -13,7 +15,7 @@ class LabelStudioUnavailable(RuntimeError):
 class LabelStudioClient:
     def __init__(self, base_url: str | None = None, token: str | None = None):
         self.base_url = (base_url or os.environ.get("LABEL_STUDIO_URL", "http://127.0.0.1:8080")).rstrip("/")
-        self.token = token if token is not None else os.environ.get("LABEL_STUDIO_API_TOKEN", "")
+        self.token, self.token_source = resolve_service_token(self.base_url, token)
 
     async def request(self, method: str, path: str, **kwargs: Any) -> Any:
         headers = dict(kwargs.pop("headers", {}))

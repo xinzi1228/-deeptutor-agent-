@@ -42,6 +42,7 @@ async def status() -> dict:
     return {
         "available": available,
         "configured": bool(client.token),
+        "credential_mode": "local_auto" if client.token_source == "local_database" else client.token_source,
         "mapping": mapping.public_dict(),
         "management_url": client.base_url if get_current_user().role == "admin" else None,
         "mode": "profile_project_same_origin_gateway",
