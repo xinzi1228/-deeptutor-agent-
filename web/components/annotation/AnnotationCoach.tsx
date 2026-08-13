@@ -15,6 +15,7 @@ import {
   type ChartData,
 } from "@/components/chat/home/ChatChartCard";
 import { readStoredLanguage } from "@/context/app-shell-storage";
+import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 
 const STRUGGLE_POLL_MS = 30_000;
 const STRUGGLE_WINDOW_MS = 60_000;
@@ -185,6 +186,8 @@ export default function AnnotationCoach({
   sessionId = "",
 }: AnnotationCoachProps) {
   const { t } = useTranslation();
+  const { active } = useLearningProfile();
+  const profileKey = active?.id || "locked";
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [cards, setCards] = useState<ChartData[]>([]);
@@ -235,9 +238,9 @@ export default function AnnotationCoach({
   useEffect(() => {
     if (!sessionIdRef.current) {
       try {
-        const stored = window.localStorage.getItem(COACH_SESSION_KEY);
+        const stored = window.localStorage.getItem(`${COACH_SESSION_KEY}.${profileKey}`);
         sessionIdRef.current = stored || `annotation-coach-${crypto.randomUUID()}`;
-        window.localStorage.setItem(COACH_SESSION_KEY, sessionIdRef.current);
+        window.localStorage.setItem(`${COACH_SESSION_KEY}.${profileKey}`, sessionIdRef.current);
       } catch {
         sessionIdRef.current = `annotation-coach-${Date.now()}`;
       }
@@ -251,7 +254,32 @@ export default function AnnotationCoach({
         }
       }
     } catch { /* use default */ }
+  }, [profileKey]);
+
+  useEffect(() => {
+    const resetForProfile = () => {
+      clientRef.current?.disconnect();
+      clientRef.current = null;
+      sessionIdRef.current = "";
+      setMessages([]);
+      setCards([]);
+      setInput("");
+      setSending(false);
+      setAwaitingInput(false);
+      setOpen(false);
+    };
+    window.addEventListener("deeptutor:learning-profile-changed", resetForProfile);
+    return () => window.removeEventListener("deeptutor:learning-profile-changed", resetForProfile);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     dragRef.current = { startX: event.clientX, startY: event.clientY, right: position.right, bottom: position.bottom, moved: false };
@@ -450,6 +478,7 @@ export default function AnnotationCoach({
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
+      if (document.visibilityState !== "visible" || (!open && !sessionIdRef.current)) return;
       try {
         const res = await apiFetch(apiUrl("/api/v1/profile/trace-log?limit=30"), {
           cache: "no-store",
@@ -491,7 +520,7 @@ export default function AnnotationCoach({
       clientRef.current?.disconnect();
       clientRef.current = null;
     };
-  }, [t]);
+  }, [open, t]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -546,7 +575,7 @@ export default function AnnotationCoach({
       )}
 
       {open && (
-        <div className="flex h-[440px] w-[340px] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl">
+        <div role="dialog" aria-modal="false" aria-label="标注教练" className="fixed inset-x-3 bottom-3 flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl sm:static sm:h-[440px] sm:w-[340px]">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-3.5 py-3">
             <img src={coachImage} alt="标注教练星仔" className="h-8 w-8 rounded-full bg-white object-cover" />
             <div className="flex-1">
