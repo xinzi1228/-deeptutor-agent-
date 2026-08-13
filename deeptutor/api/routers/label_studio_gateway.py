@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from deeptutor.api.routers.auth import TokenPayload, require_admin
-
 from deeptutor.multi_user.context import (
     get_current_learning_profile,
     get_current_user,
