@@ -6,9 +6,9 @@
 
 - 运行时只注册 `chat` capability；主 Persona 为 `annotation-coach`。教学能力通过 always-on 工具和受控扩展挂入 Chat 管道。
 - 一个系统账号可创建多个学习档案。每个档案使用 PIN 解锁，并分别保存对话、记忆、知识库、学习记录、标注草稿/提交和报告；教师只读访问不会写入学生记录。
-- 标注页保留两条路径：自研教学标注台支持图片、文本、音频、视频；专业模式通过标注星图后端同源网关连接 Label Studio 1.23，不把服务 Token、隐藏身份密码或 LS Cookie 发给浏览器。
-- 标注教练使用独立会话，能读取当前题、最近 5 次提交、已确认薄弱点和档案记忆摘要；头像可拖动并持久化位置。
-- 对话可输出带数据来源和单位的 Chart.js 图表、Mermaid 图、图片卡片。`chart_designer`、`diagram_designer`、`illustration_designer` 是隔离上下文的专职子 Agent；插画专家只设计提示词，实际生图必须使用用户配置的 imagegen 模型。
+- 标注页保留两条路径：统一 React 教学标注台用同一套外壳支持图片、文本、音频、视频和 9 类任务，草稿自动保存到当前档案；专业模式通过标注星图后端同源网关连接 Label Studio 1.23，不把服务 Token、隐藏身份密码或 LS Cookie 发给浏览器。
+- 标注教练使用档案隔离的独立会话，能读取当前题、最近 5 次提交、已确认薄弱点和档案记忆摘要；头像可拖动并按思考、鼓励、提醒、成功、错误等状态切换。
+- 对话可输出 Chart.js 图表、Mermaid 图和图片作品。数字图必须先由 `read_learning_chart_data` 生成当前档案的 `dataset_ref`，随后才能保存，模型不能直接填写来源或改写数值。`chart_designer`、`diagram_designer`、`illustration_designer` 是隔离上下文的专职子 Agent；实际生图使用管理员已配置的 imagegen 模型，并支持单次临时选择而不修改全局默认。
 - `/capabilities` 是新手入口：模型、知识库、Skill/MCP、标注服务和系统体检；可快速导入第一份资料、运行七步初始化、下载严格白名单的脱敏报告。高级配置仍保留在 `/settings/*`。
 - 学习数据页具备独立滚动容器；图表、记录、图谱和标注教练按需加载。生产构建与 gzip 路由预算已通过。
 
@@ -64,10 +64,10 @@ Web / WebSocket
 |---|---|
 | 学习档案、PIN、授权、迁移 | `deeptutor/services/learning_profiles/`、`deeptutor/api/routers/learning_profiles.py` |
 | 当前用户/档案路径解析 | `deeptutor/multi_user/context.py`、`deeptutor/multi_user/paths.py` |
-| 教学标注草稿与提交 | `deeptutor/services/annotation_attempts/`、`deeptutor/api/routers/annotation.py` |
+| 教学标注草稿与提交 | `deeptutor/services/annotation_attempts/`、`deeptutor/api/routers/annotation.py`、`web/components/annotation/UnifiedAnnotationWorkbench.tsx` |
 | 专业模式网关与白名单 | `deeptutor/services/label_studio_gateway/`、`deeptutor/api/routers/label_studio_gateway.py` |
 | 教练上下文 | `deeptutor/services/coach_context/` |
-| 可信可视化 | `deeptutor/services/visualization_artifacts/`、`deeptutor/tools/visualization_artifact_tool.py` |
+| 可信可视化 | `deeptutor/services/visualization_artifacts/`、`deeptutor/tools/learning_chart_data_tool.py`、`deeptutor/tools/visualization_artifact_tool.py` |
 | 专职子 Agent | `deeptutor/tools/delegate_expert_tool.py`、`deeptutor/skills/builtin/annotation-coach-flows/references/experts/` |
 | 能力中心 | `deeptutor/api/routers/capability_center.py`、`web/app/(utility)/capabilities/` |
 | 学习报告与提醒 | `deeptutor/services/learning_communication.py` |
@@ -80,7 +80,7 @@ Web / WebSocket
 - 诊断、日志、模型上下文和 API 响应不得包含 PIN 哈希、API Key、Label Studio Token/Cookie、隐藏身份密码或其他学生数据。
 - Label Studio 项目、任务和 annotation-id 均须由服务端再次校验当前档案归属；隐藏导航不等于授权。
 - 报告和提醒只能引用落盘事实。单次错误是 `unconfirmed`，只有重复且确认后才能称为稳定薄弱点。
-- `VisualizationArtifact` 的数据图必须带真实来源与单位；不能为了好看让模型编造数值。
+- `VisualizationArtifact` 的数据图必须引用服务端生成的数据快照 `dataset_ref`；只写“来源”文字不算可信数据，且不得为了好看改数或补零。
 
 ## 工具、Skill、MCP 与扩展
 
@@ -120,4 +120,6 @@ npm run perf:check
 
 ## 当前交付重点
 
-产品代码四项升级、两账号四档案越权矩阵和隔离 Label Studio 专业模式 E2E 均已完成。专业模式 E2E 可运行 `python scripts/label_studio_gateway_e2e.py`，它会使用一次性数据库验证免二次登录、标注回写、跨档案隔离和教师只读边界，不触碰正式数据。后续优先准备竞赛提交材料和目标用户验证。不要再按旧文档把专业模式描述为直接 iframe `localhost:8080` 或让学生使用共享管理员账号。
+产品代码四项升级、两账号四档案越权矩阵和隔离 Label Studio 专业模式 E2E 均已完成。专业模式还具备档案任务分配与低侵入未保存状态桥接；教学模式已经迁移到统一 React 标注台。可视化作品支持全屏、换图、来源查看、JSON/PNG 下载、保存、加入学习资料和删除；报告卡片增强扩展已具备真实运行时行为。专业模式 E2E 可运行 `python scripts/label_studio_gateway_e2e.py`，它会使用一次性数据库验证免二次登录、标注回写、跨档案隔离和教师只读边界，不触碰正式数据。
+
+当前机器的 Embedding 与 imagegen 模型目录均未配置，因此能力中心必须显示“资料未索引/生图不可用”，不能伪造 ready 状态。管理员配置模型并通过连接测试后，才能把现有 60 篇资料真正索引、运行带引用问答，以及执行真实生图。不要再按旧文档把专业模式描述为直接 iframe `localhost:8080` 或让学生使用共享管理员账号。
