@@ -522,6 +522,13 @@ export default function AnnotationCoach({
   const coachStatus = deriveCoachStatus(sending, awaitingInput);
   const flashActive = flash !== null && Date.now() < flash.until;
   const ringClass = flashActive ? STATUS_RING.flash : STATUS_RING[coachStatus];
+  const coachImage = sending
+    ? "/coach/coach-thinking.png"
+    : hint
+      ? "/coach/coach-reminder.png"
+      : flashActive
+        ? "/coach/coach-success.png"
+        : "/coach/coach-default.png";
 
   return (
     <div className="fixed z-50 flex flex-col items-end gap-3" style={{ right: position.right, bottom: position.bottom }}>
@@ -541,7 +548,7 @@ export default function AnnotationCoach({
       {open && (
         <div className="flex h-[440px] w-[340px] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-3.5 py-3">
-            <img src="/coach/coach-master.png" alt="标注教练星仔" className="h-8 w-8 rounded-full bg-white object-cover" />
+            <img src={coachImage} alt="标注教练星仔" className="h-8 w-8 rounded-full bg-white object-cover" />
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-[var(--foreground)]">
@@ -706,7 +713,7 @@ export default function AnnotationCoach({
         className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 ${ringClass} bg-[var(--primary)] text-2xl shadow-lg transition-transform hover:scale-105`}
       >
         <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-[var(--primary)] opacity-30" />
-        <img src="/coach/coach-master.png" alt="打开标注教练" className="relative h-12 w-12 rounded-full bg-white object-cover" />
+        <img src={coachImage} alt="打开标注教练" className="relative h-12 w-12 rounded-full bg-white object-cover" />
       </button>
     </div>
   );
