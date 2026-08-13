@@ -91,3 +91,20 @@ async def test_report_summary_endpoint_uses_record_backed_text(monkeypatch):
     assert result["summary"]["completed_count"] == 1
     assert "已完成 1 道练习" in result["text"]
     assert result["quality_warnings"] == []
+
+
+@pytest.mark.asyncio
+async def test_report_card_extension_changes_presentation_only(monkeypatch):
+    from deeptutor.api.routers import profile
+    from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+
+    monkeypatch.setattr(profile, "_all_records", lambda: [])
+    monkeypatch.setattr(ExtensionMarketplaceService, "is_enabled", lambda self, value: value == "report-card-enhancer")
+
+    result = await profile.report_summary()
+
+    assert result["presentation"] == "cards"
+    assert [card["title"] for card in result["cards"]] == [
+        "本次成果", "当前判断", "关键改进点", "下次行动"
+    ]
+    assert "数据不足" in result["text"]

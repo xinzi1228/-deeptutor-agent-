@@ -90,11 +90,27 @@ async def report_summary() -> dict[str, Any]:
     """A concise, evidence-backed learning report for the progress overview."""
     summary = build_learning_communication_summary(_all_records())
     text = render_learning_report(summary)
-    return {
+    result: dict[str, Any] = {
         "summary": summary.to_dict(),
         "text": text,
         "quality_warnings": audit_learning_copy(text, kind="report", summary=summary),
     }
+    from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+
+    if ExtensionMarketplaceService().is_enabled("report-card-enhancer"):
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        result["presentation"] = "cards"
+        result["cards"] = [
+            {
+                "title": line.split("：", 1)[0],
+                "content": line.split("：", 1)[1] if "：" in line else line,
+            }
+            for line in lines
+        ]
+    else:
+        result["presentation"] = "plain"
+        result["cards"] = []
+    return result
 
 
 @router.get("/visualizations")

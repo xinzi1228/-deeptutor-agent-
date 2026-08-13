@@ -29,6 +29,8 @@ export interface LearningReport {
   summary: LearningReportSummary;
   text: string;
   quality_warnings: string[];
+  presentation: "plain" | "cards";
+  cards: { title: string; content: string }[];
 }
 
 export interface WorkspaceViews {

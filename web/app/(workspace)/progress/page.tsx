@@ -234,9 +234,20 @@ export default function ProgressPage() {
                   {learningReport.summary.data_status === "empty" ? "等待首条记录" : "学习记录已核对"}
                 </span>
               </div>
-              <div className="space-y-1.5 whitespace-pre-line text-sm leading-6 text-[var(--foreground)]">
-                {learningReport.text}
-              </div>
+              {learningReport.presentation === "cards" && learningReport.cards.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {learningReport.cards.map((card) => (
+                    <article key={card.title} className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-3.5">
+                      <h3 className="text-xs font-semibold text-[var(--primary)]">{card.title}</h3>
+                      <p className="mt-1.5 text-sm leading-6 text-[var(--foreground)]">{card.content}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1.5 whitespace-pre-line text-sm leading-6 text-[var(--foreground)]">
+                  {learningReport.text}
+                </div>
+              )}
             </section>
           )}
 
