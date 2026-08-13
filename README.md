@@ -115,7 +115,7 @@ start_label_studio.bat
 ```
 
 - **学生入口**：Annotation 页 →「专业模式」；页面嵌入的是标注星图同源网关，不是把 8080 管理台直接暴露给学生
-- **Coach 自动建项目/导数据**：后端 `label_studio_tool` 通过 REST API 工作，需设置：
+- **项目与任务同步**：后端 `label_studio_gateway` 通过 REST API 工作，需设置：
   - `LABEL_STUDIO_URL=http://localhost:8080`
   - `LABEL_STUDIO_API_TOKEN=<LS 的 API token>`（LS 账号页 → Account & Settings → Access Token）
   - `LABEL_STUDIO_BRIDGE_SECRET=<独立随机长字符串>`（用于派生每个学习档案的隐藏会话凭证）

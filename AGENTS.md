@@ -66,7 +66,7 @@ Web / WebSocket
 | 教学标注草稿与提交 | `deeptutor/services/annotation_attempts/`、`deeptutor/api/routers/annotation.py` |
 | 专业模式网关与白名单 | `deeptutor/services/label_studio_gateway/`、`deeptutor/api/routers/label_studio_gateway.py` |
 | 教练上下文 | `deeptutor/services/coach_context/` |
-| 可信可视化 | `deeptutor/services/visualization_artifacts/`、`deeptutor/tools/create_visualization_tool.py` |
+| 可信可视化 | `deeptutor/services/visualization_artifacts/`、`deeptutor/tools/visualization_artifact_tool.py` |
 | 专职子 Agent | `deeptutor/tools/delegate_expert_tool.py`、`deeptutor/skills/builtin/annotation-coach-flows/references/experts/` |
 | 能力中心 | `deeptutor/api/routers/capability_center.py`、`web/app/(utility)/capabilities/` |
 | 学习报告与提醒 | `deeptutor/services/learning_communication.py` |
