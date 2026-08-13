@@ -42,6 +42,10 @@ class ExtensionEnabledRequest(BaseModel):
     enabled: bool
 
 
+class VisualizationStateRequest(BaseModel):
+    save_state: str
+
+
 def _all_records(scope: str | None = None) -> list[dict[str, Any]]:
     """Load learning records: canonical JSONL store first, L3 memory fallback."""
     try:
@@ -102,6 +106,61 @@ async def profile_visualizations(limit: int = 12) -> dict[str, Any]:
     if root is None:
         raise HTTPException(status_code=423, detail="请先解锁学习档案")
     return {"artifacts": VisualizationArtifactStore(root).list(limit=max(1, min(limit, 30)))}
+
+
+@router.get("/visualizations/{artifact_id}")
+async def profile_visualization(artifact_id: str) -> dict[str, Any]:
+    from deeptutor.multi_user.paths import get_current_learning_profile_root
+    from deeptutor.services.visualization_artifacts import VisualizationArtifactStore
+
+    root = get_current_learning_profile_root(require_unlocked=True)
+    if root is None:
+        raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    try:
+        artifact = VisualizationArtifactStore(root).get(artifact_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="找不到该作品")
+    return {"artifact": artifact}
+
+
+@router.patch("/visualizations/{artifact_id}")
+async def set_profile_visualization_state(
+    artifact_id: str, request: VisualizationStateRequest
+) -> dict[str, Any]:
+    from deeptutor.multi_user.paths import get_current_learning_profile_root
+    from deeptutor.services.visualization_artifacts import VisualizationArtifactStore
+
+    root = get_current_learning_profile_root(require_unlocked=True)
+    if root is None:
+        raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    try:
+        artifact = VisualizationArtifactStore(root).set_save_state(
+            artifact_id, request.save_state
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"artifact": artifact}
+
+
+@router.delete("/visualizations/{artifact_id}")
+async def delete_profile_visualization(artifact_id: str) -> dict[str, bool]:
+    from deeptutor.multi_user.paths import get_current_learning_profile_root
+    from deeptutor.services.visualization_artifacts import VisualizationArtifactStore
+
+    root = get_current_learning_profile_root(require_unlocked=True)
+    if root is None:
+        raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    try:
+        deleted = VisualizationArtifactStore(root).delete(artifact_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="找不到该作品")
+    return {"deleted": True}
 
 
 @router.get("/extensions/catalog")
