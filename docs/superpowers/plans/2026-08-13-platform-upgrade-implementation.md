@@ -408,3 +408,25 @@ workspace/learning_profiles/<learning_profile_id>/
 ## 11. 首个实施批次
 
 下一步只启动 Phase 0，原因是 Label Studio 社区版的隐藏用户和网页会话能力是最大不确定项。Phase 0 不修改正式数据，也不阻止随后并行准备学习档案模型。完成能力报告后，再锁定 Phase 3B 的具体身份策略。
+
+## 12. 实施结果（2026-08-13）
+
+本计划已按推荐方案完成主路径实施：
+
+| 阶段 | 状态 | 关键结果 | 提交 |
+|---|---|---|---|
+| Phase 0 | 完成 | 对 Label Studio 1.23 做隔离探测，采用“每档案独立项目 + 服务端白名单 + 隐藏网页会话” | `7367191d` |
+| Phase 1–2 | 完成 | 多学习档案、PIN、授权 Grant、审计、历史数据迁移与路径隔离 | `57efb77a` |
+| Phase 3 | 完成 | 教学/专业标注统一草稿与提交、LS 同源网关、教练实时上下文和 annotation-id 归属复核 | `278dbf33`、`b288188d` |
+| Phase 4 | 完成 | 可信 VisualizationArtifact、Chart.js/Mermaid/图片卡片、三名可视化专职子 Agent | `26d9c3c6` |
+| Phase 5 | 完成 | `/capabilities`、七步初始化、资料快速导入、模型/Skill/MCP/LS/系统体检和脱敏报告 | `b288188d` |
+| Phase 6 | 完成主路径 | 学习数据滚动、标注教练与数据标签按需加载、生产构建、gzip 包体预算和浏览器冒烟 | `3283d7b1` |
+
+已验证：
+
+- 后端定向测试与 Ruff 通过；能力中心和 LS 策略新增 6 项测试通过。
+- `npx tsc --noEmit`、改动文件 ESLint、Next 生产构建通过，46 个静态页面生成成功。
+- gzip 性能预算：公共外壳 141KB，标注页 41KB，学习数据页 42KB，均通过门禁。
+- Playwright 可见浏览器验收覆盖能力中心、学习档案锁、学习数据滚动、标注教练头像与专业模式入口；未再出现 Chart.js Canvas 重用异常。
+
+仍需部署环境完成的外部配置不是代码缺口：在正式 Label Studio 中生成 `LABEL_STUDIO_API_TOKEN`，设置独立 `LABEL_STUDIO_BRIDGE_SECRET`，再用两个真实账号、每账号两个学习档案执行完整越权矩阵。未配置或 LS 未启动时，教学标注台按设计继续可用。

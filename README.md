@@ -11,6 +11,9 @@
 - **Canvas 标注工作台** — 鼠标画框标注，内置即时检查
 - **Label Studio 集成** — 嵌入 LS 作为专业标注界面（可选增强，不装不影响核心教学）
 - **记忆追踪** — Coach 记录每次练习成绩，推荐渐进式学习路径
+- **多学习档案** — 同一系统账号可为不同学生切换独立 PIN 档案，对话、记忆、练习和报告互不混用
+- **能力中心** — 用新手能看懂的方式完成模型体检、资料快速导入、Skill/MCP 状态检查和初始化
+- **可信生成式可视化** — 对话可输出带来源与单位的图表、流程图和用户模型生成的插画
 - **教学轨迹/流程可视化** — 进度面板、回合链追溯、能力雷达
 - **规范引用溯源** — 引用标注标准（GB/T 41867-2022 等）时给出可点击出处
 - **定时学习提醒 + 免登录分享 + 生成式练习卡片**
@@ -73,10 +76,11 @@ npx next dev --port 3782
 
 # 终端3 - Label Studio (可选，专业标注界面增强；不装不影响核心教学)
 start_label_studio.bat
-#   - 首次运行自动初始化数据库 + 账号 (admin@localhost / admin123，登录后请改密)
-#   - Coach 通过 REST API 建项目/导数据，环境变量：
+#   - 管理员首次登录后创建服务 Token，学生不使用这个账号
+#   - 标注星图后端通过受控网关建项目、导数据并建立隐藏会话：
 #     set LABEL_STUDIO_URL=http://localhost:8080
 #     set LABEL_STUDIO_API_TOKEN=<你的 LS token>
+#     set LABEL_STUDIO_BRIDGE_SECRET=<独立随机长字符串>
 ```
 
 ### 4. 验证安装
@@ -92,7 +96,8 @@ deeptutor run chat "你好"
 打开 `http://localhost:3782`：
 - **Chat 页** → 选 `annotation-coach` Persona → 说"我要练习标注"
 - **Annotation 页** → 左侧菜单 → 选任务 → 鼠标画框 → 点"检查标注"
-  - 顶部可切「基础模式 / 专业模式」：**专业模式 = Label Studio 嵌入界面**（需 LS 已启动）
+  - 顶部可切教学图片/文本/音频/视频与专业模式；专业模式由同源网关直达本人任务，不需要再次登录 Label Studio
+- **能力中心** → 左侧“能力中心” → 查看缺失配置、导入第一份资料、下载脱敏体检报告
 
 ## Label Studio（专业标注界面）
 
@@ -106,13 +111,14 @@ pip install label-studio
 start_label_studio.bat
 # 或手动：label-studio start --init --data-dir data/label-studio --username admin@localhost --password admin123 --port 8080
 
-# 3. 访问 http://localhost:8080，账号 admin@localhost / admin123（登录后请修改密码）
+# 3. 管理员访问 http://localhost:8080 完成首次配置；学生不要从这里登录
 ```
 
-- **前端入口**：Annotation 页 →「专业模式」（iframe 嵌入 `http://localhost:8080`）
+- **学生入口**：Annotation 页 →「专业模式」；页面嵌入的是标注星图同源网关，不是把 8080 管理台直接暴露给学生
 - **Coach 自动建项目/导数据**：后端 `label_studio_tool` 通过 REST API 工作，需设置：
   - `LABEL_STUDIO_URL=http://localhost:8080`
   - `LABEL_STUDIO_API_TOKEN=<LS 的 API token>`（LS 账号页 → Account & Settings → Access Token）
+  - `LABEL_STUDIO_BRIDGE_SECRET=<独立随机长字符串>`（用于派生每个学习档案的隐藏会话凭证）
 - **数据位置**：`data/label-studio/`（运行时数据，已在 .gitignore）
 
 ## 项目结构
