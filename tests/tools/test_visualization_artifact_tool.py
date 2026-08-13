@@ -20,11 +20,14 @@ def test_chart_requires_real_source_and_unit() -> None:
     payload["source"] = "当前学习档案 annotation/attempts.jsonl"
     with pytest.raises(ValueError, match="单位"):
         validate_visualization_request(payload)
+    payload["unit"] = "比例"
+    with pytest.raises(ValueError, match="dataset_ref"):
+        validate_visualization_request(payload)
 
 
 def test_chart_rejects_mismatched_or_non_numeric_data() -> None:
     base = {
-        "kind": "chart", "title": "成绩", "source": "真实记录", "unit": "分",
+        "kind": "chart", "title": "成绩", "source": "真实记录", "source_ref": "dataset_test", "unit": "分",
         "content": {"chart_type": "bar", "labels": ["A", "B"], "datasets": [{"label": "得分", "data": [1]}]},
     }
     with pytest.raises(ValueError, match="长度"):
@@ -36,7 +39,7 @@ def test_chart_rejects_mismatched_or_non_numeric_data() -> None:
 
 def test_valid_chart_and_safe_mermaid() -> None:
     chart = validate_visualization_request({
-        "kind": "chart", "title": "成绩趋势", "source": "学习记录", "unit": "%",
+        "kind": "chart", "title": "成绩趋势", "source": "学习记录", "source_ref": "dataset_test", "unit": "%",
         "source_updated_at": "2026-08-13",
         "content": {"chart_type": "line", "labels": ["1", "2"], "datasets": [{"label": "F1", "data": [60, 80]}]},
     })
@@ -56,6 +59,9 @@ def test_visual_specialists_exist_and_are_isolated() -> None:
     for expert in ("chart_designer", "diagram_designer", "illustration_designer"):
         assert expert in EXPERT_IDS
         assert load_expert_card(expert)
-    assert EXPERT_TOOL_WHITELISTS["chart_designer"] == ("create_visualization",)
+    assert EXPERT_TOOL_WHITELISTS["chart_designer"] == (
+        "read_learning_chart_data",
+        "create_visualization",
+    )
     assert EXPERT_TOOL_WHITELISTS["diagram_designer"] == ("create_visualization",)
     assert EXPERT_TOOL_WHITELISTS["illustration_designer"] == ()

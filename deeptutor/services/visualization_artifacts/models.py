@@ -19,6 +19,7 @@ class VisualizationArtifact:
     render_protocol: str
     content: dict[str, Any]
     source: str
+    source_ref: str
     unit: str
     source_updated_at: str
     validation_status: str
@@ -39,6 +40,7 @@ def validate_visualization_request(payload: dict[str, Any], *, session_id: str =
     description = str(payload.get("description") or "").strip()
     alt_text = str(payload.get("alt_text") or description or title).strip()
     source = str(payload.get("source") or "").strip()
+    source_ref = str(payload.get("source_ref") or "").strip()
     unit = str(payload.get("unit") or "").strip()
     content = payload.get("content")
     if kind not in {"chart", "diagram", "generated_image"}:
@@ -59,6 +61,8 @@ def validate_visualization_request(payload: dict[str, Any], *, session_id: str =
             raise ValueError("数字图表必须提供真实数据来源，不能编造数字")
         if not unit:
             raise ValueError("数字图表必须说明单位")
+        if not source_ref.startswith("dataset_"):
+            raise ValueError("数字图表必须引用 read_learning_chart_data 返回的 dataset_ref")
         if not isinstance(labels, list) or not labels or len(labels) > 100:
             raise ValueError("labels 需要是 1 到 100 项的数组")
         if not isinstance(datasets, list) or not datasets or len(datasets) > 12:
@@ -88,6 +92,7 @@ def validate_visualization_request(payload: dict[str, Any], *, session_id: str =
     return VisualizationArtifact(
         id=f"viz_{uuid.uuid4().hex}", kind=kind, title=title, description=description,
         alt_text=alt_text, render_protocol=protocol, content=content, source=source,
+        source_ref=source_ref,
         unit=unit, source_updated_at=str(payload.get("source_updated_at") or ""),
         validation_status="validated", validation_message=message,
         created_at=datetime.now(timezone.utc).isoformat(), session_id=session_id,

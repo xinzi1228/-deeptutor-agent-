@@ -92,7 +92,7 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
         "graph_query",
         "render_ui",
     ),
-    "chart_designer": ("create_visualization",),
+    "chart_designer": ("read_learning_chart_data", "create_visualization"),
     "diagram_designer": ("create_visualization",),
     # Image generation remains a user-configured, user-toggleable capability.
     # This specialist only produces a safe prompt; the master invokes imagegen.

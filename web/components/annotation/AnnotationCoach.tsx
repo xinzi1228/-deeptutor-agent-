@@ -35,6 +35,7 @@ type CoachStatus = "idle" | "working" | "waiting-input" | "flash";
 interface CoachFlash {
   status: CoachStatus;
   until: number;
+  image: "success" | "error";
 }
 
 // Hermes 宠物状态机借鉴（agent/pet/state.py derive_pet_state 优先级）：
@@ -138,6 +139,32 @@ function detectCoachMood(text: string): CoachMood {
   return "neutral";
 }
 
+function initialCoachPosition() {
+  if (typeof window === "undefined") return { right: 20, bottom: 20 };
+  try {
+    const raw = window.localStorage.getItem(COACH_POSITION_KEY);
+    const stored = raw ? (JSON.parse(raw) as { right?: number; bottom?: number }) : {};
+    if (Number.isFinite(stored.right) && Number.isFinite(stored.bottom)) {
+      return {
+        right: Math.max(12, Number(stored.right)),
+        bottom: Math.max(12, Number(stored.bottom)),
+      };
+    }
+  } catch {
+    // use default
+  }
+  return { right: 20, bottom: 20 };
+}
+
+function initialShortcutVisibility() {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(SHORTCUT_DISMISS_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
 // PetPhrase 借鉴：同组内按使用频率降序（同频保预设序），点击不重排
 function sortByUses(phrases: QuickPhrase[], uses: Record<string, number>): QuickPhrase[] {
   return [...phrases].sort((a, b) => (uses[b.key] ?? 0) - (uses[a.key] ?? 0));
@@ -197,9 +224,9 @@ export default function AnnotationCoach({
   const [flash, setFlash] = useState<CoachFlash | null>(null);
   const flashTimerRef = useRef<number | null>(null);
 
-  const flashCoach = useCallback((ms = 1600) => {
+  const flashCoach = useCallback((image: "success" | "error" = "success", ms = 1600) => {
     if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
-    setFlash({ status: "flash", until: Date.now() + ms });
+    setFlash({ status: "flash", until: Date.now() + ms, image });
     flashTimerRef.current = window.setTimeout(() => {
       setFlash(null);
       flashTimerRef.current = null;
@@ -207,7 +234,7 @@ export default function AnnotationCoach({
   }, []);
 
   const [hint, setHint] = useState<string | null>(null);
-  const [showShortcuts, setShowShortcuts] = useState(true);
+  const [showShortcuts, setShowShortcuts] = useState(initialShortcutVisibility);
   const [quickUses, setQuickUses] = useState<Record<string, number>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -231,7 +258,7 @@ export default function AnnotationCoach({
   const sessionIdRef = useRef<string>(sessionId);
   const shownStrugglesRef = useRef<Set<string>>(new Set());
   const listEndRef = useRef<HTMLDivElement | null>(null);
-  const [position, setPosition] = useState({ right: 20, bottom: 20 });
+  const [position, setPosition] = useState(initialCoachPosition);
   const dragRef = useRef<{ startX: number; startY: number; right: number; bottom: number; moved: boolean } | null>(null);
   const suppressClickRef = useRef(false);
 
@@ -245,15 +272,6 @@ export default function AnnotationCoach({
         sessionIdRef.current = `annotation-coach-${Date.now()}`;
       }
     }
-    try {
-      const raw = window.localStorage.getItem(COACH_POSITION_KEY);
-      if (raw) {
-        const stored = JSON.parse(raw) as { right?: number; bottom?: number };
-        if (Number.isFinite(stored.right) && Number.isFinite(stored.bottom)) {
-          setPosition({ right: Math.max(12, Number(stored.right)), bottom: Math.max(12, Number(stored.bottom)) });
-        }
-      }
-    } catch { /* use default */ }
   }, [profileKey]);
 
   useEffect(() => {
@@ -307,16 +325,6 @@ export default function AnnotationCoach({
     try { window.localStorage.setItem(COACH_POSITION_KEY, JSON.stringify(position)); } catch { /* ignore */ }
   };
 
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(SHORTCUT_DISMISS_KEY) === "1") {
-        setShowShortcuts(false);
-      }
-    } catch {
-      // localStorage unavailable — keep defaults
-    }
-  }, []);
-
   const handleEvent = useCallback((event: StreamEvent) => {
     if (event.type === "session") {
       const meta = (event.metadata ?? {}) as { session_id?: string };
@@ -327,7 +335,7 @@ export default function AnnotationCoach({
     if (event.type === "done") {
       setSending(false);
       setAwaitingInput(false);
-      flashCoach(); // 回合完成 → flash（Hermes just_completed→WAVE 借鉴）
+      flashCoach("success"); // 回合完成 → 成功状态
       return;
     }
     if (event.type === "error") {
@@ -337,7 +345,7 @@ export default function AnnotationCoach({
         ...prev,
         { role: "coach", content: event.content || "抱歉，我遇到了一点问题，请稍后再试。" },
       ]);
-      flashCoach(); // 错误也 flash（Hermes error→FAILED 借鉴，emoji 走 mood）
+      flashCoach("error");
       return;
     }
     if (event.type === "wait_for_input") {
@@ -367,7 +375,7 @@ export default function AnnotationCoach({
         return [...prev, { role: "coach", content: event.content }];
       });
     }
-  }, []);
+  }, [flashCoach]);
 
   const ensureClient = useCallback(() => {
     if (clientRef.current) return clientRef.current;
@@ -463,7 +471,7 @@ export default function AnnotationCoach({
         [phrase.key]: (prev[phrase.key] ?? 0) + 1,
       }));
       sendText(phrase.label, { showUserMessage: true });
-      flashCoach(); // H2 wave flash
+      flashCoach("success"); // H2 wave flash
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
       setCopiedKey(phrase.key);
       copiedTimerRef.current = window.setTimeout(() => {
@@ -549,15 +557,21 @@ export default function AnnotationCoach({
   };
 
   const coachStatus = deriveCoachStatus(sending, awaitingInput);
-  const flashActive = flash !== null && Date.now() < flash.until;
+  const flashActive = flash !== null;
   const ringClass = flashActive ? STATUS_RING.flash : STATUS_RING[coachStatus];
+  const latestCoachMessage = [...messages].reverse().find((message) => message.role === "coach");
+  const latestMood = detectCoachMood(latestCoachMessage?.content ?? "");
   const coachImage = sending
     ? "/coach/coach-thinking.png"
     : hint
       ? "/coach/coach-reminder.png"
       : flashActive
-        ? "/coach/coach-success.png"
-        : "/coach/coach-default.png";
+        ? flash?.image === "error"
+          ? "/coach/coach-error.png"
+          : "/coach/coach-success.png"
+        : latestMood === "empathetic" || latestMood === "curious"
+          ? "/coach/coach-encourage.png"
+          : "/coach/coach-default.png";
 
   return (
     <div className="fixed z-50 flex flex-col items-end gap-3" style={{ right: position.right, bottom: position.bottom }}>

@@ -30,6 +30,7 @@ from deeptutor.tools.label_studio_tool import (
     LabelStudioCreateProjectTool,
     LabelStudioImportTool,
 )
+from deeptutor.tools.learning_chart_data_tool import ReadLearningChartDataTool
 from deeptutor.tools.learning_path_tool import RenderLearningPathTool
 from deeptutor.tools.log_decision_tool import LogDecisionTool
 from deeptutor.tools.media_gen_tool import ImagegenTool, VideogenTool
@@ -1671,6 +1672,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     StruggleDetectTool,
     TeachingFlowTool,
     RenderUiTool,
+    ReadLearningChartDataTool,
     CreateVisualizationTool,
     RouteInputTool,
     VerifyOutputTool,
