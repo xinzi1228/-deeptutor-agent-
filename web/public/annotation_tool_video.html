@@ -753,6 +753,15 @@ window.addEventListener('message', (event) => {
   select.value = task.id;
   loadTask();
 });
+const _annotationSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  _annotationSetItem(key, value);
+  if (key === 'annotation_last_result' || key === 'annotation_pending_message') {
+    let payload = value;
+    try { payload = JSON.parse(value); } catch (_) {}
+    window.parent.postMessage({ type: 'annotation_workbench_event', key, payload, taskId: currentTask }, window.location.origin);
+  }
+};
 loadTask();
 </script>
 </body>

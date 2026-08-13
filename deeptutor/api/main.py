@@ -356,6 +356,7 @@ from deeptutor.api.routers import (
     achievements,
     agent_config,
     annotation,
+    label_studio_gateway,
     attachments,
     auth,
     book,
@@ -488,6 +489,12 @@ app.include_router(
     annotation.router,
     prefix="/api/v1/annotation",
     tags=["annotation"],
+    dependencies=_auth,
+)
+app.include_router(
+    label_studio_gateway.router,
+    prefix="/api/v1/label-studio",
+    tags=["label-studio"],
     dependencies=_auth,
 )
 app.include_router(tools_router.router, prefix="/api/v1/tools", tags=["tools"], dependencies=_auth)

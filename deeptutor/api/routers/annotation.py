@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
-from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import BaseModel, Field
 
+from deeptutor.multi_user.paths import get_current_learning_profile_root
+from deeptutor.services.annotation_attempts import AnnotationAttemptStore
+from deeptutor.services.coach_context import build_annotation_coach_context
 from deeptutor.tools import annotation_check
 
 router = APIRouter()
@@ -37,6 +41,40 @@ _REPORTERS = {
     "video_event": annotation_check._video_event_report,
     "ner": annotation_check._ner_report,
 }
+
+
+class ActivityRequest(BaseModel):
+    task_id: str = Field(max_length=120)
+    mode: str = Field(default="teaching", max_length=40)
+    stage: str = Field(default="selected", max_length=60)
+    summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class DraftRequest(BaseModel):
+    task_id: str = Field(max_length=120)
+    mode: str = Field(default="teaching", max_length=40)
+    payload: dict[str, Any]
+
+
+class AttemptRequest(BaseModel):
+    task_id: str = Field(max_length=120)
+    task_type: str = Field(default="bbox", max_length=60)
+    mode: str = Field(default="teaching", max_length=40)
+    payload: dict[str, Any]
+    idempotency_key: str = Field(min_length=8, max_length=160)
+    metrics: dict[str, Any] | None = None
+    report: str = Field(default="", max_length=8000)
+    grade: bool = True
+
+
+def _private_store() -> AnnotationAttemptStore:
+    try:
+        root = get_current_learning_profile_root(require_unlocked=True)
+    except PermissionError as exc:
+        raise HTTPException(status_code=423, detail=str(exc)) from exc
+    if root is None:
+        raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    return AnnotationAttemptStore(root)
 
 
 def _task_bank() -> dict[str, dict[str, Any]]:
@@ -69,16 +107,7 @@ def _load_json_list(raw: Any, field: str) -> list[dict]:
     return raw
 
 
-@router.post("/check")
-async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
-    """Grade a single annotation submission against ground truth.
-
-    Body: ``{task_type, predictions, ground_truth, image_size?, pre_annotation?}``.
-    Returns ``{task_type, metrics, report}``. ``task_type`` defaults to ``bbox``.
-    When ``pre_annotation`` (AI 预标注, bbox only) is provided, also returns
-    ``pre_annotation_metrics`` + ``improvement`` (学生 F1 - AI 预标注 F1) for
-    the AI 辅助标注审阅教学 double-scoring flow.
-    """
+def _grade_annotation(body: dict[str, Any]) -> dict[str, Any]:
     task_type = str(body.get("task_type") or "bbox").strip()
     if task_type not in _SCORERS:
         raise HTTPException(
@@ -124,6 +153,91 @@ async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
         resp["pre_annotation_metrics"] = pre_annotation_metrics
         resp["improvement"] = improvement
     return resp
+
+
+@router.post("/check")
+async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
+    """Grade a single annotation submission without persisting it."""
+    return _grade_annotation(body)
+
+
+@router.post("/activity")
+async def update_annotation_activity(body: ActivityRequest) -> dict[str, Any]:
+    """Record what the learner is doing so the coach can offer timely help."""
+    try:
+        current = _private_store().set_current(
+            task_id=body.task_id, mode=body.mode, stage=body.stage, summary=body.summary
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"current": current}
+
+
+@router.put("/drafts/{task_id}")
+async def save_annotation_draft(task_id: str, body: DraftRequest) -> dict[str, Any]:
+    if body.task_id != task_id:
+        raise HTTPException(status_code=422, detail="路径任务编号与请求内容不一致")
+    try:
+        draft = _private_store().save_draft(task_id, body.mode, body.payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"draft": draft}
+
+
+@router.get("/drafts/{task_id}")
+async def get_annotation_draft(task_id: str) -> dict[str, Any]:
+    return {"draft": _private_store().get_draft(task_id)}
+
+
+@router.post("/attempts", status_code=status.HTTP_201_CREATED)
+async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
+    metrics = body.metrics or {}
+    report = body.report
+    grade_result: dict[str, Any] | None = None
+    if body.grade:
+        task = _task_bank().get(body.task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail=f"找不到任务 {body.task_id}")
+        predictions = body.payload.get("predictions", body.payload.get("annotations", []))
+        try:
+            grade_result = _grade_annotation({
+                "task_type": body.task_type,
+                "predictions": predictions,
+                "ground_truth": task.get("ground_truth", []),
+                "image_size": body.payload.get("image_size", ""),
+                "pre_annotation": body.payload.get("pre_annotation"),
+            })
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=f"标注内容无法评分：{exc}") from exc
+        metrics = grade_result.get("metrics", {})
+        report = str(grade_result.get("report", ""))
+    try:
+        attempt, created = _private_store().append_attempt(
+            task_id=body.task_id,
+            task_type=body.task_type,
+            mode=body.mode,
+            payload=body.payload,
+            metrics=metrics,
+            report=report,
+            idempotency_key=body.idempotency_key,
+            source="professional_gateway" if body.mode == "professional" else "teaching_workbench",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"attempt": attempt, "created": created, "grade": grade_result}
+
+
+@router.get("/attempts")
+async def list_annotation_attempts(
+    task_id: str = "", limit: int = Query(default=20, ge=1, le=100)
+) -> dict[str, Any]:
+    return {"attempts": _private_store().list_attempts(task_id=task_id, limit=limit)}
+
+
+@router.get("/coach-context")
+async def annotation_coach_context() -> dict[str, Any]:
+    store = _private_store()
+    return build_annotation_coach_context(store.root.parent)
 
 
 @router.get("/ground-truth/{task_id}")

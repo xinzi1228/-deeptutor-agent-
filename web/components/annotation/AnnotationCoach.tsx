@@ -383,16 +383,7 @@ export default function AnnotationCoach({
       const client = ensureClient();
       if (!client.connected) client.connect();
 
-      const payload: StartTurnMessage = {
-        type: "message",
-        content: text,
-        session_id: sessionIdRef.current || null,
-        capability: "chat",
-        language: readStoredLanguage(),
-        persona: "annotation-coach",
-      };
-
-      const attemptSend = (attempt = 0) => {
+      const attemptSend = (payload: StartTurnMessage, attempt = 0) => {
         if (client.connected) {
           client.send(payload);
           return;
@@ -405,9 +396,27 @@ export default function AnnotationCoach({
           ]);
           return;
         }
-        window.setTimeout(() => attemptSend(attempt + 1), 200);
+        window.setTimeout(() => attemptSend(payload, attempt + 1), 200);
       };
-      attemptSend();
+      // Resolve a compact snapshot at send time. The visible user message stays
+      // clean; only the coach receives task/attempt/memory context.
+      void apiFetch(apiUrl("/api/v1/annotation/coach-context"), { cache: "no-store" })
+        .then(async (response) => response.ok ? response.json() : null)
+        .catch(() => null)
+        .then((context) => {
+          const contextText = context
+            ? `\n\n[系统提供的当前学习上下文，请勿逐字复述]\n${JSON.stringify(context)}\n[学生问题]\n${text}`
+            : text;
+          const payload: StartTurnMessage = {
+            type: "message",
+            content: contextText,
+            session_id: sessionIdRef.current || null,
+            capability: "chat",
+            language: readStoredLanguage(),
+            persona: "annotation-coach",
+          };
+          attemptSend(payload);
+        });
     },
     [sending, hint, t, ensureClient],
   );
@@ -534,9 +543,7 @@ export default function AnnotationCoach({
       {open && (
         <div className="flex h-[440px] w-[340px] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-3.5 py-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary)] text-base">
-              🤖
-            </div>
+            <img src="/coach/coach-master.png" alt="标注教练星仔" className="h-8 w-8 rounded-full bg-white object-cover" />
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-[var(--foreground)]">
@@ -701,7 +708,7 @@ export default function AnnotationCoach({
         className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 ${ringClass} bg-[var(--primary)] text-2xl shadow-lg transition-transform hover:scale-105`}
       >
         <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-[var(--primary)] opacity-30" />
-        <span className="relative">🤖</span>
+        <img src="/coach/coach-master.png" alt="打开标注教练" className="relative h-12 w-12 rounded-full bg-white object-cover" />
       </button>
     </div>
   );
