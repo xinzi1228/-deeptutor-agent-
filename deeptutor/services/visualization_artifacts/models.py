@@ -92,4 +92,5 @@ def validate_visualization_request(payload: dict[str, Any], *, session_id: str =
         validation_status="validated", validation_message=message,
         created_at=datetime.now(timezone.utc).isoformat(), session_id=session_id,
         model=str(payload.get("model") or ""),
+        save_state=str(payload.get("save_state") or "session"),
     )

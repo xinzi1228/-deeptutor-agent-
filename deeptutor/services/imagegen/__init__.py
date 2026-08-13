@@ -22,6 +22,8 @@ async def generate_image(
     quality: str | None = None,
     style: str | None = None,
     n: int = 1,
+    profile_id: str | None = None,
+    model_id: str | None = None,
 ) -> list[tuple[bytes, str]]:
     """Generate ``n`` images for ``prompt`` using the active imagegen selection.
 
@@ -33,7 +35,11 @@ async def generate_image(
     prompt = (prompt or "").strip()
     if not prompt:
         raise GenerationProviderError("Cannot generate an image from an empty prompt.")
-    config = resolve_imagegen_runtime_config(catalog=catalog)
+    config = resolve_imagegen_runtime_config(
+        catalog=catalog,
+        profile_id=profile_id,
+        model_id=model_id,
+    )
     if size:
         config.size = size
     if quality:

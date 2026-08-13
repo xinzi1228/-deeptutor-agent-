@@ -145,6 +145,18 @@ class ImagegenTool(BaseTool):
                     required=False,
                     default=1,
                 ),
+                ToolParameter(
+                    name="profile_id",
+                    type="string",
+                    description="Optional configured image-provider profile ID for this call only.",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="model_id",
+                    type="string",
+                    description="Optional configured image model ID for this call only.",
+                    required=False,
+                ),
             ],
         )
 
@@ -160,9 +172,17 @@ class ImagegenTool(BaseTool):
         except (TypeError, ValueError):
             count = 1
         count = max(1, min(count, 4))
+        profile_id = str(kwargs.get("profile_id") or "").strip() or None
+        model_id = str(kwargs.get("model_id") or "").strip() or None
 
         try:
-            images = await generate_image(prompt, size=size, n=count)
+            images = await generate_image(
+                prompt,
+                size=size,
+                n=count,
+                profile_id=profile_id,
+                model_id=model_id,
+            )
         except ValueError as exc:  # not configured
             return ToolResult(content=str(exc), success=False)
         except GenerationProviderError as exc:
@@ -171,13 +191,62 @@ class ImagegenTool(BaseTool):
 
         run_dir = _run_dir(kwargs.get("_workspace_dir"), "imagegen")
         artifacts = _write_media(run_dir, images, stem=_slug(prompt, "image"), default_ext="png")
-        return _artifact_result(
+        result = _artifact_result(
             artifacts,
             empty_message="Image generation produced no saved files.",
             prompt=prompt,
             count=len(images),
             kind="image",
         )
+        if not result.success:
+            return result
+
+        # Keep generated illustrations in the same reusable artifact protocol as
+        # charts and diagrams.  Storage is best-effort for direct/admin tool
+        # tests that run without an unlocked learning profile.
+        from deeptutor.services.config.provider_runtime import resolve_imagegen_runtime_config
+        from deeptutor.services.visualization_artifacts import (
+            VisualizationArtifactStore,
+            validate_visualization_request,
+        )
+
+        try:
+            resolved = resolve_imagegen_runtime_config(profile_id=profile_id, model_id=model_id)
+            resolved_model = f"{resolved.provider_name}/{resolved.model}"
+        except ValueError:
+            # Direct unit tests may replace the generation facade without a
+            # catalog.  Real calls cannot reach here without a configured model.
+            resolved_model = model_id or "configured-imagegen"
+        visualizations: list[dict[str, Any]] = []
+        for index, media_artifact in enumerate(artifacts, start=1):
+            title = "AI 概念示意图" if len(artifacts) == 1 else f"AI 概念示意图 {index}"
+            visualization = validate_visualization_request(
+                {
+                    "kind": "generated_image",
+                    "title": title,
+                    "description": "依据用户提示词生成的概念示意图，不作为精确事实或数字证据。",
+                    "alt_text": prompt,
+                    "source": "用户提示词（概念示意）",
+                    "unit": "不适用",
+                    "model": resolved_model,
+                    "save_state": "session",
+                    "content": {"prompt": prompt, "image_url": media_artifact.url},
+                },
+                session_id=str(kwargs.get("_session_id") or ""),
+            )
+            visualizations.append(visualization.to_dict())
+            try:
+                from deeptutor.multi_user.paths import get_current_learning_profile_root
+
+                profile_root = get_current_learning_profile_root(require_unlocked=True)
+                if profile_root is not None:
+                    VisualizationArtifactStore(profile_root).save(visualization)
+            except (PermissionError, RuntimeError):
+                logger.debug("image visualization was not persisted outside a profile context")
+        result.metadata["visualizations"] = visualizations
+        result.metadata["chart"] = {"type": "visualization", "data": visualizations[0]}
+        result.metadata["model"] = resolved_model
+        return result
 
 
 class VideogenTool(BaseTool):

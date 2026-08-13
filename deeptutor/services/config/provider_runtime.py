@@ -953,11 +953,47 @@ def resolve_imagegen_runtime_config(
     catalog: dict[str, Any] | None = None,
     *,
     service: ModelCatalogService | None = None,
+    profile_id: str | None = None,
+    model_id: str | None = None,
 ) -> ImagegenConfig:
-    """Resolve the active text-to-image config from the model catalog."""
+    """Resolve a text-to-image config without mutating the global selection.
+
+    ``profile_id`` / ``model_id`` are per-call overrides.  They deliberately
+    select only entries that already exist in the administrator-managed model
+    catalog, so a chat turn cannot inject arbitrary endpoints or credentials.
+    """
     catalog_service = service or get_model_catalog_service()
     loaded = _load_catalog(catalog)
     profile, model = _active_profile_and_model(loaded, catalog_service, "imagegen")
+    imagegen_service = loaded.get("services", {}).get("imagegen", {})
+    if profile_id:
+        profile = next(
+            (item for item in imagegen_service.get("profiles", []) if item.get("id") == profile_id),
+            None,
+        )
+        if profile is None:
+            raise ValueError("The selected image-generation profile does not exist.")
+        model = None
+    if model_id:
+        profiles = [profile] if profile_id and profile is not None else imagegen_service.get("profiles", [])
+        selected = next(
+            (
+                (candidate, item)
+                for candidate in profiles
+                for item in candidate.get("models", [])
+                if item.get("id") == model_id
+            ),
+            None,
+        )
+        if selected is not None:
+            profile, model = selected
+        else:
+            model = None
+        if model is None:
+            raise ValueError("The selected image-generation model does not exist in this profile.")
+    elif profile_id and profile is not None:
+        models = profile.get("models", [])
+        model = models[0] if models else None
     resolved_model = _as_str((model or {}).get("model"))
     if not resolved_model:
         raise ValueError(
