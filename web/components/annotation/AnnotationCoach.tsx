@@ -299,7 +299,6 @@ export default function AnnotationCoach({
     if (event.type === "done") {
       setSending(false);
       setAwaitingInput(false);
-      setCards([]); // 回合边界重置，防 Chart.js/cytoscape 实例累积（⑥轮H1）
       flashCoach(); // 回合完成 → flash（Hermes just_completed→WAVE 借鉴）
       return;
     }
@@ -370,7 +369,6 @@ export default function AnnotationCoach({
       }
       setInput("");
       setSending(true);
-      setCards([]); // 新回合开始，重置上回合图表实例
 
       if (QUESTION_MARKERS.some((marker) => text.includes(marker))) {
         void apiFetch(apiUrl("/api/v1/profile/workspace/inbox"), {
