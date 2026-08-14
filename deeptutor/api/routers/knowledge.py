@@ -386,6 +386,7 @@ def _save_uploaded_files(
                     for dest in _save_zip_archive(
                         file, sanitized_filename, dest_dir, allowed_extensions
                     ):
+                        _validate_textbook_markdown_provenance(dest)
                         written_file_paths.append(dest)
                         uploaded_files.append(dest.relative_to(target_dir).as_posix())
                         uploaded_file_paths.append(str(dest))
@@ -422,6 +423,7 @@ def _save_uploaded_files(
                 DocumentValidator.validate_upload_safety(
                     sanitized_filename, written_bytes, allowed_extensions=allowed_extensions
                 )
+                _validate_textbook_markdown_provenance(file_path)
                 written_file_paths.append(file_path)
                 uploaded_files.append(rel_name)
                 uploaded_file_paths.append(str(file_path))
@@ -456,6 +458,22 @@ def _save_uploaded_files(
         raise
 
     return uploaded_files, uploaded_file_paths
+
+
+def _validate_textbook_markdown_provenance(path: Path) -> None:
+    """Fail closed when a generated textbook artifact loses its source lineage."""
+    if path.suffix.lower() != ".md":
+        return
+    try:
+        header = path.read_text(encoding="utf-8")[:4096]
+    except (OSError, UnicodeDecodeError):
+        return
+    if "artifact_type: textbook_markdown" not in header:
+        return
+    required = ("source_hash:", "parser_engine:", "parser_signature:", "source_page_count:")
+    missing = [field[:-1] for field in required if field not in header]
+    if missing:
+        raise ValueError(f"教材 Markdown 缺少可追溯字段：{', '.join(missing)}")
 
 
 def _get_upload_file_size(file: UploadFile) -> int | None:

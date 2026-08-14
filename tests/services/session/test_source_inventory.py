@@ -188,6 +188,32 @@ async def test_build_inventory_fresh_attachments_only() -> None:
 
 
 @pytest.mark.asyncio
+async def test_build_inventory_marks_traceable_textbook_as_textbook_source() -> None:
+    inv = await build_inventory(
+        FakeStore(),
+        session_id="s1",
+        leaf_message_id=None,
+        current_turn_ordinal=1,
+        fresh_attachment_records=[
+            {
+                "id": "book-1",
+                "filename": "教材.md",
+                "extracted_text": "# 第一章",
+                "artifact_type": "textbook_markdown",
+            }
+        ],
+        fresh_notebook_records=[],
+        fresh_book_context_text="",
+        fresh_book_references=[],
+        fresh_history_session_ids=[],
+        fresh_question_entry_ids=[],
+    )
+
+    assert inv.entries[0].sid == "tb-book-1"
+    assert inv.entries[0].kind == "textbook"
+
+
+@pytest.mark.asyncio
 async def test_build_inventory_historical_attachment_visible_to_next_turn() -> None:
     """Attachment uploaded in turn 1 must appear as 'previously attached
     (turn 1)' in turn 2's manifest, even though turn 2's payload is empty."""

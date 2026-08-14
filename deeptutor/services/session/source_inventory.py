@@ -288,10 +288,12 @@ def _add_fresh(
         att_id = str(record.get("id", "") or "").strip()
         if not text.strip() or not att_id:
             continue
+        source_kind = str(record.get("source_kind") or record.get("artifact_type") or "").lower()
+        is_textbook = source_kind in {"textbook", "textbook_markdown"}
         inv.add(
             SourceEntry(
-                sid=f"at-{att_id}",
-                kind="attachment",
+                sid=f"tb-{att_id}" if is_textbook else f"at-{att_id}",
+                kind="textbook" if is_textbook else "attachment",
                 name=str(record.get("filename") or "Untitled file"),
                 full_text=text,
                 fresh=True,

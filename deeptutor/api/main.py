@@ -391,6 +391,7 @@ from deeptutor.api.routers import (
     student_dashboard,
     subagents,
     system,
+    textbook_ingestion,
     unified_ws,
     voice,
 )
@@ -435,6 +436,12 @@ app.include_router(
 )
 app.include_router(
     knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"], dependencies=_auth
+)
+app.include_router(
+    textbook_ingestion.router,
+    prefix="/api/v1/textbooks",
+    tags=["textbooks"],
+    dependencies=_admin,
 )
 app.include_router(imports.router, prefix="/api/v1/imports", tags=["imports"], dependencies=_auth)
 app.include_router(
