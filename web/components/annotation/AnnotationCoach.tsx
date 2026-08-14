@@ -279,6 +279,7 @@ export default function AnnotationCoach({
       clientRef.current?.disconnect();
       clientRef.current = null;
       sessionIdRef.current = "";
+      shownStrugglesRef.current.clear();
       setMessages([]);
       setCards([]);
       setInput("");
@@ -513,6 +514,34 @@ export default function AnnotationCoach({
             );
           }
           return;
+        }
+        const contextResponse = await apiFetch(apiUrl("/api/v1/annotation/coach-context"), {
+          cache: "no-store",
+        });
+        if (!contextResponse.ok) return;
+        const context = (await contextResponse.json()) as {
+          annotation_projection?: {
+            task_id?: string;
+            stage?: string;
+            updated_at?: string;
+            summary?: { validation_issue_count?: number };
+          };
+        };
+        const projection = context.annotation_projection;
+        const taskId = String(projection?.task_id || "");
+        if (!taskId) return;
+        const issueCount = Math.max(0, Number(projection?.summary?.validation_issue_count || 0));
+        const updatedAt = Date.parse(String(projection?.updated_at || ""));
+        const paused = projection?.stage === "editing" && Number.isFinite(updatedAt) && now - updatedAt > STRUGGLE_WINDOW_MS;
+        const reason = issueCount > 0 ? "quality" : paused ? "pause" : "";
+        if (!reason) return;
+        const marker = `${taskId}|${reason}`;
+        if (shownStrugglesRef.current.has(marker)) return;
+        shownStrugglesRef.current.add(marker);
+        if (!cancelled) {
+          setHint(issueCount > 0
+            ? `本地质检发现 ${issueCount} 个明显问题。要我只提示最关键的一处吗？`
+            : "你在这一步停了一会儿。需要我结合当前任务给一个小提示吗？");
         }
       } catch {
         // 轮询失败静默

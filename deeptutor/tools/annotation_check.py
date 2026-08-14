@@ -958,10 +958,25 @@ class AnnotationCheckTool(BaseTool):
                     image_size = (int(img_w.strip()), int(img_h.strip()))
                 except (ValueError, AttributeError):
                     pass  # malformed input -> fall back to default
-            content, metrics = _bbox_report(predictions, ground_truth, image_size=image_size)
+            from deeptutor.services.annotation_scoring import BboxScorer
+
+            score = BboxScorer().score(
+                predictions,
+                ground_truth,
+                reference_version=str(kwargs.get("reference_version") or "tool:provided-ground-truth"),
+                image_size=image_size,
+            )
+            content = score.report
+            metrics = score.metrics
             f1 = metrics.get("f1", 0.0)
             readiness = auto_readiness(f1)
-            metadata["readiness"] = readiness
+            metadata.update(metrics)
+            metadata.update({
+                "readiness": readiness,
+                "rule_version": score.rule_version,
+                "reference_version": score.reference_version,
+                "score_hash": score.score_hash,
+            })
             passed = f1 >= 0.7
             if pre_annotation:
                 # 畸形 pre_annotation (合法 JSON 但缺 x/y/w/h 字段) 会令 _bbox_dict

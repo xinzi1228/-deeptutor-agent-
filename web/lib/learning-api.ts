@@ -201,6 +201,16 @@ export type AnnotationSubmitResult = {
   attempt?: { task_id: string; metrics?: Record<string, unknown>; report?: string; revision?: Record<string, unknown> };
   grade?: { metrics?: Record<string, unknown>; report?: string };
   local_check?: { metrics?: Record<string, unknown>; report?: string };
+  score_record?: AnnotationScoreRecord | null;
+};
+
+export type AnnotationScoreRecord = {
+  revision_number?: number;
+  correction_of?: string;
+  metric_delta?: Record<string, number>;
+  rule_version?: string;
+  reference_version?: string;
+  score_hash?: string;
 };
 
 const annotationDraftKey = (profileId: string, taskId: string) =>
@@ -238,7 +248,7 @@ export async function submitAnnotationRevision(body: Record<string, unknown>): P
 }
 
 export async function retryPendingAnnotationRevisions(): Promise<{
-  completed: Array<{ attempt: AnnotationSubmitResult["attempt"] }>;
+  completed: Array<{ attempt: AnnotationSubmitResult["attempt"]; score_record?: AnnotationScoreRecord | null }>;
   pending: Array<Record<string, unknown>>;
 }> {
   const response = await apiFetch(apiUrl("/api/v1/annotation/attempts/retry-pending"), { method: "POST" });

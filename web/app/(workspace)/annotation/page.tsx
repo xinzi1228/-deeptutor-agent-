@@ -5,7 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
 import AnnotationProgress from "@/components/annotation/AnnotationProgress";
+import AnnotationResultCard from "@/components/annotation/AnnotationResultCard";
 import { apiFetch, apiUrl } from "@/lib/api";
+import type { AnnotationScoreRecord } from "@/lib/learning-api";
 import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import type { AnnotationTask } from "@/components/annotation/UnifiedAnnotationWorkbench";
 import { useCurrentLearningTask } from "@/components/current-task/CurrentLearningTaskContext";
@@ -47,6 +49,8 @@ export default function AnnotationPage() {
   const [labelStudio, setLabelStudio] = useState<{ available: boolean; configured?: boolean; management_url?: string | null; detail?: string } | null>(null);
   const [professionalUrl, setProfessionalUrl] = useState("");
   const [professionalLoading, setProfessionalLoading] = useState(false);
+  const [professionalSyncing, setProfessionalSyncing] = useState(false);
+  const [professionalResult, setProfessionalResult] = useState<{ metrics: Record<string, number>; report: string; scoreRecord?: AnnotationScoreRecord | null } | null>(null);
   const [browserSessionId, setBrowserSessionId] = useState("");
   const [editAccess, setEditAccess] = useState<EditAccess>({ editable: false, lease: null, message: "请选择任务" });
   const draftSaverRef = useRef<(() => Promise<{ draftVersion: number; lease: AnnotationEditLease }>) | null>(null);
@@ -177,6 +181,7 @@ export default function AnnotationPage() {
     const startedAt = performance.now();
     setProfessionalLoading(true);
     setProfessionalUrl("");
+    setProfessionalResult(null);
     try {
       if (selectedTask && selectedTask !== taskId && editAccess.editable && editAccess.lease) {
         const checkpointed = await saveOwnedCheckpoint();
@@ -252,15 +257,40 @@ export default function AnnotationPage() {
     }).catch(() => undefined);
   }, [selectedTask]);
 
+  const syncProfessionalResult = useCallback(async () => {
+    if (!selectedTask || professionalSyncing) return;
+    setProfessionalSyncing(true);
+    try {
+      const response = await apiFetch(apiUrl(`/api/v1/label-studio/sync/${encodeURIComponent(selectedTask)}`), { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.detail || "同步失败");
+      if (!data.synced) throw new Error(data?.detail || "请先在专业模式中保存标注");
+      setProfessionalResult({
+        metrics: data.attempt?.metrics || {},
+        report: data.attempt?.report || "专业模式标注已同步",
+        scoreRecord: data.score_record,
+      });
+      reportLiveState({ task_id: selectedTask, mode: "professional", stage: "submitted", metrics: data.attempt?.metrics || {} });
+    } catch (reason) {
+      setEditAccess((current) => ({ ...current, message: reason instanceof Error ? reason.message : "同步失败" }));
+    } finally {
+      setProfessionalSyncing(false);
+    }
+  }, [professionalSyncing, reportLiveState, selectedTask]);
+
   useEffect(() => {
     const onProfessionalEvent = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.data?.type !== "label_studio_workbench_event") return;
+      const allowedStages = new Set(["bridge_ready", "draft_changed", "selection_changed", "tool_changed", "label_changed", "undo", "save", "task_changed"]);
+      const rawStage = String(event.data.event || "editing");
       reportLiveState({
         task_id: selectedTask,
         mode: "professional",
-        stage: String(event.data.event || "editing"),
-        annotation_count: Number(event.data.annotationCount || 0),
+        stage: allowedStages.has(rawStage) ? rawStage : "editing",
+        annotation_count: Math.max(0, Math.min(10_000, Number(event.data.annotationCount || 0))),
         current_label: String(event.data.label || "").slice(0, 80),
+        selected_object_id: String(event.data.selectedObjectId || "").slice(0, 120),
+        tool: String(event.data.tool || "").slice(0, 40),
         realtime_bridge: true,
       });
     };
@@ -367,8 +397,9 @@ export default function AnnotationPage() {
             <option value="">{mode === "pro" ? "选择后直接进入 Label Studio 题目" : "选择任务后加载到当前标注台"}</option>
             {filteredTasks.map((task) => <option key={task.id} value={task.id}>{task.id} · {task.title}{task.difficulty ? `（${task.difficulty}）` : ""}</option>)}
           </select>
-          {mode === "pro" && professionalUrl && <button className="rounded border border-[var(--border)] px-2 py-1 text-xs text-[var(--primary)]" onClick={() => void apiFetch(apiUrl(`/api/v1/label-studio/sync/${encodeURIComponent(selectedTask)}`), { method: "POST" })}>同步已保存标注</button>}
+          {mode === "pro" && professionalUrl && <button disabled={professionalSyncing} className="rounded border border-[var(--border)] px-2 py-1 text-xs text-[var(--primary)] disabled:opacity-50" onClick={() => void syncProfessionalResult()}>{professionalSyncing ? "正在评分…" : "同步并评分"}</button>}
         </div>
+      {mode === "pro" && professionalResult ? <div className="border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 sm:px-6"><AnnotationResultCard metrics={professionalResult.metrics} report={professionalResult.report} formal revisionNumber={professionalResult.scoreRecord?.revision_number} metricDelta={professionalResult.scoreRecord?.metric_delta} ruleVersion={professionalResult.scoreRecord?.rule_version} referenceVersion={professionalResult.scoreRecord?.reference_version} /></div> : null}
       <div className="flex-1">
         {mode !== "pro" ? selectedTaskData ? <UnifiedAnnotationWorkbench key={selectedTask} task={selectedTaskData} previousTaskId={selectedIndex > 0 ? filteredTasks[selectedIndex - 1]?.id : undefined} nextTaskId={selectedIndex >= 0 ? filteredTasks[selectedIndex + 1]?.id : undefined} onSelectTask={(taskId) => void chooseTask(taskId)} onLiveState={reportLiveState} readOnly={!editAccess.editable} browserSessionId={browserSessionId} leaseVersion={editAccess.lease?.version} onLeaseChange={handleLeaseChange} onLeaseLost={handleLeaseLost} registerDraftSaver={registerDraftSaver} /> : <div className="flex h-full items-center justify-center p-8"><div className="max-w-md rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 text-center"><h2 className="font-semibold">选择一项任务开始练习</h2><p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">统一 React 标注台会自动保存草稿到当前学习档案，并把实时进度提供给标注教练。</p></div></div> : labelStudio?.available && professionalUrl ? (
           <div className="relative h-full"><iframe src={professionalUrl} className={`h-full w-full border-0 ${editAccess.editable ? "" : "pointer-events-none opacity-70"}`} title="Label Studio 专业标注台" />{!editAccess.editable && <div className="absolute inset-x-4 top-4 rounded-xl border border-amber-500/35 bg-[var(--card)]/95 p-3 text-center text-xs text-amber-700 shadow-sm">专业标注台当前只读，请先在上方接管编辑。</div>}</div>

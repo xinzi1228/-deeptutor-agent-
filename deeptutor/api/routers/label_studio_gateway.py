@@ -15,6 +15,11 @@ from deeptutor.multi_user.context import (
 )
 from deeptutor.multi_user.paths import get_current_learning_profile_root
 from deeptutor.services.annotation_attempts import AnnotationAttemptStore
+from deeptutor.services.annotation_scoring import (
+    AnnotationScoreStore,
+    BboxScorer,
+    parse_label_studio_bbox_result,
+)
 from deeptutor.services.label_studio_gateway import (
     LabelStudioAccessPolicy,
     LabelStudioClient,
@@ -140,6 +145,8 @@ async def assign_professional_tasks(
 
 @router.post("/sync/{task_id}")
 async def sync_professional_attempt(task_id: str) -> dict:
+    from deeptutor.api.routers.annotation import _reference_version, _task_bank
+
     access, root, mapping = _context(write=True)
     ls_task_id = mapping.task_map.get(task_id)
     if not ls_task_id:
@@ -154,13 +161,40 @@ async def sync_professional_attempt(task_id: str) -> dict:
         return {"synced": False, "detail": "Label Studio 中还没有已保存标注"}
     latest = annotations[-1]
     annotation_id = latest.get("id", "unknown")
+    task_definition = _task_bank().get(task_id)
+    if task_definition is None:
+        raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")
+    task_type = str(task_definition.get("type") or "bbox")
+    raw_results = latest.get("result", [])
+    result_rows = [row for row in raw_results if isinstance(row, dict)] if isinstance(raw_results, list) else []
+    metrics: dict[str, object] = {}
+    report = "Label Studio 专业模式标注已同步；当前题型暂不支持统一自动评分。"
+    scoring = None
+    payload: dict[str, object] = {
+        "annotations": result_rows,
+        "ls_task_id": ls_task_id,
+        "ls_annotation_id": annotation_id,
+    }
+    if task_type == "bbox":
+        predictions, image_size = parse_label_studio_bbox_result(result_rows)
+        ground_truth = task_definition.get("ground_truth", [])
+        ground_truth_rows = [row for row in ground_truth if isinstance(row, dict)] if isinstance(ground_truth, list) else []
+        scoring = BboxScorer().score(
+            predictions,
+            ground_truth_rows,
+            reference_version=_reference_version(task_id, ground_truth_rows),
+            image_size=image_size,
+        )
+        metrics = scoring.metrics
+        report = scoring.report
+        payload.update({"predictions": predictions, "image_size": f"{image_size[0]}x{image_size[1]}"})
     attempt, created = AnnotationAttemptStore(root).append_attempt(
         task_id=task_id,
-        task_type="label_studio",
+        task_type=task_type,
         mode="professional",
-        payload={"annotations": latest.get("result", []), "ls_task_id": ls_task_id, "ls_annotation_id": annotation_id},
-        metrics={},
-        report="Label Studio 专业模式标注已同步，等待统一评分。",
+        payload=payload,
+        metrics=metrics,
+        report=report,
         idempotency_key=f"ls:{ls_task_id}:{annotation_id}",
         source="professional_gateway",
         sync_status="synced",
@@ -171,7 +205,17 @@ async def sync_professional_attempt(task_id: str) -> dict:
             "unique_id": latest.get("unique_id", ""),
         },
     )
-    return {"synced": True, "created": created, "attempt": attempt}
+    score_record = None
+    if scoring is not None:
+        score_record = AnnotationScoreStore(root).record(
+            task_id=task_id,
+            attempt_id=str(attempt.get("id") or ""),
+            metrics=scoring.metrics,
+            rule_version=scoring.rule_version,
+            reference_version=scoring.reference_version,
+            score_hash=scoring.score_hash,
+        )
+    return {"synced": True, "created": created, "attempt": attempt, "score_record": score_record}
 
 
 def _rewrite_text(text: str) -> str:
@@ -203,13 +247,24 @@ _REALTIME_BRIDGE = r"""
     const selectors = [".lsf-region", ".htx-region", "[data-testid*='region']", "[class*='Region']"];
     return Math.max(0, ...selectors.map((selector) => document.querySelectorAll(selector).length));
   };
+  const selectedObjectId = () => {
+    const selected = document.querySelector("[data-testid*='region'][aria-selected='true'], [class*='Region'][class*='selected'], .lsf-region.selected, .htx-region.selected");
+    if (!selected) return "";
+    return String(selected.getAttribute("data-id") || selected.getAttribute("data-region-id") || selected.id || "").slice(0, 120);
+  };
+  const activeTool = () => {
+    const button = document.querySelector("button[aria-pressed='true'], [role='button'][aria-pressed='true']");
+    if (!button) return "";
+    return String(button.getAttribute("data-tool") || button.getAttribute("aria-label") || button.getAttribute("title") || "").slice(0, 40);
+  };
+  const snapshot = () => ({ annotationCount: countRegions(), selectedObjectId: selectedObjectId(), tool: activeTool() });
   let lastCount = -1;
   let timer = 0;
   const inspect = () => {
     clearTimeout(timer);
     timer = setTimeout(() => {
       const count = countRegions();
-      if (count !== lastCount) { lastCount = count; send("draft_changed", { annotationCount: count }); }
+      if (count !== lastCount) { lastCount = count; send("draft_changed", snapshot()); }
     }, 180);
   };
   new MutationObserver(inspect).observe(document.documentElement, { subtree: true, childList: true, attributes: true });
@@ -217,13 +272,14 @@ _REALTIME_BRIDGE = r"""
     const target = event.target && event.target.closest ? event.target.closest("button,[role='button']") : null;
     if (!target) return;
     const text = `${target.getAttribute("aria-label") || ""} ${target.getAttribute("title") || ""} ${target.textContent || ""}`.toLowerCase();
-    if (/undo|撤销/.test(text)) send("undo", { annotationCount: countRegions() });
-    if (/submit|update|save|保存|提交/.test(text)) send("save", { annotationCount: countRegions() });
+    if (/undo|撤销/.test(text)) send("undo", snapshot());
+    if (/submit|update|save|保存|提交/.test(text)) send("save", snapshot());
     const label = target.getAttribute("data-label") || target.getAttribute("aria-label") || "";
     if (label && /label|标签/i.test(text)) send("label_changed", { label: String(label).slice(0, 80) });
+    window.setTimeout(() => send("selection_changed", snapshot()), 0);
   }, true);
   window.addEventListener("popstate", () => send("task_changed"));
-  send("bridge_ready", { annotationCount: countRegions(), bridgeVersion: 1 });
+  send("bridge_ready", { ...snapshot(), bridgeVersion: 2 });
   inspect();
 })();
 </script>

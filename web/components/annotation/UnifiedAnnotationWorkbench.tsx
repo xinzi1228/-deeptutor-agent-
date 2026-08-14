@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Cloud,
@@ -19,6 +18,7 @@ import type { AnnotationEditLease } from "@/lib/annotation-edit-session";
 import BboxCanvas from "@/components/annotation/bbox/BboxCanvas";
 import BboxObjectList from "@/components/annotation/bbox/BboxObjectList";
 import BboxToolbar, { type BboxTool } from "@/components/annotation/bbox/BboxToolbar";
+import AnnotationResultCard from "@/components/annotation/AnnotationResultCard";
 import { toBbox, validateBoxes, type Bbox, type ImageBounds } from "@/components/annotation/bbox/bbox-geometry";
 import { createBboxState, reduceBboxState } from "@/components/annotation/bbox/bbox-reducer";
 import {
@@ -27,6 +27,7 @@ import {
   retryPendingAnnotationRevisions,
   saveBrowserAnnotationDraft,
   submitAnnotationRevision,
+  type AnnotationScoreRecord,
 } from "@/lib/learning-api";
 
 export type AnnotationTask = {
@@ -75,12 +76,6 @@ function clone(value: Array<Record<string, unknown>>) {
   return JSON.parse(JSON.stringify(value)) as Array<Record<string, unknown>>;
 }
 
-function scoreLabel(metrics: Record<string, unknown>) {
-  const raw = metrics.f1 ?? metrics.accuracy ?? metrics.compliance_rate;
-  if (typeof raw !== "number") return "已评分";
-  return `${Math.round(raw * 100)} 分`;
-}
-
 export default function UnifiedAnnotationWorkbench({
   task,
   previousTaskId,
@@ -100,7 +95,7 @@ export default function UnifiedAnnotationWorkbench({
   const [history, setHistory] = useState<Array<Array<Record<string, unknown>>>>([]);
   const [future, setFuture] = useState<Array<Array<Record<string, unknown>>>>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [result, setResult] = useState<{ metrics: Record<string, unknown>; report: string; formal: boolean } | null>(null);
+  const [result, setResult] = useState<{ metrics: Record<string, unknown>; report: string; formal: boolean; scoreRecord?: AnnotationScoreRecord | null } | null>(null);
   const [syncPending, setSyncPending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -250,7 +245,7 @@ export default function UnifiedAnnotationWorkbench({
       if (activeProfileId) clearBrowserAnnotationDraft(activeProfileId, task.id);
       setSyncPending(false);
       setSaveState("synced");
-      setResult({ metrics: data.grade?.metrics || data.attempt?.metrics || {}, report: data.grade?.report || data.attempt?.report || "提交成功", formal: true });
+      setResult({ metrics: data.grade?.metrics || data.attempt?.metrics || {}, report: data.grade?.report || data.attempt?.report || "提交成功", formal: true, scoreRecord: data.score_record });
       onLiveState?.({ task_id: task.id, mode: "teaching", stage: "submitted", metrics: data.grade?.metrics || data.attempt?.metrics || {} });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "提交失败");
@@ -261,11 +256,12 @@ export default function UnifiedAnnotationWorkbench({
     if (!syncPending) return;
     const retry = () => {
       void retryPendingAnnotationRevisions().then((data) => {
-        const completed = data.completed.find((item) => item.attempt?.task_id === task.id)?.attempt;
+        const completedRow = data.completed.find((item) => item.attempt?.task_id === task.id);
+        const completed = completedRow?.attempt;
         if (!completed) return;
         setSyncPending(false);
         setSaveState("synced");
-        setResult({ metrics: completed.metrics || {}, report: completed.report || "正式修订已同步", formal: true });
+        setResult({ metrics: completed.metrics || {}, report: completed.report || "正式修订已同步", formal: true, scoreRecord: completedRow?.score_record });
         if (activeProfileId) {
           clearBrowserAnnotationDraft(activeProfileId, task.id);
           invalidateStudentDashboard(activeProfileId);
@@ -316,10 +312,10 @@ export default function UnifiedAnnotationWorkbench({
         <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><SaveIcon className="h-3.5 w-3.5" />{saveText}</span>
       </div>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <fieldset disabled={readOnly} className={readOnly ? "pointer-events-none opacity-70" : ""}><TaskEditor task={task} predictions={predictions} onChange={update} onUndo={undo} onRedo={redo} canUndo={Boolean(history.length)} canRedo={Boolean(future.length)} onImageSizeChange={(size) => { imageSizeRef.current = `${size.width}x${size.height}`; }} /></fieldset>
+        <fieldset disabled={readOnly} className={readOnly ? "pointer-events-none opacity-70" : ""}><TaskEditor task={task} predictions={predictions} onChange={update} onUndo={undo} onRedo={redo} canUndo={Boolean(history.length)} canRedo={Boolean(future.length)} onImageSizeChange={(size) => { imageSizeRef.current = `${size.width}x${size.height}`; }} onInteractionState={(state) => onLiveState?.({ task_id: task.id, mode: "teaching", stage: "editing", ...state })} /></fieldset>
       </div>
       {error && <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-600">{error}</div>}
-      {result && <section className={`mt-3 rounded-2xl border p-4 ${result.formal ? "border-emerald-500/25 bg-emerald-500/5" : "border-amber-500/35 bg-amber-500/10"}`}><div className={`flex items-center gap-2 font-semibold ${result.formal ? "text-emerald-600" : "text-amber-700"}`}><CheckCircle2 className="h-4 w-4" />{result.formal ? `正式成绩 · ${scoreLabel(result.metrics)}` : `本地检查（非正式）· ${scoreLabel(result.metrics)}`}</div><div className="mt-2 flex flex-wrap gap-2">{Object.entries(result.metrics).map(([key, value]) => <span key={key} className="rounded-lg bg-[var(--background)] px-2 py-1 text-[11px]">{key}: {String(value)}</span>)}</div><p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-[var(--muted-foreground)]">{result.report}</p></section>}
+      {result && <div className="mt-3" aria-label={result.formal ? "正式评分" : "本地检查（非正式）"}><AnnotationResultCard metrics={result.metrics} report={result.report} formal={result.formal} revisionNumber={result.scoreRecord?.revision_number} metricDelta={result.scoreRecord?.metric_delta} ruleVersion={result.scoreRecord?.rule_version} referenceVersion={result.scoreRecord?.reference_version} /></div>}
       <details className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:hidden" open><summary className="cursor-pointer text-xs font-semibold">提交与切换任务</summary><div className="mt-3 flex flex-wrap gap-2">{(task.labels || []).map((label) => <span key={label} className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[11px]">{label}</span>)}</div><button type="button" disabled={readOnly || submitting} onClick={() => void submit()} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Send className="h-4 w-4" />{readOnly ? "只读模式" : submitting ? "正在评分…" : "提交并评分"}</button><div className="mt-2 grid grid-cols-2 gap-2"><button disabled={!previousTaskId} onClick={() => previousTaskId && onSelectTask(previousTaskId)} className="rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">上一题</button><button disabled={!nextTaskId} onClick={() => nextTaskId && onSelectTask(nextTaskId)} className="rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">下一题</button></div></details>
     </main>
 
@@ -335,8 +331,8 @@ function ToolbarButton({ label, disabled, onClick, children }: { label: string; 
   return <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-lg border border-transparent p-2 text-[var(--muted-foreground)] hover:border-[var(--border)] hover:bg-[var(--card)] hover:text-[var(--foreground)] disabled:opacity-35">{children}</button>;
 }
 
-function TaskEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo, onImageSizeChange }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean; onImageSizeChange: (size: ImageBounds) => void }) {
-  if (task.type === "bbox") return <BBoxEditor task={task} predictions={predictions} onChange={onChange} onUndo={onUndo} onRedo={onRedo} canUndo={canUndo} canRedo={canRedo} onImageSizeChange={onImageSizeChange} />;
+function TaskEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo, onImageSizeChange, onInteractionState }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean; onImageSizeChange: (size: ImageBounds) => void; onInteractionState?: (state: Record<string, unknown>) => void }) {
+  if (task.type === "bbox") return <BBoxEditor task={task} predictions={predictions} onChange={onChange} onUndo={onUndo} onRedo={onRedo} canUndo={canUndo} canRedo={canRedo} onImageSizeChange={onImageSizeChange} onInteractionState={onInteractionState} />;
   if (task.type === "classification") return <ChoiceEditor task={task} value={String(predictions[0]?.label || "")} onChange={(label) => onChange([{ id: 0, label }])} />;
   if (task.type === "judgment") return <ItemChoiceEditor task={task} predictions={predictions} onChange={onChange} />;
   if (task.type === "error_case") return <ErrorCaseEditor task={task} predictions={predictions} onChange={onChange} />;
@@ -384,7 +380,7 @@ function JsonEditor({ task, predictions, onChange }: { task: AnnotationTask; pre
   return <div className="space-y-4"><Media task={task} /><p className="text-xs text-[var(--muted-foreground)]">该任务使用结构化编辑器。视频跟踪格式为每帧一个对象，包含 frame 与 boxes。</p><textarea key={serialized} spellCheck={false} defaultValue={serialized} onChange={(event) => { try { const value = JSON.parse(event.target.value); if (Array.isArray(value)) onChange(value); } catch { /* keep editing until JSON is valid */ } }} className="min-h-72 w-full rounded-xl border border-[var(--border)] bg-slate-950 p-4 font-mono text-xs text-slate-100" /></div>;
 }
 
-function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo, onImageSizeChange }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean; onImageSizeChange: (size: ImageBounds) => void }) {
+function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo, onImageSizeChange, onInteractionState }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean; onImageSizeChange: (size: ImageBounds) => void; onInteractionState?: (state: Record<string, unknown>) => void }) {
   const labels = task.labels?.length ? task.labels : ["object"];
   const externalBoxes = useMemo(() => predictions.map(toBbox), [predictions]);
   const [state, dispatch] = useReducer(reduceBboxState, externalBoxes, (boxes) => createBboxState(boxes, labels[0]));
@@ -427,6 +423,15 @@ function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canR
   }, [deleteBox, state.selectedId]);
 
   const issues = useMemo(() => validateBoxes(state.boxes, bounds), [bounds, state.boxes]);
+  useEffect(() => {
+    onInteractionState?.({
+      annotation_count: state.boxes.length,
+      selected_object_id: state.selectedId || "",
+      current_label: state.activeLabel,
+      tool,
+      validation_issue_count: issues.length,
+    });
+  }, [issues.length, onInteractionState, state.activeLabel, state.boxes.length, state.selectedId, tool]);
   return <div className="space-y-3">
     <BboxToolbar tool={tool} onToolChange={setTool} activeLabel={state.activeLabel} labels={labels} onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} onFit={() => setZoom(1)} canUndo={canUndo} canRedo={canRedo} hasSelection={Boolean(state.selectedId)} onUndo={onUndo} onRedo={onRedo} onDelete={() => state.selectedId && deleteBox(state.selectedId)} />
     <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">

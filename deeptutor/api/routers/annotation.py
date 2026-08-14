@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 from urllib.error import URLError
@@ -21,6 +22,7 @@ from deeptutor.services.annotation_attempts import (
     EditLeaseConflict,
     EditLeaseVersionMismatch,
 )
+from deeptutor.services.annotation_scoring import AnnotationScoreStore, BboxScorer
 from deeptutor.services.coach_context import build_annotation_coach_context
 from deeptutor.services.label_studio_gateway import (
     LabelStudioClient,
@@ -197,9 +199,15 @@ def _grade_annotation(body: dict[str, Any]) -> dict[str, Any]:
                 image_size = (int(img_w.strip()), int(img_h.strip()))
             except (ValueError, AttributeError):
                 pass
-        report, _ = annotation_check._bbox_report(
-            predictions, ground_truth, image_size=image_size
+        reference_version = str(body.get("reference_version") or "provided-ground-truth")
+        score = BboxScorer().score(
+            predictions,
+            ground_truth,
+            reference_version=reference_version,
+            image_size=image_size,
         )
+        metrics = score.metrics
+        report = score.report
         raw_pre = body.get("pre_annotation")
         if raw_pre:
             # 双评: 同一 ground_truth 额外评 AI 预标注; 畸形则忽略
@@ -215,6 +223,12 @@ def _grade_annotation(body: dict[str, Any]) -> dict[str, Any]:
         report = _REPORTERS[task_type](predictions, ground_truth)
 
     resp: dict[str, Any] = {"task_type": task_type, "metrics": metrics, "report": report}
+    if task_type == "bbox":
+        resp["scoring"] = {
+            "rule_version": score.rule_version,
+            "reference_version": score.reference_version,
+            "score_hash": score.score_hash,
+        }
     if pre_annotation_metrics is not None:
         resp["pre_annotation_metrics"] = pre_annotation_metrics
         resp["improvement"] = improvement
@@ -228,6 +242,38 @@ def _payload_image_size(payload: dict[str, Any]) -> tuple[int, int]:
         return max(1, int(width)), max(1, int(height))
     except (TypeError, ValueError):
         return 1000, 1000
+
+
+def _reference_version(task_id: str, ground_truth: Any) -> str:
+    canonical = json.dumps(ground_truth, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"task-bank:{task_id}:sha256:{digest}"
+
+
+def _record_formal_score(store: AnnotationAttemptStore, attempt: dict[str, Any]) -> dict[str, Any] | None:
+    if attempt.get("task_type") != "bbox":
+        return None
+    task_id = str(attempt.get("task_id") or "")
+    task = _task_bank().get(task_id)
+    payload = attempt.get("payload") if isinstance(attempt.get("payload"), dict) else {}
+    predictions = payload.get("predictions", [])
+    ground_truth = task.get("ground_truth", []) if isinstance(task, dict) else []
+    if not isinstance(predictions, list) or not isinstance(ground_truth, list):
+        return None
+    score = BboxScorer().score(
+        [row for row in predictions if isinstance(row, dict)],
+        [row for row in ground_truth if isinstance(row, dict)],
+        reference_version=_reference_version(task_id, ground_truth),
+        image_size=_payload_image_size(payload),
+    )
+    return AnnotationScoreStore(store.root.parent).record(
+        task_id=task_id,
+        attempt_id=str(attempt.get("id") or ""),
+        metrics=score.metrics,
+        rule_version=score.rule_version,
+        reference_version=score.reference_version,
+        score_hash=score.score_hash,
+    )
 
 
 async def _sync_pending_submission(
@@ -394,6 +440,7 @@ async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
                 "task_type": body.task_type,
                 "predictions": predictions,
                 "ground_truth": task.get("ground_truth", []),
+                "reference_version": _reference_version(body.task_id, task.get("ground_truth", [])),
                 "image_size": body.payload.get("image_size", ""),
                 "pre_annotation": body.payload.get("pre_annotation", task.get("pre_annotation")),
             })
@@ -429,6 +476,7 @@ async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
         }
     except (PermissionError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    score_record = _record_formal_score(store, attempt)
     return {
         "finalized": True,
         "sync_status": "synced",
@@ -436,6 +484,7 @@ async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
         "created": created,
         "grade": grade_result,
         "revision": attempt.get("revision", {}),
+        "score_record": score_record,
     }
 
 
@@ -447,7 +496,7 @@ async def retry_pending_annotation_attempts() -> dict[str, Any]:
     for pending in store.list_pending_submissions(limit=10):
         try:
             attempt, created = await _sync_pending_submission(store, pending)
-            completed.append({"attempt": attempt, "created": created})
+            completed.append({"attempt": attempt, "created": created, "score_record": _record_formal_score(store, attempt)})
         except LabelStudioUnavailable as exc:
             retry = store.mark_submission_retry(str(pending.get("idempotency_key") or ""), str(exc))
             store.mark_draft_sync_status(str(pending.get("task_id") or ""), "retry_pending", detail=str(exc))

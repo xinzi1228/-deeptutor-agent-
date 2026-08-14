@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from deeptutor.services.annotation_attempts import AnnotationAttemptStore
+from deeptutor.services.annotation_scoring import AnnotationScoreStore
 from deeptutor.services.current_learning_task.store import CurrentLearningTaskStore
 
 
@@ -42,7 +43,24 @@ def build_annotation_coach_context(profile_root: Path) -> dict[str, Any]:
     """Return a small, explainable context window rather than raw history."""
     profile_root = Path(profile_root)
     attempts = AnnotationAttemptStore(profile_root)
+    scores = AnnotationScoreStore(profile_root)
     current_task = CurrentLearningTaskStore(profile_root).get()
+    annotation_projection = attempts.current()
+    active_task_id = str(annotation_projection.get("task_id") or (current_task.task_id if current_task else ""))
+    draft = attempts.get_draft(active_task_id) if active_task_id else None
+    draft_payload = draft.get("payload", {}) if isinstance(draft, dict) else {}
+    draft_predictions = draft_payload.get("predictions", []) if isinstance(draft_payload, dict) else []
+    saved_draft = {
+        "task_id": active_task_id,
+        "version": draft.get("version", 0) if isinstance(draft, dict) else 0,
+        "sync_status": draft.get("sync_status", "") if isinstance(draft, dict) else "",
+        "annotation_count": len(draft_predictions) if isinstance(draft_predictions, list) else 0,
+        "labels": list(dict.fromkeys(
+            str(row.get("label"))
+            for row in draft_predictions
+            if isinstance(row, dict) and row.get("label")
+        ))[:10] if isinstance(draft_predictions, list) else [],
+    }
     learning = _read_jsonl_tail(profile_root / "learning" / "records.jsonl", 20)
     confirmed_weaknesses: list[dict[str, Any]] = []
     for row in learning:
@@ -60,9 +78,26 @@ def build_annotation_coach_context(profile_root: Path) -> dict[str, Any]:
         })
     return {
         "current": current_task.model_dump(mode="json") if current_task else attempts.current(),
-        "annotation_projection": attempts.current(),
+        "annotation_projection": annotation_projection,
+        "saved_draft": saved_draft,
         "recent_attempts": compact_attempts,
+        "recent_scores": [
+            {
+                key: row.get(key)
+                for key in (
+                    "task_id",
+                    "attempt_id",
+                    "revision_number",
+                    "correction_of",
+                    "metrics",
+                    "metric_delta",
+                    "rule_version",
+                    "reference_version",
+                )
+            }
+            for row in scores.list_scores(task_id=active_task_id, limit=3)
+        ],
         "confirmed_weaknesses": confirmed_weaknesses[-5:],
         "memory_summary": _memory_summary(profile_root),
-        "context_policy": "默认仅提供当前任务、最近5次练习、确认的薄弱点与短记忆摘要；完整历史需用户明确要求。",
+        "context_policy": "仅提供当前任务、草稿摘要、实时步骤、最近3次确定性评分、最近5次练习、确认薄弱点与短记忆摘要；不提供原始坐标，模型只能解释服务端分数。",
     }
