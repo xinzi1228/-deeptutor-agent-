@@ -39,6 +39,42 @@ class _FakeCatalogService:
     def load(self) -> dict[str, Any]:
         return deepcopy(self._catalog)
 
+    def load_public(self) -> dict[str, Any]:
+        public = self.load()
+        for service in public.get("services", {}).values():
+            for profile in service.get("profiles", []):
+                profile["api_key_set"] = bool(profile.get("api_key"))
+                profile["api_key"] = ""
+        return public
+
+    def materialize_catalog(self, catalog: dict[str, Any]) -> dict[str, Any]:
+        return deepcopy(catalog)
+
+    def secret_migration_status(self):
+        profiles = [
+            profile
+            for target in self._catalog.get("services", {}).values()
+            for profile in target.get("profiles", [])
+        ]
+        plaintext_count = sum(bool(profile.get("api_key")) for profile in profiles)
+        return SimpleNamespace(
+            to_dict=lambda: {
+                "backend": "memory",
+                "plaintext_count": plaintext_count,
+                "reference_count": 0,
+                "configured_count": plaintext_count,
+                "migration_required": plaintext_count > 0,
+            }
+        )
+
+    def migrate_plaintext_secrets(self):
+        for target in self._catalog.get("services", {}).values():
+            for profile in target.get("profiles", []):
+                if profile.get("api_key"):
+                    profile["secret_ref"] = "memory:opaque"
+                    profile["api_key"] = ""
+        return self.secret_migration_status()
+
     def apply(self, catalog: dict[str, Any]) -> dict[str, Any]:
         current = self.save(catalog)
         return {
@@ -513,6 +549,31 @@ async def test_get_llm_options_returns_redacted_catalog(monkeypatch: pytest.Monk
     assert "base_url" not in response["options"][0]
 
 
+@pytest.mark.asyncio
+async def test_catalog_security_reports_and_migrates_without_returning_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    catalog = _build_catalog(
+        llm_model="gpt-test",
+        llm_base_url="https://llm.example/v1",
+        llm_api_key="secret-key",
+        embedding_model="embed-test",
+        embedding_base_url="https://emb.example/v1/embeddings",
+        embedding_api_key="embedding-secret",
+    )
+    service = _FakeCatalogService(catalog)
+    monkeypatch.setattr(settings_router, "get_model_catalog_service", lambda: service)
+
+    before = await settings_router.get_catalog_security()
+    after = await settings_router.migrate_catalog_secrets()
+
+    assert before["migration_required"] is True
+    assert before["plaintext_count"] == 2
+    assert after["migration_required"] is False
+    assert "secret-key" not in json.dumps(after)
+    assert "embedding-secret" not in json.dumps(after)
+
+
 @pytest.fixture(autouse=True)
 def _reset_runtime_state() -> None:
     llm_config_module.clear_llm_config_cache()
@@ -557,7 +618,10 @@ async def test_update_catalog_invalidates_runtime_caches(monkeypatch: pytest.Mon
     new_llm_client = llm_client_module.get_llm_client()
     new_embedding_client = embedding_client_module.get_embedding_client()
 
-    assert response == {"catalog": updated_catalog}
+    response_profile = response["catalog"]["services"]["llm"]["profiles"][0]
+    assert response_profile["api_key"] == ""
+    assert response_profile["api_key_set"] is True
+    assert "new-llm-key" not in json.dumps(response)
     assert old_llm_config.model == "gpt-old"
     assert new_llm_config.model == "gpt-new"
     assert new_llm_config.base_url == "https://new-llm.example/v1"
@@ -602,7 +666,10 @@ async def test_apply_catalog_invalidates_runtime_caches(monkeypatch: pytest.Monk
     new_llm_client = llm_client_module.get_llm_client()
     new_embedding_client = embedding_client_module.get_embedding_client()
 
-    assert response["catalog"] == applied_catalog
+    response_profile = response["catalog"]["services"]["llm"]["profiles"][0]
+    assert response_profile["api_key"] == ""
+    assert response_profile["api_key_set"] is True
+    assert "after-apply-llm-key" not in json.dumps(response)
     assert response["runtime"]["catalog_path"]
     assert new_llm_config.model == "gpt-after-apply"
     assert new_llm_client is not old_llm_client

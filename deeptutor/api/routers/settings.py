@@ -515,7 +515,7 @@ async def get_settings():
         return {"ui": load_ui_settings()}
     return {
         "ui": load_ui_settings(),
-        "catalog": get_model_catalog_service().load(),
+        "catalog": get_model_catalog_service().load_public(),
         "providers": _provider_choices(),
     }
 
@@ -568,7 +568,23 @@ async def refresh_openai_codex_models() -> dict[str, Any]:
 @router.get("/catalog")
 async def get_catalog():
     _require_settings_admin()
-    return {"catalog": get_model_catalog_service().load()}
+    return {"catalog": get_model_catalog_service().load_public()}
+
+
+@router.get("/catalog/security")
+async def get_catalog_security():
+    _require_settings_admin()
+    return get_model_catalog_service().secret_migration_status().to_dict()
+
+
+@router.post("/catalog/security/migrate")
+async def migrate_catalog_secrets():
+    _require_settings_admin()
+    status_payload = get_model_catalog_service().migrate_plaintext_secrets()
+    return {
+        "message": "Legacy plaintext model credentials migrated to the secure store.",
+        **status_payload.to_dict(),
+    }
 
 
 @router.get("/network")
@@ -1012,20 +1028,22 @@ async def get_llm_options():
 @router.put("/catalog")
 async def update_catalog(payload: CatalogPayload):
     _require_settings_admin()
-    catalog = get_model_catalog_service().save(payload.catalog)
+    service = get_model_catalog_service()
+    service.save(payload.catalog)
     _invalidate_runtime_caches()
-    return {"catalog": catalog}
+    return {"catalog": service.load_public()}
 
 
 @router.post("/apply")
 async def apply_catalog(payload: CatalogPayload | None = None):
     _require_settings_admin()
-    catalog = payload.catalog if payload is not None else get_model_catalog_service().load()
-    applied = get_model_catalog_service().apply(catalog)
+    service = get_model_catalog_service()
+    catalog = payload.catalog if payload is not None else service.load()
+    applied = service.apply(catalog)
     _invalidate_runtime_caches()
     return {
         "message": "Catalog applied to runtime settings.",
-        "catalog": get_model_catalog_service().load(),
+        "catalog": service.load_public(),
         "runtime": applied,
     }
 
@@ -1176,7 +1194,9 @@ async def update_enabled_tools(update: EnabledToolsUpdate):
 @router.post("/tests/{service}/start")
 async def start_service_test(service: str, payload: CatalogPayload | None = None):
     _require_settings_admin()
-    run = get_config_test_runner().start(service, payload.catalog if payload else None)
+    catalog_service = get_model_catalog_service()
+    catalog = catalog_service.materialize_catalog(payload.catalog) if payload else None
+    run = get_config_test_runner().start(service, catalog)
     return {"run_id": run.id}
 
 
@@ -1237,8 +1257,9 @@ class TourCompletePayload(BaseModel):
 @router.post("/tour/complete")
 async def complete_tour(payload: TourCompletePayload | None = None):
     _require_settings_admin()
-    catalog = payload.catalog if payload and payload.catalog else get_model_catalog_service().load()
-    applied = get_model_catalog_service().apply(catalog)
+    service = get_model_catalog_service()
+    catalog = payload.catalog if payload and payload.catalog else service.load()
+    applied = service.apply(catalog)
     _invalidate_runtime_caches()
     now = int(time.time())
     launch_at = now + 3

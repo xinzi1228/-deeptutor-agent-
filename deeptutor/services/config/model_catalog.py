@@ -11,6 +11,7 @@ from typing import Any
 from uuid import uuid4
 
 from deeptutor.services.path_service import get_path_service
+from deeptutor.services.secrets import SecretMigrationStatus, SecretStore
 
 from .embedding_endpoint import normalize_embedding_endpoint_for_display
 
@@ -53,8 +54,13 @@ def _default_catalog() -> dict[str, Any]:
 class ModelCatalogService:
     _instances: dict[str, "ModelCatalogService"] = {}
 
-    def __init__(self, path: Path | None = None):
+    def __init__(
+        self,
+        path: Path | None = None,
+        secret_store: SecretStore | None = None,
+    ):
         self.path = path or CATALOG_PATH
+        self.secret_store = secret_store or SecretStore.for_catalog(self.path)
         self._lock = threading.RLock()
 
     @classmethod
@@ -75,13 +81,72 @@ class ModelCatalogService:
             before = deepcopy(catalog)
             self._normalize(catalog)
             if merged_defaults or catalog != before:
-                self.save(catalog)
-            return catalog
+                if not self._has_plaintext_secrets(catalog):
+                    return self.save(catalog)
+                # Keep legacy credentials untouched until the administrator
+                # explicitly runs the migration action. The normalized view is
+                # still safe to use in memory and public responses are redacted.
+                return catalog
+            return self._resolve_secrets(catalog)
 
         catalog = _default_catalog()
         self._normalize(catalog)
         self.save(catalog)
         return catalog
+
+    def load_public(self) -> dict[str, Any]:
+        """Return catalog metadata without revealing credentials or references."""
+
+        public = deepcopy(self.load())
+        for service in public.get("services", {}).values():
+            for profile in service.get("profiles", []):
+                profile["api_key_set"] = bool(profile.get("api_key"))
+                profile["api_key"] = ""
+                profile.pop("secret_ref", None)
+                profile.pop("clear_api_key", None)
+        return public
+
+    def materialize_catalog(self, catalog: dict[str, Any]) -> dict[str, Any]:
+        """Hydrate a redacted UI draft for connection tests without persisting it."""
+
+        materialized = deepcopy(catalog)
+        existing = self.load()
+        existing_profiles = self._profile_index(existing)
+        for service_name, service in materialized.get("services", {}).items():
+            for profile in service.get("profiles", []):
+                if profile.get("api_key"):
+                    continue
+                saved = existing_profiles.get((service_name, str(profile.get("id") or "")))
+                if saved:
+                    profile["api_key"] = saved.get("api_key", "")
+                profile.pop("api_key_set", None)
+        self._normalize(materialized)
+        return materialized
+
+    def secret_migration_status(self) -> SecretMigrationStatus:
+        raw = self._read_existing_catalog()
+        profiles = [
+            profile
+            for service in raw.get("services", {}).values()
+            for profile in service.get("profiles", [])
+        ]
+        return SecretMigrationStatus(
+            backend=self.secret_store.backend_name,
+            plaintext_count=sum(bool(profile.get("api_key")) for profile in profiles),
+            reference_count=sum(bool(profile.get("secret_ref")) for profile in profiles),
+            configured_count=sum(
+                bool(profile.get("api_key") or profile.get("secret_ref"))
+                for profile in profiles
+            ),
+        )
+
+    def migrate_plaintext_secrets(self) -> SecretMigrationStatus:
+        """Move legacy plaintext keys after an explicit administrator action."""
+
+        raw = self._read_existing_catalog()
+        if raw and self._has_plaintext_secrets(raw):
+            self.save(raw)
+        return self.secret_migration_status()
 
     def _read_existing_catalog(self) -> dict[str, Any]:
         if not self.path.exists() or self.path.stat().st_size == 0:
@@ -96,6 +161,7 @@ class ModelCatalogService:
         with self._lock:
             normalized = deepcopy(catalog)
             self._normalize(normalized)
+            stored = self._prepare_for_storage(normalized)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             fd, temp_name = tempfile.mkstemp(
                 prefix=f".{self.path.name}.",
@@ -105,14 +171,14 @@ class ModelCatalogService:
             temp_path = Path(temp_name)
             try:
                 with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-                    json.dump(normalized, handle, indent=2, ensure_ascii=False)
+                    json.dump(stored, handle, indent=2, ensure_ascii=False)
                     handle.write("\n")
                     handle.flush()
                     os.fsync(handle.fileno())
                 os.replace(temp_path, self.path)
             finally:
                 temp_path.unlink(missing_ok=True)
-            return normalized
+            return self._resolve_secrets(stored)
 
     def update(self, mutator: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
         with self._lock:
@@ -200,6 +266,62 @@ class ModelCatalogService:
                     service["active_model_id"] = models[0]["id"]
                     changed = True
         return changed
+
+    def _prepare_for_storage(self, catalog: dict[str, Any]) -> dict[str, Any]:
+        stored = deepcopy(catalog)
+        existing = self._read_existing_catalog()
+        existing_profiles = self._profile_index(existing)
+        for service_name, service in stored.get("services", {}).items():
+            for profile in service.get("profiles", []):
+                profile_id = str(profile.get("id") or "")
+                previous = existing_profiles.get((service_name, profile_id), {})
+                incoming = str(profile.get("api_key") or "").strip()
+                clear = bool(profile.pop("clear_api_key", False))
+                reference = str(profile.get("secret_ref") or previous.get("secret_ref") or "")
+                if clear:
+                    self.secret_store.delete(reference)
+                    reference = ""
+                elif incoming:
+                    reference = self.secret_store.put(
+                        f"model:{service_name}:{profile_id}", incoming
+                    )
+                elif not reference and previous.get("api_key"):
+                    reference = self.secret_store.put(
+                        f"model:{service_name}:{profile_id}",
+                        str(previous["api_key"]),
+                    )
+                profile["api_key"] = ""
+                profile.pop("api_key_set", None)
+                if reference:
+                    profile["secret_ref"] = reference
+                else:
+                    profile.pop("secret_ref", None)
+        return stored
+
+    def _resolve_secrets(self, catalog: dict[str, Any]) -> dict[str, Any]:
+        runtime = deepcopy(catalog)
+        for service in runtime.get("services", {}).values():
+            for profile in service.get("profiles", []):
+                reference = str(profile.get("secret_ref") or "")
+                if reference:
+                    profile["api_key"] = self.secret_store.get(reference)
+        return runtime
+
+    @staticmethod
+    def _profile_index(catalog: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+        return {
+            (service_name, str(profile.get("id") or "")): profile
+            for service_name, service in catalog.get("services", {}).items()
+            for profile in service.get("profiles", [])
+        }
+
+    @staticmethod
+    def _has_plaintext_secrets(catalog: dict[str, Any]) -> bool:
+        return any(
+            bool(profile.get("api_key"))
+            for service in catalog.get("services", {}).values()
+            for profile in service.get("profiles", [])
+        )
 
     def get_active_profile(
         self, catalog: dict[str, Any], service_name: str

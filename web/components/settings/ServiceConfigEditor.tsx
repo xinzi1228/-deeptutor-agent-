@@ -126,7 +126,8 @@ export function ServiceConfigEditor({ service }: { service: ServiceName }) {
   const isPerplexityMissingKey =
     service === "search" &&
     searchProviderRaw === "perplexity" &&
-    !String(activeProfile?.api_key || "").trim();
+    !String(activeProfile?.api_key || "").trim() &&
+    !activeProfile?.api_key_set;
   const activeLlmDetection =
     service === "llm" &&
     llmContextDetection?.profileId === draft.services.llm.active_profile_id &&
@@ -1134,8 +1135,13 @@ function ProfileFields({
       )}
       {fields.apiKey && (
         <div className="sm:col-span-2">
-          <div className="mb-1.5 text-[12px] text-[var(--muted-foreground)]">
-            {t("API Key")}
+          <div className="mb-1.5 flex items-center justify-between gap-3 text-[12px] text-[var(--muted-foreground)]">
+            <span>{t("API Key")}</span>
+            {profile.api_key_set && !profile.api_key && (
+              <span className="text-emerald-600 dark:text-emerald-400">
+                {t("已由当前 Windows 账户安全保存")}
+              </span>
+            )}
           </div>
           <div className="relative">
             <input
@@ -1147,7 +1153,11 @@ function ProfileFields({
               onChange={(e) =>
                 updateProfileField(service, "api_key", e.target.value)
               }
-              placeholder="sk-..."
+              placeholder={
+                profile.api_key_set
+                  ? t("留空可继续使用已保存的密钥")
+                  : "sk-..."
+              }
             />
             <button
               type="button"

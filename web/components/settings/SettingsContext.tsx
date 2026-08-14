@@ -82,6 +82,8 @@ export type CatalogProfile = {
   provider?: string;
   base_url: string;
   api_key: string;
+  api_key_set?: boolean;
+  clear_api_key?: boolean;
   api_version: string;
   extra_headers?: Record<string, string> | string;
   proxy?: string;

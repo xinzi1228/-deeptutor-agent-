@@ -9,6 +9,8 @@ import time
 from typing import Any
 from uuid import uuid4
 
+from deeptutor.services.secrets.redaction import redact_secrets
+
 from .context_window_detection import detect_context_window
 from .model_catalog import get_model_catalog_service
 from .provider_runtime import (
@@ -53,9 +55,9 @@ class TestRun:
     def emit(self, kind: str, message: str, **extra: Any) -> None:
         payload = {
             "type": kind,
-            "message": message,
+            "message": redact_secrets(message),
             "timestamp": time.time(),
-            **extra,
+            **redact_secrets(extra),
         }
         with self.lock:
             self.events.append(payload)

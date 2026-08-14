@@ -1,10 +1,19 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSettings } from "@/components/settings/SettingsContext";
 import { statusDotClass } from "@/components/settings/shared";
+import { apiFetch, apiUrl } from "@/lib/api";
+
+type SecretSecurityStatus = {
+  backend: string;
+  plaintext_count: number;
+  reference_count: number;
+  configured_count: number;
+  migration_required: boolean;
+};
 
 /**
  * Resident status module on the settings hub — the old `/settings/status` page
@@ -17,7 +26,43 @@ import { statusDotClass } from "@/components/settings/shared";
  */
 export default function SettingsStatusPanel() {
   const { t } = useTranslation();
-  const { status } = useSettings();
+  const { status, catalogEditable } = useSettings();
+  const [secretStatus, setSecretStatus] = useState<SecretSecurityStatus | null>(
+    null,
+  );
+  const [migrating, setMigrating] = useState(false);
+
+  useEffect(() => {
+    if (!catalogEditable) return;
+    let active = true;
+    void apiFetch(apiUrl("/api/v1/settings/catalog/security"))
+      .then(async (response) =>
+        response.ok
+          ? ((await response.json()) as SecretSecurityStatus)
+          : null,
+      )
+      .then((payload) => {
+        if (active && payload) setSecretStatus(payload);
+      });
+    return () => {
+      active = false;
+    };
+  }, [catalogEditable]);
+
+  const migrateSecrets = useCallback(async () => {
+    setMigrating(true);
+    try {
+      const response = await apiFetch(
+        apiUrl("/api/v1/settings/catalog/security/migrate"),
+        { method: "POST" },
+      );
+      if (response.ok) {
+        setSecretStatus((await response.json()) as SecretSecurityStatus);
+      }
+    } finally {
+      setMigrating(false);
+    }
+  }, []);
 
   const items = [
     {
@@ -88,6 +133,43 @@ export default function SettingsStatusPanel() {
           </div>
         </Fragment>
       ))}
+      {catalogEditable && secretStatus && (
+        <>
+          <span
+            aria-hidden
+            className="hidden h-7 w-px shrink-0 bg-[var(--border)]/70 sm:block"
+          />
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                secretStatus.migration_required ? "bg-amber-500" : "bg-emerald-500"
+              }`}
+            />
+            <div className="flex items-center gap-2 text-[12px]">
+              <span className="font-medium text-[var(--foreground)]">
+                {t("密钥安全")}
+              </span>
+              <span className="text-[var(--muted-foreground)]">
+                {secretStatus.migration_required
+                  ? t("发现 {{count}} 个旧版明文密钥", {
+                      count: secretStatus.plaintext_count,
+                    })
+                  : t("已安全存储")}
+              </span>
+              {secretStatus.migration_required && (
+                <button
+                  type="button"
+                  disabled={migrating}
+                  onClick={() => void migrateSecrets()}
+                  className="rounded-md border border-amber-500/40 px-2 py-1 text-amber-700 transition-colors hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-300"
+                >
+                  {migrating ? t("迁移中…") : t("立即迁移")}
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

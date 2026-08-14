@@ -151,7 +151,9 @@ def test_load_persists_normalized_active_ids(tmp_path: Path):
         encoding="utf-8",
     )
 
-    ModelCatalogService(path=catalog_path).load()
+    service = ModelCatalogService(path=catalog_path)
+    service.load()
+    service.migrate_plaintext_secrets()
 
     saved = json.loads(catalog_path.read_text(encoding="utf-8"))
     llm = saved["services"]["llm"]
