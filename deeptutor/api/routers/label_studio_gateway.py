@@ -163,6 +163,13 @@ async def sync_professional_attempt(task_id: str) -> dict:
         report="Label Studio 专业模式标注已同步，等待统一评分。",
         idempotency_key=f"ls:{ls_task_id}:{annotation_id}",
         source="professional_gateway",
+        sync_status="synced",
+        revision={
+            "provider": "label_studio",
+            "task_id": ls_task_id,
+            "annotation_id": annotation_id,
+            "unique_id": latest.get("unique_id", ""),
+        },
     )
     return {"synced": True, "created": created, "attempt": attempt}
 

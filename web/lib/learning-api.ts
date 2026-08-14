@@ -186,3 +186,63 @@ export async function generateModulesFromNotebook(
     throw new Error(`Failed to generate modules from notebook: ${res.status}`);
   return res.json();
 }
+
+export type BrowserAnnotationDraft = {
+  profileId: string;
+  taskId: string;
+  predictions: Array<Record<string, unknown>>;
+  updatedAt: number;
+};
+
+export type AnnotationSubmitResult = {
+  finalized: boolean;
+  sync_status: "synced" | "retry_pending";
+  detail?: string;
+  attempt?: { task_id: string; metrics?: Record<string, unknown>; report?: string; revision?: Record<string, unknown> };
+  grade?: { metrics?: Record<string, unknown>; report?: string };
+  local_check?: { metrics?: Record<string, unknown>; report?: string };
+};
+
+const annotationDraftKey = (profileId: string, taskId: string) =>
+  `annotation-browser-draft:v1:${profileId}:${taskId}`;
+
+export function saveBrowserAnnotationDraft(draft: BrowserAnnotationDraft): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(annotationDraftKey(draft.profileId, draft.taskId), JSON.stringify(draft));
+}
+
+export function readBrowserAnnotationDraft(profileId: string, taskId: string): BrowserAnnotationDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = JSON.parse(window.sessionStorage.getItem(annotationDraftKey(profileId, taskId)) || "null");
+    return value?.profileId === profileId && value?.taskId === taskId && Array.isArray(value?.predictions) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearBrowserAnnotationDraft(profileId: string, taskId: string): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(annotationDraftKey(profileId, taskId));
+}
+
+export async function submitAnnotationRevision(body: Record<string, unknown>): Promise<AnnotationSubmitResult> {
+  const response = await apiFetch(apiUrl("/api/v1/annotation/attempts"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.detail || "提交失败");
+  return data as AnnotationSubmitResult;
+}
+
+export async function retryPendingAnnotationRevisions(): Promise<{
+  completed: Array<{ attempt: AnnotationSubmitResult["attempt"] }>;
+  pending: Array<Record<string, unknown>>;
+}> {
+  const response = await apiFetch(apiUrl("/api/v1/annotation/attempts/retry-pending"), { method: "POST" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.detail || "同步重试失败");
+  return data;
+}

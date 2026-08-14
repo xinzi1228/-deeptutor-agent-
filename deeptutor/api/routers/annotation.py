@@ -10,7 +10,10 @@ from urllib.request import Request, urlopen
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from deeptutor.multi_user.context import require_learning_profile_write_access
+from deeptutor.multi_user.context import (
+    get_current_learning_profile,
+    require_learning_profile_write_access,
+)
 from deeptutor.multi_user.paths import get_current_learning_profile_root
 from deeptutor.services.annotation_attempts import (
     AnnotationAttemptStore,
@@ -19,6 +22,11 @@ from deeptutor.services.annotation_attempts import (
     EditLeaseVersionMismatch,
 )
 from deeptutor.services.coach_context import build_annotation_coach_context
+from deeptutor.services.label_studio_gateway import (
+    LabelStudioClient,
+    LabelStudioProfileMap,
+    LabelStudioUnavailable,
+)
 from deeptutor.tools import annotation_check
 
 router = APIRouter()
@@ -213,6 +221,46 @@ def _grade_annotation(body: dict[str, Any]) -> dict[str, Any]:
     return resp
 
 
+def _payload_image_size(payload: dict[str, Any]) -> tuple[int, int]:
+    raw = str(payload.get("image_size") or "").lower()
+    try:
+        width, height = raw.split("x", maxsplit=1)
+        return max(1, int(width)), max(1, int(height))
+    except (TypeError, ValueError):
+        return 1000, 1000
+
+
+async def _sync_pending_submission(
+    store: AnnotationAttemptStore, pending: dict[str, Any]
+) -> tuple[dict[str, Any], bool]:
+    if pending.get("sync_status") == "synced" and isinstance(pending.get("revision"), dict):
+        return store.finalize_submission(str(pending.get("idempotency_key") or ""))
+    task_id = str(pending.get("task_id") or "")
+    task = _task_bank().get(task_id)
+    if task is None:
+        raise ValueError(f"找不到任务 {task_id}")
+    access = get_current_learning_profile()
+    if access is None:
+        raise PermissionError("请先解锁学习档案")
+    root = store.root.parent
+    mapping = LabelStudioProfileMap.load(root, access.profile_id)
+    client = LabelStudioClient()
+    _project_id, ls_task_id = await client.ensure_task(mapping, task_id, task, root)
+    payload = pending.get("payload") if isinstance(pending.get("payload"), dict) else {}
+    raw_predictions = payload.get("predictions", payload.get("annotations", []))
+    predictions = raw_predictions if isinstance(raw_predictions, list) else []
+    revision = await client.create_annotation_revision(
+        ls_task_id=ls_task_id,
+        task_type=str(pending.get("task_type") or "bbox"),
+        predictions=[row for row in predictions if isinstance(row, dict)],
+        idempotency_key=str(pending.get("idempotency_key") or ""),
+        image_size=_payload_image_size(payload),
+    )
+    store.mark_submission_synced(str(pending["idempotency_key"]), revision=revision)
+    store.mark_draft_sync_status(task_id, "synced", revision=revision)
+    return store.finalize_submission(str(pending["idempotency_key"]))
+
+
 @router.post("/check")
 async def check_annotation(body: dict[str, Any]) -> dict[str, Any]:
     """Grade a single annotation submission without persisting it."""
@@ -353,8 +401,9 @@ async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
             raise HTTPException(status_code=422, detail=f"标注内容无法评分：{exc}") from exc
         metrics = grade_result.get("metrics", {})
         report = str(grade_result.get("report", ""))
+    store = _private_store(write=True)
     try:
-        attempt, created = _private_store(write=True).append_attempt(
+        pending, _queued = store.queue_submission(
             task_id=body.task_id,
             task_type=body.task_type,
             mode=body.mode,
@@ -366,7 +415,46 @@ async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"attempt": attempt, "created": created, "grade": grade_result}
+    try:
+        attempt, created = await _sync_pending_submission(store, pending)
+    except LabelStudioUnavailable as exc:
+        retry = store.mark_submission_retry(body.idempotency_key, str(exc))
+        store.mark_draft_sync_status(body.task_id, "retry_pending", detail=str(exc))
+        return {
+            "finalized": False,
+            "sync_status": "retry_pending",
+            "pending": {key: retry.get(key) for key in ("id", "task_id", "retry_count", "last_error")},
+            "local_check": grade_result,
+            "detail": "已暂存到当前学习档案；Label Studio 恢复后会自动重试。当前结果仅为本地检查，不计入正式成绩。",
+        }
+    except (PermissionError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "finalized": True,
+        "sync_status": "synced",
+        "attempt": attempt,
+        "created": created,
+        "grade": grade_result,
+        "revision": attempt.get("revision", {}),
+    }
+
+
+@router.post("/attempts/retry-pending")
+async def retry_pending_annotation_attempts() -> dict[str, Any]:
+    store = _private_store(write=True)
+    completed: list[dict[str, Any]] = []
+    still_pending: list[dict[str, Any]] = []
+    for pending in store.list_pending_submissions(limit=10):
+        try:
+            attempt, created = await _sync_pending_submission(store, pending)
+            completed.append({"attempt": attempt, "created": created})
+        except LabelStudioUnavailable as exc:
+            retry = store.mark_submission_retry(str(pending.get("idempotency_key") or ""), str(exc))
+            store.mark_draft_sync_status(str(pending.get("task_id") or ""), "retry_pending", detail=str(exc))
+            still_pending.append({key: retry.get(key) for key in ("id", "task_id", "retry_count", "last_error")})
+        except (PermissionError, ValueError) as exc:
+            still_pending.append({"id": pending.get("id"), "task_id": pending.get("task_id"), "last_error": str(exc)})
+    return {"completed": completed, "pending": still_pending}
 
 
 @router.get("/attempts")

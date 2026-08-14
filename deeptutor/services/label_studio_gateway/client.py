@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from typing import Any
+import uuid
 
 import httpx
 
@@ -10,6 +12,52 @@ from .local_credentials import resolve_service_token
 
 class LabelStudioUnavailable(RuntimeError):
     pass
+
+
+def build_label_studio_result(
+    task_type: str,
+    predictions: list[dict[str, Any]],
+    *,
+    image_size: tuple[int, int] = (1000, 1000),
+    revision_key: str = "",
+) -> list[dict[str, Any]]:
+    """Convert learner coordinates to Label Studio's persisted result schema."""
+    width = max(1, int(image_size[0]))
+    height = max(1, int(image_size[1]))
+    if task_type == "bbox":
+        results: list[dict[str, Any]] = []
+        marker = hashlib.sha256(revision_key.encode("utf-8")).hexdigest()[:12] if revision_key else ""
+        for index, row in enumerate(predictions):
+            label = str(row.get("label") or "目标")
+            results.append({
+                "id": f"dt_{marker}_{index}" if marker else str(row.get("id") or uuid.uuid4().hex[:10]),
+                "from_name": "label",
+                "to_name": "image",
+                "type": "rectanglelabels",
+                "original_width": width,
+                "original_height": height,
+                "image_rotation": 0,
+                "value": {
+                    "x": round(float(row.get("x") or 0) / width * 100, 6),
+                    "y": round(float(row.get("y") or 0) / height * 100, 6),
+                    "width": round(float(row.get("w") or 0) / width * 100, 6),
+                    "height": round(float(row.get("h") or 0) / height * 100, 6),
+                    "rotation": 0,
+                    "rectanglelabels": [label],
+                },
+            })
+        return results
+    if task_type in {"classification", "judgment"}:
+        choices = [str(row.get("label")) for row in predictions if row.get("label")]
+        marker = hashlib.sha256(revision_key.encode("utf-8")).hexdigest()[:12] if revision_key else uuid.uuid4().hex[:10]
+        return [{
+            "id": f"dt_{marker}_0",
+            "from_name": "label",
+            "to_name": "text",
+            "type": "choices",
+            "value": {"choices": choices},
+        }] if choices else []
+    return predictions
 
 
 class LabelStudioClient:
@@ -66,3 +114,56 @@ class LabelStudioClient:
             mapping.task_map[task_id] = int(ids[-1])
             mapping.save(profile_root)
         return int(mapping.project_id), int(mapping.task_map[task_id])
+
+    async def create_annotation_revision(
+        self,
+        *,
+        ls_task_id: int,
+        task_type: str,
+        predictions: list[dict[str, Any]],
+        idempotency_key: str,
+        image_size: tuple[int, int] = (1000, 1000),
+    ) -> dict[str, Any]:
+        result = build_label_studio_result(
+            task_type,
+            predictions,
+            image_size=image_size,
+            revision_key=idempotency_key,
+        )
+        expected_ids = {str(row.get("id")) for row in result if isinstance(row, dict) and row.get("id")}
+        task = await self.request("GET", f"/api/tasks/{ls_task_id}")
+        annotations = task.get("annotations", []) if isinstance(task, dict) else []
+        for annotation in annotations:
+            if not isinstance(annotation, dict):
+                continue
+            annotation_result = annotation.get("result", [])
+            if not annotation_result and annotation.get("id") is not None:
+                full = await self.request("GET", f"/api/annotations/{annotation['id']}")
+                annotation_result = full.get("result", []) if isinstance(full, dict) else []
+            actual_ids = {
+                str(row.get("id"))
+                for row in annotation_result
+                if isinstance(row, dict) and row.get("id")
+            }
+            if expected_ids and actual_ids == expected_ids:
+                return {
+                    "provider": "label_studio",
+                    "task_id": ls_task_id,
+                    "annotation_id": annotation.get("id"),
+                    "idempotency_key": idempotency_key,
+                    "reused": True,
+                }
+        created = await self.request(
+            "POST",
+            f"/api/tasks/{ls_task_id}/annotations",
+            json={"result": result, "was_cancelled": False},
+        )
+        if not isinstance(created, dict) or created.get("id") is None:
+            raise LabelStudioUnavailable("Label Studio 已接收提交，但没有返回正式修订编号")
+        return {
+            "provider": "label_studio",
+            "task_id": ls_task_id,
+            "annotation_id": created["id"],
+            "idempotency_key": idempotency_key,
+            "reused": False,
+        }

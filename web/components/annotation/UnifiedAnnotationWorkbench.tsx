@@ -21,6 +21,13 @@ import BboxObjectList from "@/components/annotation/bbox/BboxObjectList";
 import BboxToolbar, { type BboxTool } from "@/components/annotation/bbox/BboxToolbar";
 import { toBbox, validateBoxes, type Bbox, type ImageBounds } from "@/components/annotation/bbox/bbox-geometry";
 import { createBboxState, reduceBboxState } from "@/components/annotation/bbox/bbox-reducer";
+import {
+  clearBrowserAnnotationDraft,
+  readBrowserAnnotationDraft,
+  retryPendingAnnotationRevisions,
+  saveBrowserAnnotationDraft,
+  submitAnnotationRevision,
+} from "@/lib/learning-api";
 
 export type AnnotationTask = {
   id: string;
@@ -53,7 +60,7 @@ type Props = {
   ) => void;
 };
 
-type SaveState = "idle" | "saving" | "saved" | "offline";
+type SaveState = "idle" | "saving" | "backend_saved" | "local_pending" | "synced";
 
 function emptyPredictions(task: AnnotationTask): Array<Record<string, unknown>> {
   if (task.type === "classification") return [{ id: 0, label: "" }];
@@ -93,12 +100,15 @@ export default function UnifiedAnnotationWorkbench({
   const [history, setHistory] = useState<Array<Array<Record<string, unknown>>>>([]);
   const [future, setFuture] = useState<Array<Array<Record<string, unknown>>>>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [result, setResult] = useState<{ metrics: Record<string, unknown>; report: string } | null>(null);
+  const [result, setResult] = useState<{ metrics: Record<string, unknown>; report: string; formal: boolean } | null>(null);
+  const [syncPending, setSyncPending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const hydratedTask = useRef("");
   const predictionsRef = useRef(predictions);
   const leaseVersionRef = useRef(leaseVersion);
+  const imageSizeRef = useRef("1000x1000");
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => { predictionsRef.current = predictions; }, [predictions]);
   useEffect(() => { leaseVersionRef.current = leaseVersion; }, [leaseVersion]);
@@ -109,18 +119,26 @@ export default function UnifiedAnnotationWorkbench({
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then((data) => {
         if (cancelled) return;
-        const restored = data?.draft?.payload?.predictions;
+        const backendUpdatedAt = Date.parse(String(data?.draft?.updated_at || "")) || 0;
+        const browserDraft = activeProfileId ? readBrowserAnnotationDraft(activeProfileId, task.id) : null;
+        const restored = browserDraft && browserDraft.updatedAt > backendUpdatedAt
+          ? browserDraft.predictions
+          : data?.draft?.payload?.predictions;
         setPredictions(Array.isArray(restored) ? restored : emptyPredictions(task));
+        setSyncPending(data?.draft?.sync_status === "retry_pending");
+        if (data?.draft?.sync_status === "synced") setSaveState("synced");
         hydratedTask.current = task.id;
       })
       .catch(() => {
         if (!cancelled) {
-          setPredictions(emptyPredictions(task));
+          const browserDraft = activeProfileId ? readBrowserAnnotationDraft(activeProfileId, task.id) : null;
+          setPredictions(browserDraft?.predictions || emptyPredictions(task));
+          if (browserDraft) setSaveState("local_pending");
           hydratedTask.current = task.id;
         }
       });
     return () => { cancelled = true; };
-  }, [task]);
+  }, [activeProfileId, task]);
 
   const update = useCallback((next: Array<Record<string, unknown>>) => {
     if (readOnly) return;
@@ -151,35 +169,39 @@ export default function UnifiedAnnotationWorkbench({
   }, []);
 
   const saveDraftNow = useCallback(async () => {
-    const activeLeaseVersion = leaseVersionRef.current;
-    if (readOnly || !activeLeaseVersion) throw new Error("当前页面没有编辑权");
-    setSaveState("saving");
-    try {
-      const response = await apiFetch(apiUrl(`/api/v1/annotation/drafts/${encodeURIComponent(task.id)}`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          task_id: task.id,
-          mode: "teaching",
-          payload: { predictions: predictionsRef.current },
-          browser_session_id: browserSessionId,
-          lease_version: activeLeaseVersion,
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        if (response.status === 409 || response.status === 412) onLeaseLost?.();
-        throw new Error(data?.detail || "草稿保存失败");
+    const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
+      const activeLeaseVersion = leaseVersionRef.current;
+      if (readOnly || !activeLeaseVersion) throw new Error("当前页面没有编辑权");
+      setSaveState("saving");
+      try {
+        const response = await apiFetch(apiUrl(`/api/v1/annotation/drafts/${encodeURIComponent(task.id)}`), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            task_id: task.id,
+            mode: "teaching",
+            payload: { predictions: predictionsRef.current, image_size: imageSizeRef.current },
+            browser_session_id: browserSessionId,
+            lease_version: activeLeaseVersion,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (response.status === 409 || response.status === 412) onLeaseLost?.();
+          throw new Error(data?.detail || "草稿保存失败");
+        }
+        const nextLease = data.lease as AnnotationEditLease;
+        leaseVersionRef.current = nextLease.version;
+        onLeaseChange?.(nextLease);
+        setSaveState("backend_saved");
+        return { draftVersion: Number(data?.draft?.version || 0), lease: nextLease };
+      } catch (reason) {
+        setSaveState("local_pending");
+        throw reason;
       }
-      const nextLease = data.lease as AnnotationEditLease;
-      leaseVersionRef.current = nextLease.version;
-      onLeaseChange?.(nextLease);
-      setSaveState("saved");
-      return { draftVersion: Number(data?.draft?.version || 0), lease: nextLease };
-    } catch (reason) {
-      setSaveState("offline");
-      throw reason;
-    }
+    });
+    saveQueueRef.current = operation.then(() => undefined, () => undefined);
+    return operation;
   }, [browserSessionId, onLeaseChange, onLeaseLost, readOnly, task.id]);
 
   useEffect(() => {
@@ -190,40 +212,69 @@ export default function UnifiedAnnotationWorkbench({
   useEffect(() => {
     if (hydratedTask.current !== task.id) return;
     onLiveState?.({ task_id: task.id, mode: "teaching", stage: "editing", annotation_count: predictions.length, labels: predictions.map((item) => item.label).filter(Boolean) });
+    if (activeProfileId) saveBrowserAnnotationDraft({ profileId: activeProfileId, taskId: task.id, predictions, updatedAt: Date.now() });
     if (readOnly || !leaseVersionRef.current) return;
     const timer = window.setTimeout(() => {
       void saveDraftNow().catch(() => undefined);
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [onLiveState, predictions, readOnly, saveDraftNow, task.id]);
+  }, [activeProfileId, onLiveState, predictions, readOnly, saveDraftNow, task.id]);
 
   const submit = useCallback(async () => {
     if (submitting || readOnly || !leaseVersionRef.current) return;
     setSubmitting(true); setError("");
     try {
-      const response = await apiFetch(apiUrl("/api/v1/annotation/attempts"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          task_id: task.id,
-          task_type: task.type,
-          mode: "teaching",
-          payload: { predictions, pre_annotation: task.pre_annotation || [] },
-          idempotency_key: `react:${task.id}:${Date.now()}`,
-          grade: true,
-          browser_session_id: browserSessionId,
-          lease_version: leaseVersionRef.current,
-        }),
+      await saveDraftNow();
+      const data = await submitAnnotationRevision({
+        task_id: task.id,
+        task_type: task.type,
+        mode: "teaching",
+        payload: { predictions, pre_annotation: task.pre_annotation || [], image_size: imageSizeRef.current },
+        idempotency_key: `react:${task.id}:${Date.now()}`,
+        grade: true,
+        browser_session_id: browserSessionId,
+        lease_version: leaseVersionRef.current,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.detail || "提交失败");
+      if (!data.finalized) {
+        const local = data.local_check || {};
+        setSyncPending(true);
+        setSaveState("local_pending");
+        setResult({
+          metrics: local.metrics || {},
+          report: `${data.detail || "已暂存本机"}\n\n${local.report || ""}`,
+          formal: false,
+        });
+        return;
+      }
       if (activeProfileId) invalidateStudentDashboard(activeProfileId);
-      setResult({ metrics: data.grade?.metrics || data.attempt?.metrics || {}, report: data.grade?.report || data.attempt?.report || "提交成功" });
+      if (activeProfileId) clearBrowserAnnotationDraft(activeProfileId, task.id);
+      setSyncPending(false);
+      setSaveState("synced");
+      setResult({ metrics: data.grade?.metrics || data.attempt?.metrics || {}, report: data.grade?.report || data.attempt?.report || "提交成功", formal: true });
       onLiveState?.({ task_id: task.id, mode: "teaching", stage: "submitted", metrics: data.grade?.metrics || data.attempt?.metrics || {} });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "提交失败");
     } finally { setSubmitting(false); }
-  }, [activeProfileId, browserSessionId, onLiveState, predictions, readOnly, submitting, task]);
+  }, [activeProfileId, browserSessionId, onLiveState, predictions, readOnly, saveDraftNow, submitting, task]);
+
+  useEffect(() => {
+    if (!syncPending) return;
+    const retry = () => {
+      void retryPendingAnnotationRevisions().then((data) => {
+        const completed = data.completed.find((item) => item.attempt?.task_id === task.id)?.attempt;
+        if (!completed) return;
+        setSyncPending(false);
+        setSaveState("synced");
+        setResult({ metrics: completed.metrics || {}, report: completed.report || "正式修订已同步", formal: true });
+        if (activeProfileId) {
+          clearBrowserAnnotationDraft(activeProfileId, task.id);
+          invalidateStudentDashboard(activeProfileId);
+        }
+      }).catch(() => undefined);
+    };
+    const timer = window.setInterval(retry, 15_000);
+    return () => window.clearInterval(timer);
+  }, [activeProfileId, syncPending, task.id]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -241,8 +292,8 @@ export default function UnifiedAnnotationWorkbench({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [nextTaskId, onSelectTask, previousTaskId, readOnly, redo, saveDraftNow, submit, undo]);
 
-  const saveText = saveState === "saving" ? "正在保存" : saveState === "saved" ? "已保存到当前档案" : saveState === "offline" ? "离线缓存待恢复" : "等待编辑";
-  const SaveIcon = saveState === "offline" ? CloudOff : Cloud;
+  const saveText = saveState === "saving" ? "正在保存" : saveState === "backend_saved" ? "草稿已保存" : saveState === "local_pending" ? "暂存本机，等待正式同步" : saveState === "synced" ? "已生成正式修订" : "等待编辑";
+  const SaveIcon = saveState === "local_pending" ? CloudOff : Cloud;
 
   return <div className="grid h-full min-h-0 grid-cols-1 bg-[var(--background)] lg:grid-cols-[minmax(190px,0.72fr)_minmax(380px,2.2fr)_minmax(210px,0.82fr)]">
     <aside className="hidden min-h-0 overflow-y-auto border-r border-[var(--border)] bg-[var(--card)] p-4 lg:block">
@@ -265,10 +316,10 @@ export default function UnifiedAnnotationWorkbench({
         <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><SaveIcon className="h-3.5 w-3.5" />{saveText}</span>
       </div>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <fieldset disabled={readOnly} className={readOnly ? "pointer-events-none opacity-70" : ""}><TaskEditor task={task} predictions={predictions} onChange={update} onUndo={undo} onRedo={redo} canUndo={Boolean(history.length)} canRedo={Boolean(future.length)} /></fieldset>
+        <fieldset disabled={readOnly} className={readOnly ? "pointer-events-none opacity-70" : ""}><TaskEditor task={task} predictions={predictions} onChange={update} onUndo={undo} onRedo={redo} canUndo={Boolean(history.length)} canRedo={Boolean(future.length)} onImageSizeChange={(size) => { imageSizeRef.current = `${size.width}x${size.height}`; }} /></fieldset>
       </div>
       {error && <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-600">{error}</div>}
-      {result && <section className="mt-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4"><div className="flex items-center gap-2 font-semibold text-emerald-600"><CheckCircle2 className="h-4 w-4" />{scoreLabel(result.metrics)}</div><div className="mt-2 flex flex-wrap gap-2">{Object.entries(result.metrics).map(([key, value]) => <span key={key} className="rounded-lg bg-[var(--background)] px-2 py-1 text-[11px]">{key}: {String(value)}</span>)}</div><p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-[var(--muted-foreground)]">{result.report}</p></section>}
+      {result && <section className={`mt-3 rounded-2xl border p-4 ${result.formal ? "border-emerald-500/25 bg-emerald-500/5" : "border-amber-500/35 bg-amber-500/10"}`}><div className={`flex items-center gap-2 font-semibold ${result.formal ? "text-emerald-600" : "text-amber-700"}`}><CheckCircle2 className="h-4 w-4" />{result.formal ? `正式成绩 · ${scoreLabel(result.metrics)}` : `本地检查（非正式）· ${scoreLabel(result.metrics)}`}</div><div className="mt-2 flex flex-wrap gap-2">{Object.entries(result.metrics).map(([key, value]) => <span key={key} className="rounded-lg bg-[var(--background)] px-2 py-1 text-[11px]">{key}: {String(value)}</span>)}</div><p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-[var(--muted-foreground)]">{result.report}</p></section>}
       <details className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:hidden" open><summary className="cursor-pointer text-xs font-semibold">提交与切换任务</summary><div className="mt-3 flex flex-wrap gap-2">{(task.labels || []).map((label) => <span key={label} className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[11px]">{label}</span>)}</div><button type="button" disabled={readOnly || submitting} onClick={() => void submit()} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Send className="h-4 w-4" />{readOnly ? "只读模式" : submitting ? "正在评分…" : "提交并评分"}</button><div className="mt-2 grid grid-cols-2 gap-2"><button disabled={!previousTaskId} onClick={() => previousTaskId && onSelectTask(previousTaskId)} className="rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">上一题</button><button disabled={!nextTaskId} onClick={() => nextTaskId && onSelectTask(nextTaskId)} className="rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">下一题</button></div></details>
     </main>
 
@@ -284,8 +335,8 @@ function ToolbarButton({ label, disabled, onClick, children }: { label: string; 
   return <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-lg border border-transparent p-2 text-[var(--muted-foreground)] hover:border-[var(--border)] hover:bg-[var(--card)] hover:text-[var(--foreground)] disabled:opacity-35">{children}</button>;
 }
 
-function TaskEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean }) {
-  if (task.type === "bbox") return <BBoxEditor task={task} predictions={predictions} onChange={onChange} onUndo={onUndo} onRedo={onRedo} canUndo={canUndo} canRedo={canRedo} />;
+function TaskEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo, onImageSizeChange }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean; onImageSizeChange: (size: ImageBounds) => void }) {
+  if (task.type === "bbox") return <BBoxEditor task={task} predictions={predictions} onChange={onChange} onUndo={onUndo} onRedo={onRedo} canUndo={canUndo} canRedo={canRedo} onImageSizeChange={onImageSizeChange} />;
   if (task.type === "classification") return <ChoiceEditor task={task} value={String(predictions[0]?.label || "")} onChange={(label) => onChange([{ id: 0, label }])} />;
   if (task.type === "judgment") return <ItemChoiceEditor task={task} predictions={predictions} onChange={onChange} />;
   if (task.type === "error_case") return <ErrorCaseEditor task={task} predictions={predictions} onChange={onChange} />;
@@ -333,7 +384,7 @@ function JsonEditor({ task, predictions, onChange }: { task: AnnotationTask; pre
   return <div className="space-y-4"><Media task={task} /><p className="text-xs text-[var(--muted-foreground)]">该任务使用结构化编辑器。视频跟踪格式为每帧一个对象，包含 frame 与 boxes。</p><textarea key={serialized} spellCheck={false} defaultValue={serialized} onChange={(event) => { try { const value = JSON.parse(event.target.value); if (Array.isArray(value)) onChange(value); } catch { /* keep editing until JSON is valid */ } }} className="min-h-72 w-full rounded-xl border border-[var(--border)] bg-slate-950 p-4 font-mono text-xs text-slate-100" /></div>;
 }
 
-function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean }) {
+function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo, onImageSizeChange }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean; onImageSizeChange: (size: ImageBounds) => void }) {
   const labels = task.labels?.length ? task.labels : ["object"];
   const externalBoxes = useMemo(() => predictions.map(toBbox), [predictions]);
   const [state, dispatch] = useReducer(reduceBboxState, externalBoxes, (boxes) => createBboxState(boxes, labels[0]));
@@ -379,7 +430,7 @@ function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canR
   return <div className="space-y-3">
     <BboxToolbar tool={tool} onToolChange={setTool} activeLabel={state.activeLabel} labels={labels} onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} onFit={() => setZoom(1)} canUndo={canUndo} canRedo={canRedo} hasSelection={Boolean(state.selectedId)} onUndo={onUndo} onRedo={onRedo} onDelete={() => state.selectedId && deleteBox(state.selectedId)} />
     <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
-      <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedId={state.selectedId} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(id) => dispatch({ type: "select", id })} onCommit={commit} onImageSizeChange={setBounds} />
+      <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedId={state.selectedId} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(id) => dispatch({ type: "select", id })} onCommit={commit} onImageSizeChange={(size) => { setBounds(size); onImageSizeChange(size); }} />
       <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 xl:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedId} issues={issues} onSelect={(id) => dispatch({ type: "select", id })} onLabelChange={changeLabel} onDelete={deleteBox} /></aside>
     </div>
     <details className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 xl:hidden"><summary className="cursor-pointer text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="mt-3"><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedId} issues={issues} onSelect={(id) => dispatch({ type: "select", id })} onLabelChange={changeLabel} onDelete={deleteBox} /></div></details>

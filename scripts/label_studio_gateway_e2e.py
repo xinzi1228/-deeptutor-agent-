@@ -217,6 +217,62 @@ def run_gateway_e2e(source_root: Path) -> dict[str, Any]:
                         raise AssertionError("专业工作台没有通过隐藏会话直接打开")
                     checks["single_sign_on"] = "passed"
 
+                    edit_lease = _assert_status(
+                        client.post(
+                            "/api/v1/annotation/edit-leases/task1",
+                            json={
+                                "mode": "teaching",
+                                "browser_session_id": "gateway-e2e-browser-a",
+                            },
+                        ),
+                        200,
+                        "取得教学台编辑权",
+                    )["lease"]
+                    draft = _assert_status(
+                        client.put(
+                            "/api/v1/annotation/drafts/task1",
+                            json={
+                                "task_id": "task1",
+                                "mode": "teaching",
+                                "payload": {
+                                    "predictions": [
+                                        {"x": 100, "y": 100, "w": 200, "h": 160, "label": "car"}
+                                    ],
+                                    "image_size": "1000x1000",
+                                },
+                                "browser_session_id": "gateway-e2e-browser-a",
+                                "lease_version": edit_lease["version"],
+                            },
+                        ),
+                        200,
+                        "保存教学台草稿",
+                    )
+                    formal = _assert_status(
+                        client.post(
+                            "/api/v1/annotation/attempts",
+                            json={
+                                "task_id": "task1",
+                                "task_type": "bbox",
+                                "mode": "teaching",
+                                "payload": {
+                                    "predictions": [
+                                        {"x": 100, "y": 100, "w": 200, "h": 160, "label": "car"}
+                                    ],
+                                    "image_size": "1000x1000",
+                                },
+                                "idempotency_key": "gateway-e2e-teaching-revision-1",
+                                "grade": True,
+                                "browser_session_id": "gateway-e2e-browser-a",
+                                "lease_version": draft["lease"]["version"],
+                            },
+                        ),
+                        201,
+                        "生成教学台正式修订",
+                    )
+                    if not formal.get("finalized") or not formal.get("revision", {}).get("annotation_id"):
+                        raise AssertionError("教学台提交没有生成 Label Studio 正式修订")
+                    checks["teaching_formal_revision"] = "passed"
+
                     annotation_payload = {
                         "result": [
                             {
