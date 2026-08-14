@@ -12,7 +12,12 @@ from pydantic import BaseModel, Field
 
 from deeptutor.multi_user.context import require_learning_profile_write_access
 from deeptutor.multi_user.paths import get_current_learning_profile_root
-from deeptutor.services.annotation_attempts import AnnotationAttemptStore
+from deeptutor.services.annotation_attempts import (
+    AnnotationAttemptStore,
+    AnnotationEditLeaseStore,
+    EditLeaseConflict,
+    EditLeaseVersionMismatch,
+)
 from deeptutor.services.coach_context import build_annotation_coach_context
 from deeptutor.tools import annotation_check
 
@@ -55,6 +60,8 @@ class DraftRequest(BaseModel):
     task_id: str = Field(max_length=120)
     mode: str = Field(default="teaching", max_length=40)
     payload: dict[str, Any]
+    browser_session_id: str = Field(min_length=8, max_length=160)
+    lease_version: int = Field(ge=1)
 
 
 class AttemptRequest(BaseModel):
@@ -66,6 +73,28 @@ class AttemptRequest(BaseModel):
     metrics: dict[str, Any] | None = None
     report: str = Field(default="", max_length=8000)
     grade: bool = True
+    browser_session_id: str = Field(min_length=8, max_length=160)
+    lease_version: int = Field(ge=1)
+
+
+class EditLeaseRequest(BaseModel):
+    mode: str = Field(max_length=40)
+    browser_session_id: str = Field(min_length=8, max_length=160)
+    takeover: bool = False
+    expected_version: int | None = Field(default=None, ge=1)
+    saved_draft_version: int = Field(default=0, ge=0)
+
+
+class EditCheckpointRequest(BaseModel):
+    mode: str = Field(max_length=40)
+    browser_session_id: str = Field(min_length=8, max_length=160)
+    expected_version: int = Field(ge=1)
+    draft_version: int = Field(ge=1)
+
+
+class EditLeaseReleaseRequest(BaseModel):
+    browser_session_id: str = Field(min_length=8, max_length=160)
+    expected_version: int = Field(ge=1)
 
 
 def _private_store(*, write: bool = False) -> AnnotationAttemptStore:
@@ -81,6 +110,26 @@ def _private_store(*, write: bool = False) -> AnnotationAttemptStore:
     if root is None:
         raise HTTPException(status_code=423, detail="请先解锁学习档案")
     return AnnotationAttemptStore(root)
+
+
+def _edit_lease_store(*, write: bool = False) -> AnnotationEditLeaseStore:
+    store = _private_store(write=write)
+    return AnnotationEditLeaseStore(store.root.parent)
+
+
+def _require_owned_lease(
+    task_id: str, *, mode: str, browser_session_id: str, lease_version: int
+) -> dict[str, Any]:
+    lease = _edit_lease_store().get(task_id)
+    if not lease:
+        raise HTTPException(status_code=409, detail="编辑权已过期，请重新进入任务")
+    if (
+        lease.get("mode") != mode
+        or lease.get("browser_session_id") != browser_session_id
+        or int(lease.get("version") or 0) != lease_version
+    ):
+        raise HTTPException(status_code=409, detail="该任务的编辑权已变化，当前页面已转为只读")
+    return lease
 
 
 def _task_bank() -> dict[str, dict[str, Any]]:
@@ -182,15 +231,93 @@ async def update_annotation_activity(body: ActivityRequest) -> dict[str, Any]:
     return {"current": current}
 
 
+@router.get("/edit-leases/{task_id}")
+async def get_annotation_edit_lease(task_id: str) -> dict[str, Any]:
+    return {"lease": _edit_lease_store().get(task_id)}
+
+
+@router.post("/edit-leases/{task_id}")
+async def acquire_annotation_edit_lease(
+    task_id: str, body: EditLeaseRequest
+) -> dict[str, Any]:
+    try:
+        lease = _edit_lease_store(write=True).acquire(
+            task_id,
+            mode=body.mode,
+            browser_session_id=body.browser_session_id,
+            takeover=body.takeover,
+            expected_version=body.expected_version,
+            saved_draft_version=body.saved_draft_version,
+        )
+    except EditLeaseConflict as exc:
+        current = _edit_lease_store().get(task_id)
+        raise HTTPException(
+            status_code=409, detail={"message": str(exc), "lease": current}
+        ) from exc
+    except EditLeaseVersionMismatch as exc:
+        raise HTTPException(status_code=412, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"lease": lease}
+
+
+@router.post("/edit-leases/{task_id}/checkpoint")
+async def checkpoint_annotation_edit_lease(
+    task_id: str, body: EditCheckpointRequest
+) -> dict[str, Any]:
+    try:
+        lease = _edit_lease_store(write=True).mark_checkpoint(
+            task_id,
+            mode=body.mode,
+            browser_session_id=body.browser_session_id,
+            expected_version=body.expected_version,
+            draft_version=body.draft_version,
+        )
+    except EditLeaseConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except EditLeaseVersionMismatch as exc:
+        raise HTTPException(status_code=412, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"lease": lease}
+
+
+@router.delete("/edit-leases/{task_id}")
+async def release_annotation_edit_lease(
+    task_id: str, body: EditLeaseReleaseRequest
+) -> dict[str, Any]:
+    released = _edit_lease_store(write=True).release(
+        task_id,
+        browser_session_id=body.browser_session_id,
+        expected_version=body.expected_version,
+    )
+    return {"released": released}
+
+
 @router.put("/drafts/{task_id}")
 async def save_annotation_draft(task_id: str, body: DraftRequest) -> dict[str, Any]:
     if body.task_id != task_id:
         raise HTTPException(status_code=422, detail="路径任务编号与请求内容不一致")
+    _require_owned_lease(
+        task_id,
+        mode=body.mode,
+        browser_session_id=body.browser_session_id,
+        lease_version=body.lease_version,
+    )
     try:
         draft = _private_store(write=True).save_draft(task_id, body.mode, body.payload)
+        lease = _edit_lease_store(write=True).mark_checkpoint(
+            task_id,
+            mode=body.mode,
+            browser_session_id=body.browser_session_id,
+            expected_version=body.lease_version,
+            draft_version=int(draft["version"]),
+        )
+    except (EditLeaseConflict, EditLeaseVersionMismatch) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"draft": draft}
+    return {"draft": draft, "lease": lease}
 
 
 @router.get("/drafts/{task_id}")
@@ -200,6 +327,12 @@ async def get_annotation_draft(task_id: str) -> dict[str, Any]:
 
 @router.post("/attempts", status_code=status.HTTP_201_CREATED)
 async def submit_annotation_attempt(body: AttemptRequest) -> dict[str, Any]:
+    _require_owned_lease(
+        body.task_id,
+        mode=body.mode,
+        browser_session_id=body.browser_session_id,
+        lease_version=body.lease_version,
+    )
     metrics = body.metrics or {}
     report = body.report
     grade_result: dict[str, Any] | None = None

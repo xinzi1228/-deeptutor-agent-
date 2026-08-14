@@ -15,6 +15,7 @@ import {
 import { apiFetch, apiUrl } from "@/lib/api";
 import { invalidateStudentDashboard } from "@/lib/student-dashboard-api";
 import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
+import type { AnnotationEditLease } from "@/lib/annotation-edit-session";
 
 export type AnnotationTask = {
   id: string;
@@ -37,6 +38,14 @@ type Props = {
   nextTaskId?: string;
   onSelectTask: (taskId: string) => void;
   onLiveState?: (state: Record<string, unknown>) => void;
+  readOnly?: boolean;
+  browserSessionId: string;
+  leaseVersion?: number;
+  onLeaseChange?: (lease: AnnotationEditLease) => void;
+  onLeaseLost?: () => void;
+  registerDraftSaver?: (
+    saver: (() => Promise<{ draftVersion: number; lease: AnnotationEditLease }>) | null,
+  ) => void;
 };
 
 type SaveState = "idle" | "saving" | "saved" | "offline";
@@ -66,6 +75,12 @@ export default function UnifiedAnnotationWorkbench({
   nextTaskId,
   onSelectTask,
   onLiveState,
+  readOnly = false,
+  browserSessionId,
+  leaseVersion,
+  onLeaseChange,
+  onLeaseLost,
+  registerDraftSaver,
 }: Props) {
   const { active } = useLearningProfile();
   const activeProfileId = active?.id;
@@ -77,6 +92,11 @@ export default function UnifiedAnnotationWorkbench({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const hydratedTask = useRef("");
+  const predictionsRef = useRef(predictions);
+  const leaseVersionRef = useRef(leaseVersion);
+
+  useEffect(() => { predictionsRef.current = predictions; }, [predictions]);
+  useEffect(() => { leaseVersionRef.current = leaseVersion; }, [leaseVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,13 +118,14 @@ export default function UnifiedAnnotationWorkbench({
   }, [task]);
 
   const update = useCallback((next: Array<Record<string, unknown>>) => {
+    if (readOnly) return;
     setPredictions((current) => {
       setHistory((rows) => [...rows.slice(-39), clone(current)]);
       setFuture([]);
       return next;
     });
     setResult(null);
-  }, []);
+  }, [readOnly]);
 
   const undo = useCallback(() => {
     setHistory((rows) => {
@@ -124,24 +145,55 @@ export default function UnifiedAnnotationWorkbench({
     });
   }, []);
 
+  const saveDraftNow = useCallback(async () => {
+    const activeLeaseVersion = leaseVersionRef.current;
+    if (readOnly || !activeLeaseVersion) throw new Error("当前页面没有编辑权");
+    setSaveState("saving");
+    try {
+      const response = await apiFetch(apiUrl(`/api/v1/annotation/drafts/${encodeURIComponent(task.id)}`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_id: task.id,
+          mode: "teaching",
+          payload: { predictions: predictionsRef.current },
+          browser_session_id: browserSessionId,
+          lease_version: activeLeaseVersion,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 409 || response.status === 412) onLeaseLost?.();
+        throw new Error(data?.detail || "草稿保存失败");
+      }
+      const nextLease = data.lease as AnnotationEditLease;
+      leaseVersionRef.current = nextLease.version;
+      onLeaseChange?.(nextLease);
+      setSaveState("saved");
+      return { draftVersion: Number(data?.draft?.version || 0), lease: nextLease };
+    } catch (reason) {
+      setSaveState("offline");
+      throw reason;
+    }
+  }, [browserSessionId, onLeaseChange, onLeaseLost, readOnly, task.id]);
+
+  useEffect(() => {
+    registerDraftSaver?.(readOnly ? null : saveDraftNow);
+    return () => registerDraftSaver?.(null);
+  }, [readOnly, registerDraftSaver, saveDraftNow]);
+
   useEffect(() => {
     if (hydratedTask.current !== task.id) return;
     onLiveState?.({ task_id: task.id, mode: "teaching", stage: "editing", annotation_count: predictions.length, labels: predictions.map((item) => item.label).filter(Boolean) });
+    if (readOnly || !leaseVersionRef.current) return;
     const timer = window.setTimeout(() => {
-      setSaveState("saving");
-      void apiFetch(apiUrl(`/api/v1/annotation/drafts/${encodeURIComponent(task.id)}`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_id: task.id, mode: "teaching", payload: { predictions } }),
-      }).then((response) => {
-        setSaveState(response.ok ? "saved" : "offline");
-      }).catch(() => setSaveState("offline"));
+      void saveDraftNow().catch(() => undefined);
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [onLiveState, predictions, task.id]);
+  }, [onLiveState, predictions, readOnly, saveDraftNow, task.id]);
 
   const submit = useCallback(async () => {
-    if (submitting) return;
+    if (submitting || readOnly || !leaseVersionRef.current) return;
     setSubmitting(true); setError("");
     try {
       const response = await apiFetch(apiUrl("/api/v1/annotation/attempts"), {
@@ -154,6 +206,8 @@ export default function UnifiedAnnotationWorkbench({
           payload: { predictions, pre_annotation: task.pre_annotation || [] },
           idempotency_key: `react:${task.id}:${Date.now()}`,
           grade: true,
+          browser_session_id: browserSessionId,
+          lease_version: leaseVersionRef.current,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -164,12 +218,13 @@ export default function UnifiedAnnotationWorkbench({
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "提交失败");
     } finally { setSubmitting(false); }
-  }, [activeProfileId, onLiveState, predictions, submitting, task]);
+  }, [activeProfileId, browserSessionId, onLiveState, predictions, readOnly, submitting, task]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT";
+      if (readOnly) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") { event.preventDefault(); redo(); }
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void submit(); }
@@ -178,7 +233,7 @@ export default function UnifiedAnnotationWorkbench({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [nextTaskId, onSelectTask, previousTaskId, redo, submit, undo]);
+  }, [nextTaskId, onSelectTask, previousTaskId, readOnly, redo, submit, undo]);
 
   const saveText = saveState === "saving" ? "正在保存" : saveState === "saved" ? "已保存到当前档案" : saveState === "offline" ? "离线缓存待恢复" : "等待编辑";
   const SaveIcon = saveState === "offline" ? CloudOff : Cloud;
@@ -193,16 +248,17 @@ export default function UnifiedAnnotationWorkbench({
     </aside>
 
     <main className="min-h-0 overflow-y-auto p-4 sm:p-5">
+      {readOnly && <div className="mb-3 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-700">该任务正在另一模式或窗口中编辑。这里保留只读查看，接管后才能修改。</div>}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <ToolbarButton label="撤销" disabled={!history.length} onClick={undo}><Undo2 className="h-4 w-4" /></ToolbarButton>
-          <ToolbarButton label="重做" disabled={!future.length} onClick={redo}><Redo2 className="h-4 w-4" /></ToolbarButton>
-          <ToolbarButton label="重置" onClick={() => update(emptyPredictions(task))}><RotateCcw className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton label="撤销" disabled={readOnly || !history.length} onClick={undo}><Undo2 className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton label="重做" disabled={readOnly || !future.length} onClick={redo}><Redo2 className="h-4 w-4" /></ToolbarButton>
+          <ToolbarButton label="重置" disabled={readOnly} onClick={() => update(emptyPredictions(task))}><RotateCcw className="h-4 w-4" /></ToolbarButton>
         </div>
         <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><SaveIcon className="h-3.5 w-3.5" />{saveText}</span>
       </div>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <TaskEditor task={task} predictions={predictions} onChange={update} />
+        <fieldset disabled={readOnly} className={readOnly ? "opacity-70" : ""}><TaskEditor task={task} predictions={predictions} onChange={update} /></fieldset>
       </div>
       {error && <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-600">{error}</div>}
       {result && <section className="mt-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4"><div className="flex items-center gap-2 font-semibold text-emerald-600"><CheckCircle2 className="h-4 w-4" />{scoreLabel(result.metrics)}</div><div className="mt-2 flex flex-wrap gap-2">{Object.entries(result.metrics).map(([key, value]) => <span key={key} className="rounded-lg bg-[var(--background)] px-2 py-1 text-[11px]">{key}: {String(value)}</span>)}</div><p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-[var(--muted-foreground)]">{result.report}</p></section>}
@@ -211,7 +267,7 @@ export default function UnifiedAnnotationWorkbench({
     <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--card)] p-4">
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">标签与提交</div>
       <div className="mt-3 flex flex-wrap gap-2">{(task.labels || []).map((label) => <span key={label} className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2.5 py-1.5 text-xs">{label}</span>)}</div>
-      <div className="mt-auto space-y-2 pt-5"><button type="button" disabled={submitting} onClick={() => void submit()} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-500 disabled:opacity-50"><Send className="h-4 w-4" />{submitting ? "正在评分…" : "提交并评分"}</button><div className="grid grid-cols-2 gap-2"><button disabled={!previousTaskId} onClick={() => previousTaskId && onSelectTask(previousTaskId)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />上一题</button><button disabled={!nextTaskId} onClick={() => nextTaskId && onSelectTask(nextTaskId)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">下一题<ChevronRight className="h-3.5 w-3.5" /></button></div></div>
+      <div className="mt-auto space-y-2 pt-5"><button type="button" disabled={readOnly || submitting} onClick={() => void submit()} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-500 disabled:opacity-50"><Send className="h-4 w-4" />{readOnly ? "只读模式" : submitting ? "正在评分…" : "提交并评分"}</button><div className="grid grid-cols-2 gap-2"><button disabled={!previousTaskId} onClick={() => previousTaskId && onSelectTask(previousTaskId)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />上一题</button><button disabled={!nextTaskId} onClick={() => nextTaskId && onSelectTask(nextTaskId)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">下一题<ChevronRight className="h-3.5 w-3.5" /></button></div></div>
     </aside>
   </div>;
 }

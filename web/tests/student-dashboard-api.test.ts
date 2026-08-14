@@ -11,7 +11,7 @@ test("home task context and student summary share one profile-keyed request", ()
   assert.match(api, /const homeRequests = new Map<string/);
   assert.match(api, /getStudentHomeDashboard\(profileId/);
   assert.match(taskContext, /getStudentHomeDashboard\(active\.id/);
-  assert.match(summary, /getStudentHomeDashboard\(active\.id/);
+  assert.match(summary, /getStudentHomeDashboard\(activeProfileId/);
 });
 
 test("growth core is aggregated while heavy analysis remains user-triggered", () => {

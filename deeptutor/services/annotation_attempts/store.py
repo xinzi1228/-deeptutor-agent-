@@ -71,14 +71,16 @@ class AnnotationAttemptStore:
         clean_id = _SAFE_ID.sub("_", task_id.strip())[:100]
         if not clean_id:
             raise ValueError("缺少任务编号")
-        record = {
-            "schema_version": 1,
-            "task_id": task_id,
-            "mode": mode,
-            "payload": _safe_payload(payload),
-            "updated_at": _now(),
-        }
         with self._lock:
+            previous = self.get_draft(task_id) or {}
+            record = {
+                "schema_version": 2,
+                "version": int(previous.get("version") or 0) + 1,
+                "task_id": task_id,
+                "mode": mode,
+                "payload": _safe_payload(payload),
+                "updated_at": _now(),
+            }
             atomic_write_json(self.drafts / f"{clean_id}.json", record)
             self.set_current(task_id=task_id, mode=mode, stage="editing", summary={"has_draft": True})
             self._task_observer("draft_saved", task_id, f"annotation/drafts/{clean_id}.json")
