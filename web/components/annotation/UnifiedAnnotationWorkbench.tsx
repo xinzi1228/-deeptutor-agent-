@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -16,6 +16,11 @@ import { apiFetch, apiUrl } from "@/lib/api";
 import { invalidateStudentDashboard } from "@/lib/student-dashboard-api";
 import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 import type { AnnotationEditLease } from "@/lib/annotation-edit-session";
+import BboxCanvas from "@/components/annotation/bbox/BboxCanvas";
+import BboxObjectList from "@/components/annotation/bbox/BboxObjectList";
+import BboxToolbar, { type BboxTool } from "@/components/annotation/bbox/BboxToolbar";
+import { toBbox, validateBoxes, type Bbox, type ImageBounds } from "@/components/annotation/bbox/bbox-geometry";
+import { createBboxState, reduceBboxState } from "@/components/annotation/bbox/bbox-reducer";
 
 export type AnnotationTask = {
   id: string;
@@ -227,19 +232,20 @@ export default function UnifiedAnnotationWorkbench({
       if (readOnly) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.shiftKey ? redo() : undo(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") { event.preventDefault(); redo(); }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); void saveDraftNow().catch(() => undefined); }
       if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void submit(); }
       if (!typing && event.key === "ArrowLeft" && previousTaskId) onSelectTask(previousTaskId);
       if (!typing && event.key === "ArrowRight" && nextTaskId) onSelectTask(nextTaskId);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [nextTaskId, onSelectTask, previousTaskId, readOnly, redo, submit, undo]);
+  }, [nextTaskId, onSelectTask, previousTaskId, readOnly, redo, saveDraftNow, submit, undo]);
 
   const saveText = saveState === "saving" ? "正在保存" : saveState === "saved" ? "已保存到当前档案" : saveState === "offline" ? "离线缓存待恢复" : "等待编辑";
   const SaveIcon = saveState === "offline" ? CloudOff : Cloud;
 
-  return <div className="grid h-full min-h-0 grid-cols-[minmax(210px,0.72fr)_minmax(420px,2.2fr)_minmax(230px,0.82fr)] bg-[var(--background)]">
-    <aside className="min-h-0 overflow-y-auto border-r border-[var(--border)] bg-[var(--card)] p-4">
+  return <div className="grid h-full min-h-0 grid-cols-1 bg-[var(--background)] lg:grid-cols-[minmax(190px,0.72fr)_minmax(380px,2.2fr)_minmax(210px,0.82fr)]">
+    <aside className="hidden min-h-0 overflow-y-auto border-r border-[var(--border)] bg-[var(--card)] p-4 lg:block">
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">当前任务</div>
       <h2 className="mt-2 text-base font-semibold leading-6">{task.title}</h2>
       <div className="mt-2 flex gap-2 text-[10px]"><span className="rounded-full bg-violet-500/10 px-2 py-1 text-violet-600">{task.modal}</span><span className="rounded-full bg-[var(--muted)] px-2 py-1">{task.type}</span></div>
@@ -248,6 +254,7 @@ export default function UnifiedAnnotationWorkbench({
     </aside>
 
     <main className="min-h-0 overflow-y-auto p-4 sm:p-5">
+      <details className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:hidden"><summary className="cursor-pointer text-xs font-semibold">当前任务：{task.title}</summary><p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">{task.instruction || "按任务要求完成标注，提交后系统会给出评分与改进建议。"}</p></details>
       {readOnly && <div className="mb-3 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-700">该任务正在另一模式或窗口中编辑。这里保留只读查看，接管后才能修改。</div>}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1">
@@ -258,13 +265,14 @@ export default function UnifiedAnnotationWorkbench({
         <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]"><SaveIcon className="h-3.5 w-3.5" />{saveText}</span>
       </div>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <fieldset disabled={readOnly} className={readOnly ? "opacity-70" : ""}><TaskEditor task={task} predictions={predictions} onChange={update} /></fieldset>
+        <fieldset disabled={readOnly} className={readOnly ? "pointer-events-none opacity-70" : ""}><TaskEditor task={task} predictions={predictions} onChange={update} onUndo={undo} onRedo={redo} canUndo={Boolean(history.length)} canRedo={Boolean(future.length)} /></fieldset>
       </div>
       {error && <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-600">{error}</div>}
       {result && <section className="mt-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4"><div className="flex items-center gap-2 font-semibold text-emerald-600"><CheckCircle2 className="h-4 w-4" />{scoreLabel(result.metrics)}</div><div className="mt-2 flex flex-wrap gap-2">{Object.entries(result.metrics).map(([key, value]) => <span key={key} className="rounded-lg bg-[var(--background)] px-2 py-1 text-[11px]">{key}: {String(value)}</span>)}</div><p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-[var(--muted-foreground)]">{result.report}</p></section>}
+      <details className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:hidden" open><summary className="cursor-pointer text-xs font-semibold">提交与切换任务</summary><div className="mt-3 flex flex-wrap gap-2">{(task.labels || []).map((label) => <span key={label} className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[11px]">{label}</span>)}</div><button type="button" disabled={readOnly || submitting} onClick={() => void submit()} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"><Send className="h-4 w-4" />{readOnly ? "只读模式" : submitting ? "正在评分…" : "提交并评分"}</button><div className="mt-2 grid grid-cols-2 gap-2"><button disabled={!previousTaskId} onClick={() => previousTaskId && onSelectTask(previousTaskId)} className="rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">上一题</button><button disabled={!nextTaskId} onClick={() => nextTaskId && onSelectTask(nextTaskId)} className="rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">下一题</button></div></details>
     </main>
 
-    <aside className="flex min-h-0 flex-col border-l border-[var(--border)] bg-[var(--card)] p-4">
+    <aside className="hidden min-h-0 flex-col border-l border-[var(--border)] bg-[var(--card)] p-4 lg:flex">
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">标签与提交</div>
       <div className="mt-3 flex flex-wrap gap-2">{(task.labels || []).map((label) => <span key={label} className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2.5 py-1.5 text-xs">{label}</span>)}</div>
       <div className="mt-auto space-y-2 pt-5"><button type="button" disabled={readOnly || submitting} onClick={() => void submit()} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-500 disabled:opacity-50"><Send className="h-4 w-4" />{readOnly ? "只读模式" : submitting ? "正在评分…" : "提交并评分"}</button><div className="grid grid-cols-2 gap-2"><button disabled={!previousTaskId} onClick={() => previousTaskId && onSelectTask(previousTaskId)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />上一题</button><button disabled={!nextTaskId} onClick={() => nextTaskId && onSelectTask(nextTaskId)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--border)] py-2 text-xs disabled:opacity-40">下一题<ChevronRight className="h-3.5 w-3.5" /></button></div></div>
@@ -276,8 +284,8 @@ function ToolbarButton({ label, disabled, onClick, children }: { label: string; 
   return <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="rounded-lg border border-transparent p-2 text-[var(--muted-foreground)] hover:border-[var(--border)] hover:bg-[var(--card)] hover:text-[var(--foreground)] disabled:opacity-35">{children}</button>;
 }
 
-function TaskEditor({ task, predictions, onChange }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void }) {
-  if (task.type === "bbox") return <BBoxEditor task={task} predictions={predictions} onChange={onChange} />;
+function TaskEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean }) {
+  if (task.type === "bbox") return <BBoxEditor task={task} predictions={predictions} onChange={onChange} onUndo={onUndo} onRedo={onRedo} canUndo={canUndo} canRedo={canRedo} />;
   if (task.type === "classification") return <ChoiceEditor task={task} value={String(predictions[0]?.label || "")} onChange={(label) => onChange([{ id: 0, label }])} />;
   if (task.type === "judgment") return <ItemChoiceEditor task={task} predictions={predictions} onChange={onChange} />;
   if (task.type === "error_case") return <ErrorCaseEditor task={task} predictions={predictions} onChange={onChange} />;
@@ -325,11 +333,57 @@ function JsonEditor({ task, predictions, onChange }: { task: AnnotationTask; pre
   return <div className="space-y-4"><Media task={task} /><p className="text-xs text-[var(--muted-foreground)]">该任务使用结构化编辑器。视频跟踪格式为每帧一个对象，包含 frame 与 boxes。</p><textarea key={serialized} spellCheck={false} defaultValue={serialized} onChange={(event) => { try { const value = JSON.parse(event.target.value); if (Array.isArray(value)) onChange(value); } catch { /* keep editing until JSON is valid */ } }} className="min-h-72 w-full rounded-xl border border-[var(--border)] bg-slate-950 p-4 font-mono text-xs text-slate-100" /></div>;
 }
 
-function BBoxEditor({ task, predictions, onChange }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const start = useRef<{ x: number; y: number } | null>(null);
-  const [preview, setPreview] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [imageSize, setImageSize] = useState({ width: 1000, height: 1000 });
-  const point = (event: React.PointerEvent) => { const rect = ref.current!.getBoundingClientRect(); return { x: Math.round(((event.clientX - rect.left) / rect.width) * imageSize.width), y: Math.round(((event.clientY - rect.top) / rect.height) * imageSize.height) }; };
-  return <div className="space-y-3"><div ref={ref} className="relative mx-auto max-w-4xl touch-none overflow-hidden rounded-xl bg-slate-950" onPointerDown={(e) => { start.current = point(e); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }} onPointerMove={(e) => { if (!start.current) return; const end = point(e); setPreview({ x: Math.min(start.current.x, end.x), y: Math.min(start.current.y, end.y), w: Math.abs(end.x - start.current.x), h: Math.abs(end.y - start.current.y) }); }} onPointerUp={() => { if (preview && preview.w > 4 && preview.h > 4) onChange([...predictions, { ...preview, label: task.labels?.[0] || "object" }]); start.current = null; setPreview(null); }}><img src={task.image_url} alt={task.title} draggable={false} onLoad={(event) => setImageSize({ width: event.currentTarget.naturalWidth || 1000, height: event.currentTarget.naturalHeight || 1000 })} className="block max-h-[560px] w-full object-contain" />{predictions.map((box, index) => <button type="button" title="点击删除此框" key={index} onClick={() => onChange(predictions.filter((_, i) => i !== index))} className="absolute border-2 border-cyan-400 bg-cyan-400/10" style={{ left: `${(Number(box.x) / imageSize.width) * 100}%`, top: `${(Number(box.y) / imageSize.height) * 100}%`, width: `${(Number(box.w) / imageSize.width) * 100}%`, height: `${(Number(box.h) / imageSize.height) * 100}%` }}><span className="absolute -top-5 left-[-2px] bg-cyan-500 px-1 text-[9px] text-white">{String(box.label || "object")}</span></button>)}{preview && <div className="pointer-events-none absolute border-2 border-violet-400 bg-violet-400/10" style={{ left: `${(preview.x / imageSize.width) * 100}%`, top: `${(preview.y / imageSize.height) * 100}%`, width: `${(preview.w / imageSize.width) * 100}%`, height: `${(preview.h / imageSize.height) * 100}%` }} />}</div><p className="text-center text-[11px] text-[var(--muted-foreground)]">在图片上按住并拖动绘制矩形框；点击已有框可删除。</p></div>;
+function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canRedo }: { task: AnnotationTask; predictions: Array<Record<string, unknown>>; onChange: (value: Array<Record<string, unknown>>) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean }) {
+  const labels = task.labels?.length ? task.labels : ["object"];
+  const externalBoxes = useMemo(() => predictions.map(toBbox), [predictions]);
+  const [state, dispatch] = useReducer(reduceBboxState, externalBoxes, (boxes) => createBboxState(boxes, labels[0]));
+  const [tool, setTool] = useState<BboxTool>("draw");
+  const [zoom, setZoom] = useState(1);
+  const [bounds, setBounds] = useState<ImageBounds>({ width: 1000, height: 1000 });
+  const externalSignature = JSON.stringify(externalBoxes);
+  const localSignature = JSON.stringify(state.boxes);
+
+  useEffect(() => {
+    if (externalSignature !== localSignature) dispatch({ type: "replace-external", boxes: externalBoxes });
+  }, [externalBoxes, externalSignature, localSignature]);
+
+  const commit = useCallback((boxes: Bbox[], selectedId: string | null) => {
+    dispatch({ type: "replace-external", boxes });
+    dispatch({ type: "select", id: selectedId });
+    onChange(boxes);
+  }, [onChange]);
+
+  const deleteBox = useCallback((id: string) => {
+    commit(state.boxes.filter((box) => box.id !== id), state.selectedId === id ? null : state.selectedId);
+  }, [commit, state.boxes, state.selectedId]);
+
+  const changeLabel = useCallback((id: string, label: string) => {
+    commit(state.boxes.map((box) => box.id === id ? { ...box, label } : box), id);
+  }, [commit, state.boxes]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT";
+      if (typing) return;
+      if ((event.key === "Delete" || event.key === "Backspace") && state.selectedId) { event.preventDefault(); deleteBox(state.selectedId); }
+      if (event.key.toLowerCase() === "v") setTool("select");
+      if (event.key.toLowerCase() === "b") setTool("draw");
+      if (event.key === "Escape") dispatch({ type: "select", id: null });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteBox, state.selectedId]);
+
+  const issues = useMemo(() => validateBoxes(state.boxes, bounds), [bounds, state.boxes]);
+  return <div className="space-y-3">
+    <BboxToolbar tool={tool} onToolChange={setTool} activeLabel={state.activeLabel} labels={labels} onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} onFit={() => setZoom(1)} canUndo={canUndo} canRedo={canRedo} hasSelection={Boolean(state.selectedId)} onUndo={onUndo} onRedo={onRedo} onDelete={() => state.selectedId && deleteBox(state.selectedId)} />
+    <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
+      <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedId={state.selectedId} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(id) => dispatch({ type: "select", id })} onCommit={commit} onImageSizeChange={setBounds} />
+      <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 xl:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedId} issues={issues} onSelect={(id) => dispatch({ type: "select", id })} onLabelChange={changeLabel} onDelete={deleteBox} /></aside>
+    </div>
+    <details className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 xl:hidden"><summary className="cursor-pointer text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="mt-3"><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedId} issues={issues} onSelect={(id) => dispatch({ type: "select", id })} onLabelChange={changeLabel} onDelete={deleteBox} /></div></details>
+    {issues.length > 0 && <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-700"><strong>本地质检发现 {issues.length} 项：</strong>{issues.slice(0, 3).map((issue) => <span key={`${issue.boxId}-${issue.code}`} className="ml-2">{issue.message}</span>)}</div>}
+    <p className="text-center text-[11px] text-[var(--muted-foreground)]">先选类别再画框；V 选择 · B 画框 · Delete 删除 · Ctrl+S 保存草稿。</p>
+  </div>;
 }

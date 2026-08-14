@@ -286,7 +286,7 @@ export default function AnnotationPage() {
 
   return (
     <div className="flex h-full flex-col bg-[var(--background)]">
-      <header className="flex items-center justify-between border-b border-[var(--border)] px-6 py-3">
+      <header className="flex min-w-0 flex-col gap-3 border-b border-[var(--border)] px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <Tag className="h-5 w-5 text-[var(--muted-foreground)]" />
           <div>
@@ -298,10 +298,10 @@ export default function AnnotationPage() {
             </p>
           </div>
         </div>
-        <div className="flex rounded-lg border border-[var(--border)] bg-[var(--card)] p-1">
+        <div className="flex max-w-full shrink-0 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--card)] p-1">
           <button
             onClick={() => void switchMode("image")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "image"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -312,7 +312,7 @@ export default function AnnotationPage() {
           </button>
           <button
             onClick={() => void switchMode("text")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "text"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -323,7 +323,7 @@ export default function AnnotationPage() {
           </button>
           <button
             onClick={() => void switchMode("audio")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "audio"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -334,7 +334,7 @@ export default function AnnotationPage() {
           </button>
           <button
             onClick={() => void switchMode("video")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "video"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -345,7 +345,7 @@ export default function AnnotationPage() {
           </button>
           <button
             onClick={() => void switchMode("pro")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "pro"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
@@ -361,9 +361,9 @@ export default function AnnotationPage() {
 
       {selectedTask && !editAccess.editable && <div className="flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/10 px-6 py-2 text-xs text-amber-800"><span>{editAccess.message || "该任务当前为只读状态"}</span><button type="button" onClick={() => void takeOverEditing()} disabled={!editAccess.lease?.checkpoint_version} className="rounded-lg bg-amber-600 px-3 py-1.5 font-medium text-white disabled:cursor-not-allowed disabled:opacity-45">接管编辑</button></div>}
 
-      <div className="flex items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-6 py-2">
+      <div className="flex min-w-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 py-2 sm:px-6">
           <label className="text-xs text-[var(--muted-foreground)]" htmlFor="task-bank">{mode === "pro" ? "本人专业任务" : "任务库"}</label>
-          <select id="task-bank" value={selectedTask} onChange={(event) => void (mode === "pro" ? chooseProfessionalTask(event.target.value) : chooseTask(event.target.value))} className="max-w-md rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs">
+          <select id="task-bank" value={selectedTask} onChange={(event) => void (mode === "pro" ? chooseProfessionalTask(event.target.value) : chooseTask(event.target.value))} className="min-w-0 max-w-md flex-1 rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs">
             <option value="">{mode === "pro" ? "选择后直接进入 Label Studio 题目" : "选择任务后加载到当前标注台"}</option>
             {filteredTasks.map((task) => <option key={task.id} value={task.id}>{task.id} · {task.title}{task.difficulty ? `（${task.difficulty}）` : ""}</option>)}
           </select>
