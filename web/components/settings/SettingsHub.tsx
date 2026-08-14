@@ -14,9 +14,11 @@ import {
 import SettingsStatusPanel from "@/components/settings/SettingsStatusPanel";
 import {
   SETTINGS_CATEGORIES,
+  categoriesForRole,
   type Lang,
   type SettingsCategory,
 } from "@/lib/settings-nav";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 /**
  * Settings hub — the landing page of `/settings`.
@@ -39,6 +41,11 @@ export default function SettingsHub() {
 
   const { catalog, catalogEditable, diagnosticsResults, startTour } =
     useSettings();
+  const auth = useAuthStatus();
+  const studentMode = auth.enabled && !auth.isAdmin;
+  const visibleCategories = categoriesForRole(
+    studentMode ? "student" : "admin",
+  );
 
   // Model preview: how many of the model-service leaves are configured.
   const modelStats = useMemo(() => {
@@ -69,6 +76,7 @@ export default function SettingsHub() {
   // quietly (non-admins get 403) → the block falls back to its blurb.
   const [network, setNetwork] = useState<NetworkPreview | null>(null);
   useEffect(() => {
+    if (studentMode) return;
     let cancelled = false;
     (async () => {
       try {
@@ -86,7 +94,7 @@ export default function SettingsHub() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [studentMode]);
 
   return (
     <div>
@@ -97,25 +105,29 @@ export default function SettingsHub() {
           </h1>
           <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-[var(--muted-foreground)]">
             {tr({
-              zh: "管理外观、模型与服务、知识库、聊天与记忆。",
+              zh: studentMode
+                ? "管理你的个人学习体验。"
+                : "管理外观、模型与服务、知识库、聊天与记忆。",
               en: "Manage appearance, models and services, knowledge base, chat, and memory.",
             })}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={startTour}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border)]/60 px-3 py-1.5 text-[12.5px] font-medium text-[var(--muted-foreground)] transition-colors hover:border-[var(--border)] hover:text-[var(--foreground)]"
-        >
-          <Rocket size={13} />
-          {tr({ zh: "引导", en: "Tour" })}
-        </button>
+        {!studentMode && (
+          <button
+            type="button"
+            onClick={startTour}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border)]/60 px-3 py-1.5 text-[12.5px] font-medium text-[var(--muted-foreground)] transition-colors hover:border-[var(--border)] hover:text-[var(--foreground)]"
+          >
+            <Rocket size={13} />
+            {tr({ zh: "引导", en: "Tour" })}
+          </button>
+        )}
       </header>
 
-      <SettingsStatusPanel />
+      {!studentMode && <SettingsStatusPanel />}
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SETTINGS_CATEGORIES.map((category) => (
+        {visibleCategories.map((category) => (
           <CategoryBlock
             key={category.key}
             category={category}

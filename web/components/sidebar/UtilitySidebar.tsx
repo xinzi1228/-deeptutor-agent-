@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { SidebarShell } from "@/components/sidebar/SidebarShell";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { AdminLink } from "@/components/auth/AdminLink";
-import { ProfileLink } from "@/components/auth/ProfileLink";
 import { useAppShell } from "@/context/AppShellContext";
 import {
   deleteSession,
@@ -14,6 +13,7 @@ import {
   updateSessionTitle,
   type SessionSummary,
 } from "@/lib/session-api";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 export default function UtilitySidebar() {
   const { t } = useTranslation();
@@ -21,6 +21,8 @@ export default function UtilitySidebar() {
   const { activeSessionId, setActiveSessionId } = useAppShell();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const auth = useAuthStatus();
+  const studentMode = auth.loading || (auth.enabled && !auth.isAdmin);
   const hasLoadedSessionsRef = useRef(false);
 
   const refreshSessions = useCallback(async () => {
@@ -83,6 +85,7 @@ export default function UtilitySidebar() {
 
   return (
     <SidebarShell
+      studentMode={studentMode}
       showSessions
       sessions={sessions}
       activeSessionId={activeSessionId}
@@ -93,7 +96,6 @@ export default function UtilitySidebar() {
       onDeleteSession={handleDeleteSession}
       footerSlot={(collapsed) => (
         <>
-          <ProfileLink collapsed={collapsed} />
           <AdminLink collapsed={collapsed} />
           <LogoutButton collapsed={collapsed} />
         </>

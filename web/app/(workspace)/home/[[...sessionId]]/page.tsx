@@ -86,6 +86,8 @@ import {
   selectedBooksToPayload,
   type SelectedBookReference,
 } from "@/lib/book-references";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
+import StudentHomeSummary from "@/components/student-shell/StudentHomeSummary";
 
 const NotebookRecordPicker = dynamic(
   () => import("@/components/notebook/NotebookRecordPicker"),
@@ -229,6 +231,8 @@ export default function ChatPage() {
   const { t } = useTranslation();
   const sessionIdParam = params.sessionId?.[0] ?? null;
   const { setActiveSessionId, language: appLanguage } = useAppShell();
+  const auth = useAuthStatus();
+  const studentMode = auth.loading || (auth.enabled && !auth.isAdmin);
 
   const {
     state,
@@ -1619,8 +1623,17 @@ export default function ChatPage() {
                 </div>
               </div>
             ) : !hasMessages ? (
-              <div className="flex w-full flex-1 min-h-0 items-end justify-center pb-14 animate-fade-in px-6">
-                <div className="w-full max-w-[960px] flex items-center justify-center gap-4">
+              <div
+                className={`flex w-full flex-1 min-h-0 justify-center animate-fade-in px-6 ${studentMode ? "items-center overflow-y-auto py-8" : "items-end pb-14"}`}
+              >
+                {studentMode ? (
+                  <StudentHomeSummary
+                    onStartChat={() =>
+                      composerRef.current?.querySelector("textarea")?.focus()
+                    }
+                  />
+                ) : (
+                  <div className="w-full max-w-[960px] flex items-center justify-center gap-4">
                   <img
                     src="/brand-mark.png"
                     alt="标注星图"
@@ -1632,7 +1645,8 @@ export default function ChatPage() {
                   <h1 className="font-serif text-[40px] font-medium leading-[1.1] tracking-[-0.015em] text-[var(--foreground)]">
                     {t(welcomeGreeting)}
                   </h1>
-                </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div
@@ -1694,6 +1708,7 @@ export default function ChatPage() {
             )}
 
             <ChatComposer
+              studentMode={studentMode}
               composerRef={composerRef}
               capMenuRef={capMenuRef}
               capBtnRef={capBtnRef}

@@ -1,6 +1,7 @@
 import UtilitySidebar from "@/components/sidebar/UtilitySidebar";
 import { CapabilityAccessProvider } from "@/components/access/CapabilityAccessContext";
 import CapabilityGate from "@/components/access/CapabilityGate";
+import StudentRouteGate from "@/components/access/StudentRouteGate";
 
 export default function UtilityLayout({
   children,
@@ -12,7 +13,7 @@ export default function UtilityLayout({
       <div className="flex h-screen overflow-hidden">
         <UtilitySidebar />
         <main className="flex-1 overflow-hidden bg-[var(--background)]">
-          <CapabilityGate>{children}</CapabilityGate>
+          <StudentRouteGate><CapabilityGate>{children}</CapabilityGate></StudentRouteGate>
         </main>
       </div>
     </CapabilityAccessProvider>

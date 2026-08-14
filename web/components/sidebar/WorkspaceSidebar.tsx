@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { SidebarShell } from "@/components/sidebar/SidebarShell";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { AdminLink } from "@/components/auth/AdminLink";
-import { ProfileLink } from "@/components/auth/ProfileLink";
 import { useUnifiedChat } from "@/context/UnifiedChatContext";
 import { ProfileSwitcher } from "@/components/learning-profiles/ProfileSwitcher";
 import {
@@ -15,6 +14,7 @@ import {
   updateSessionTitle,
   type SessionSummary,
 } from "@/lib/session-api";
+import { useAuthStatus } from "@/hooks/useAuthStatus";
 
 export default function WorkspaceSidebar() {
   const { t } = useTranslation();
@@ -28,6 +28,8 @@ export default function WorkspaceSidebar() {
   } = useUnifiedChat();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const auth = useAuthStatus();
+  const studentMode = auth.loading || (auth.enabled && !auth.isAdmin);
   const hasLoadedSessionsRef = useRef(false);
 
   const refreshSessions = useCallback(async () => {
@@ -137,6 +139,7 @@ export default function WorkspaceSidebar() {
 
   return (
     <SidebarShell
+      studentMode={studentMode}
       showSessions
       sessions={orderedSessions}
       activeSessionId={selectedSessionId}
@@ -148,7 +151,6 @@ export default function WorkspaceSidebar() {
       footerSlot={(collapsed) => (
         <>
           <ProfileSwitcher collapsed={collapsed} />
-          <ProfileLink collapsed={collapsed} />
           <AdminLink collapsed={collapsed} />
           <LogoutButton collapsed={collapsed} />
         </>

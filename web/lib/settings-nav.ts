@@ -73,6 +73,8 @@ export interface SettingsCategory {
   href: string;
   /** Leaves listed on the sub-hub page (omitted for direct-leaf categories). */
   children?: SettingsLeaf[];
+  /** Infrastructure controls hidden from student accounts. */
+  adminOnly?: boolean;
 }
 
 const MODEL_CHILDREN: SettingsLeaf[] = [
@@ -294,6 +296,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     key: "network",
+    adminOnly: true,
     label: { zh: "网络", en: "Network" },
     blurb: {
       zh: "端口、浏览器 API 地址与 CORS",
@@ -304,6 +307,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     key: "models",
+    adminOnly: true,
     label: { zh: "模型", en: "Models" },
     blurb: {
       zh: "语言、向量、搜索、语音与生成模型",
@@ -315,6 +319,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     key: "knowledge",
+    adminOnly: true,
     label: { zh: "知识库", en: "Knowledge Base" },
     blurb: { zh: "文档解析引擎", en: "Document parsing engine" },
     icon: Library,
@@ -322,6 +327,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     key: "chat",
+    adminOnly: true,
     label: { zh: "聊天", en: "Chat" },
     blurb: {
       zh: "工具、MCP 服务器、能力与附件",
@@ -333,6 +339,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     key: "agents",
+    adminOnly: true,
     label: { zh: "伙伴和智能体", en: "Partners & Agents" },
     blurb: {
       zh: "配置可在对话中调用的子智能体",
@@ -344,6 +351,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
   {
     key: "memory",
+    adminOnly: true,
     label: { zh: "记忆", en: "Memory" },
     blurb: {
       zh: "分块、预算、去重与引用策略",
@@ -353,6 +361,12 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     href: "/settings/memory",
   },
 ];
+
+export function categoriesForRole(role: "student" | "admin"): SettingsCategory[] {
+  return role === "admin"
+    ? [...SETTINGS_CATEGORIES]
+    : SETTINGS_CATEGORIES.filter((category) => !category.adminOnly);
+}
 
 export const SETTINGS_HUB_HREF = "/settings";
 const HUB_LABEL: Lang = { zh: "设置", en: "Settings" };

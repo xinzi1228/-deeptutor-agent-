@@ -30,6 +30,7 @@ import type { SessionSummary } from "@/lib/session-api";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useCapabilityAccess } from "@/components/access/CapabilityAccessContext";
 import type { Capability } from "@/lib/capability-routes";
+import StudentNavigation from "@/components/student-shell/StudentNavigation";
 
 interface NavEntry {
   href: string;
@@ -89,6 +90,8 @@ interface SidebarShellProps {
    * switch to their icon-only variant when the rail is collapsed.
    */
   footerSlot?: ReactNode | ((collapsed: boolean) => ReactNode);
+  /** Product-language navigation for non-admin student accounts. */
+  studentMode?: boolean;
 }
 
 export function SidebarShell({
@@ -101,6 +104,7 @@ export function SidebarShell({
   onRenameSession,
   onDeleteSession,
   footerSlot,
+  studentMode = false,
 }: SidebarShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -175,6 +179,9 @@ export function SidebarShell({
         </div>
 
         {/* Primary nav */}
+        {studentMode ? (
+          <StudentNavigation collapsed pathname={pathname} onLearningClick={handleHomeClick} />
+        ) : (
         <nav className="mt-1 flex w-full flex-col items-center gap-1 px-1.5">
           {PRIMARY_NAV.map((item) => {
             const active = pathname.startsWith(item.href);
@@ -230,13 +237,14 @@ export function SidebarShell({
             );
           })}
         </nav>
+        )}
 
         <div className="flex-1" />
 
         {/* Secondary nav + footer */}
         <div className="flex w-full flex-col items-center gap-1 px-1.5">
-          <div className="my-1 h-px w-7 bg-[var(--border)]/40" />
-          {SECONDARY_NAV.map((item) => {
+          {!studentMode && <div className="my-1 h-px w-7 bg-[var(--border)]/40" />}
+          {!studentMode && SECONDARY_NAV.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
               <Link
@@ -254,7 +262,7 @@ export function SidebarShell({
             );
           })}
           {renderedFooter}
-          <a
+          {!studentMode && <a
             href={DOCS_URL}
             target="_blank"
             rel="noreferrer noopener"
@@ -263,8 +271,8 @@ export function SidebarShell({
             className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl text-[var(--muted-foreground)]/70 transition-colors hover:bg-[var(--background)]/50 hover:text-[var(--foreground)]"
           >
             <BookText size={15} strokeWidth={1.6} />
-          </a>
-          <a
+          </a>}
+          {!studentMode && <a
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noreferrer noopener"
@@ -273,7 +281,7 @@ export function SidebarShell({
             className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--muted-foreground)]/70 transition-colors hover:bg-[var(--background)]/50 hover:text-[var(--foreground)]"
           >
             <Github size={15} strokeWidth={1.6} />
-          </a>
+          </a>}
           <VersionBadge collapsed />
         </div>
       </aside>
@@ -307,6 +315,9 @@ export function SidebarShell({
       </div>
 
       {/* Primary nav */}
+      {studentMode ? (
+        <StudentNavigation collapsed={false} pathname={pathname} onLearningClick={handleHomeClick} />
+      ) : (
       <nav className="px-2 pt-1">
         <div className="space-y-px">
           {PRIMARY_NAV.map((item) => {
@@ -350,6 +361,7 @@ export function SidebarShell({
           })}
         </div>
       </nav>
+      )}
 
       {/* Chat history — its own region below the nav, takes remaining height */}
       {showSessions && onSelectSession && onRenameSession && onDeleteSession ? (
@@ -405,7 +417,7 @@ export function SidebarShell({
 
       {/* Secondary nav + footer */}
       <div className="border-t border-[var(--border)]/40 px-2 py-2">
-        {SECONDARY_NAV.map((item) => {
+        {!studentMode && SECONDARY_NAV.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link
@@ -423,7 +435,7 @@ export function SidebarShell({
           );
         })}
         {renderedFooter}
-        <div className="mt-0.5 flex items-center gap-0.5">
+        {!studentMode && <div className="mt-0.5 flex items-center gap-0.5">
           <VersionBadge />
           <a
             href={DOCS_URL}
@@ -445,7 +457,7 @@ export function SidebarShell({
           >
             <Github size={13} strokeWidth={1.7} />
           </a>
-        </div>
+        </div>}
       </div>
     </aside>
   );

@@ -180,6 +180,7 @@ export default memo(function ChatComposer({
   onCancelStreaming,
   prefillInputRef,
   inputPlaceholder,
+  studentMode = false,
 }: {
   composerRef: RefObject<HTMLDivElement | null>;
   capMenuRef: RefObject<HTMLDivElement | null>;
@@ -258,6 +259,8 @@ export default memo(function ChatComposer({
   prefillInputRef?: React.MutableRefObject<((text: string) => void) | null>;
   /** Override the composer placeholder (e.g. quiz follow-up). */
   inputPlaceholder?: string;
+  /** Keep student chrome focused on input, attachment, voice and send. */
+  studentMode?: boolean;
 }) {
   const { t } = useTranslation();
   const CapIcon = activeCap.icon;
@@ -528,9 +531,9 @@ export default memo(function ChatComposer({
             onSend={doSend}
             onInputChange={handleInputChange}
             onPaste={onPaste}
-            connectedAgents={connectedAgents}
-            selectedAgent={selectedAgent}
-            onSelectAgent={onSelectAgent}
+            connectedAgents={studentMode ? [] : connectedAgents}
+            selectedAgent={studentMode ? null : selectedAgent}
+            onSelectAgent={studentMode ? undefined : onSelectAgent}
             onOpenPersonaSelector={
               onPersonaSelectionChange && onPersonaSelectorOpenChange
                 ? () => onPersonaSelectorOpenChange(true)
@@ -646,7 +649,8 @@ export default memo(function ChatComposer({
               on hover. */}
           <div className="px-3 pb-2 pt-0.5">
             <div className="flex items-center gap-1">
-              <div className="relative">
+              {!studentMode && (
+                <div className="relative">
                 <button
                   ref={capBtnRef}
                   onClick={() => onSetCapMenuOpen((v) => !v)}
@@ -768,17 +772,18 @@ export default memo(function ChatComposer({
                     })()}
                   </div>
                 )}
-              </div>
+                </div>
+              )}
 
               <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                {knowledgeBases.length > 0 ? (
+                {!studentMode && knowledgeBases.length > 0 ? (
                   <KnowledgeSelector
                     knowledgeBases={knowledgeBases}
                     selected={selectedKnowledgeBases}
                     onToggle={onToggleKB}
                   />
                 ) : null}
-                {onPersonaSelectionChange ? (
+                {!studentMode && onPersonaSelectionChange ? (
                   <PersonaSelector
                     value={personaSelection ?? ""}
                     onChange={onPersonaSelectionChange}
@@ -786,14 +791,16 @@ export default memo(function ChatComposer({
                     onOpenChange={onPersonaSelectorOpenChange}
                   />
                 ) : null}
-                <ModelSelector
-                  options={llmOptions}
-                  activeDefault={activeLLMDefault}
-                  value={llmSelection}
-                  loading={llmOptionsLoading}
-                  error={llmOptionsError}
-                  onChange={onSelectLLM}
-                />
+                {!studentMode && (
+                  <ModelSelector
+                    options={llmOptions}
+                    activeDefault={activeLLMDefault}
+                    value={llmSelection}
+                    loading={llmOptionsLoading}
+                    error={llmOptionsError}
+                    onChange={onSelectLLM}
+                  />
+                )}
 
                 <button
                   type="button"
