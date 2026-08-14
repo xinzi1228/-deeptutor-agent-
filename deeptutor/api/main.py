@@ -365,6 +365,7 @@ from deeptutor.api.routers import (
     co_writer,
     content_governance,
     cron,
+    current_learning_task,
     dashboard,
     imports,
     knowledge,
@@ -481,6 +482,12 @@ app.include_router(
     prefix="/api/v1/content-governance",
     tags=["content-governance"],
     dependencies=_admin,
+)
+app.include_router(
+    current_learning_task.router,
+    prefix="/api/v1/current-learning-task",
+    tags=["current-learning-task"],
+    dependencies=_auth,
 )
 app.include_router(
     mcp_settings.router,

@@ -47,11 +47,16 @@ def get_current_learning_profile() -> ProfileAccessContext | None:
     return _current_learning_profile.get()
 
 
-def require_learning_profile_write_access() -> ProfileAccessContext:
-    """Return the active profile context only when it permits private-data writes."""
+def require_learning_profile_access() -> ProfileAccessContext:
     profile = get_current_learning_profile()
     if profile is None:
         raise PermissionError("请先解锁学习档案")
+    return profile
+
+
+def require_learning_profile_write_access() -> ProfileAccessContext:
+    """Return the active profile context only when it permits private-data writes."""
+    profile = require_learning_profile_access()
     if profile.read_only:
         raise PermissionError("当前为教师只读视角，不能修改学生学习数据")
     return profile

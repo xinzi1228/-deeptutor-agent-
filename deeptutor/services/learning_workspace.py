@@ -29,13 +29,36 @@ class LearningWorkspaceService:
             raise PermissionError(f"{actor} cannot {action} {resource}")
 
     def manifest(self) -> dict[str, Any]:
+        current_task = self._current_task_summary()
         if not self.manifest_file.exists():
-            return {"schema_version": 1, "last_rebuild": None, "assets": self.asset_versions()}
+            return {"schema_version": 1, "last_rebuild": None, "assets": self.asset_versions(), "current_task": current_task}
         try:
             data = json.loads(self.manifest_file.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {"schema_version": 1}
+            if isinstance(data, dict):
+                return {**data, "current_task": current_task}
+            return {"schema_version": 1, "current_task": current_task}
         except (OSError, json.JSONDecodeError):
-            return {"schema_version": 1, "last_rebuild": None, "assets": self.asset_versions()}
+            return {"schema_version": 1, "last_rebuild": None, "assets": self.asset_versions(), "current_task": current_task}
+
+    @staticmethod
+    def _current_task_summary() -> dict[str, Any] | None:
+        try:
+            from deeptutor.multi_user.paths import get_current_learning_profile_root
+            from deeptutor.services.current_learning_task.store import CurrentLearningTaskStore
+
+            profile_root = get_current_learning_profile_root(require_unlocked=False)
+            task = CurrentLearningTaskStore(profile_root).get() if profile_root else None
+        except (ImportError, PermissionError, RuntimeError):
+            task = None
+        if task is None:
+            return None
+        return {
+            "course_id": task.course_id,
+            "task_id": task.task_id,
+            "phase": task.phase,
+            "mode": task.mode,
+            "version": task.version,
+        }
 
     def asset_versions(self) -> dict[str, dict[str, str | None]]:
         from deeptutor.services.path_service import get_path_service

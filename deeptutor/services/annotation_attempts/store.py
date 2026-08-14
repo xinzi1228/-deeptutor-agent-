@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import re
 import threading
-from typing import Any
+from typing import Any, Callable
 import uuid
 
 from deeptutor.services.file_io import atomic_write_json, atomic_write_text
@@ -34,12 +34,19 @@ class AnnotationAttemptStore:
     are append-only and de-duplicated by a client supplied idempotency key.
     """
 
-    def __init__(self, profile_root: Path):
-        self.root = Path(profile_root) / "annotation"
+    def __init__(
+        self,
+        profile_root: Path,
+        *,
+        task_observer: Callable[[str, str, str], None] | None = None,
+    ):
+        self.profile_root = Path(profile_root)
+        self.root = self.profile_root / "annotation"
         self.drafts = self.root / "drafts"
         self.attempts_file = self.root / "attempts.jsonl"
         self.current_file = self.root / "current.json"
         self._lock = threading.RLock()
+        self._task_observer = task_observer or self._notify_current_task
 
     def _read_rows(self) -> list[dict[str, Any]]:
         if not self.attempts_file.exists():
@@ -74,6 +81,7 @@ class AnnotationAttemptStore:
         with self._lock:
             atomic_write_json(self.drafts / f"{clean_id}.json", record)
             self.set_current(task_id=task_id, mode=mode, stage="editing", summary={"has_draft": True})
+            self._task_observer("draft_saved", task_id, f"annotation/drafts/{clean_id}.json")
         return record
 
     def get_draft(self, task_id: str) -> dict[str, Any] | None:
@@ -131,7 +139,33 @@ class AnnotationAttemptStore:
                 stage="submitted",
                 summary={"attempt_id": record["id"], "metrics": record["metrics"]},
             )
+            self._task_observer("attempt_submitted", task_id, record["id"])
             return record, True
+
+    @staticmethod
+    def _notify_current_task(event_type: str, task_id: str, reference: str) -> None:
+        """Publish references only; annotation payload remains in its source store."""
+        try:
+            from deeptutor.services.current_learning_task.service import (
+                get_current_learning_task_service,
+            )
+
+            service = get_current_learning_task_service()
+            current = service.get()
+            if current is None or current.task_id != task_id:
+                return
+            kwargs = (
+                {"draft_ref": reference}
+                if event_type == "draft_saved"
+                else {"latest_submission_ref": reference}
+            )
+            service.patch_context(
+                **kwargs,
+                expected_version=current.version,
+                idempotency_key=f"annotation:{event_type}:{reference}",
+            )
+        except (ImportError, PermissionError, RuntimeError, ValueError):
+            return
 
     def set_current(
         self,

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from deeptutor.services.annotation_attempts import AnnotationAttemptStore
+from deeptutor.services.current_learning_task.store import CurrentLearningTaskStore
 
 
 def _read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
@@ -41,6 +42,7 @@ def build_annotation_coach_context(profile_root: Path) -> dict[str, Any]:
     """Return a small, explainable context window rather than raw history."""
     profile_root = Path(profile_root)
     attempts = AnnotationAttemptStore(profile_root)
+    current_task = CurrentLearningTaskStore(profile_root).get()
     learning = _read_jsonl_tail(profile_root / "learning" / "records.jsonl", 20)
     confirmed_weaknesses: list[dict[str, Any]] = []
     for row in learning:
@@ -57,7 +59,8 @@ def build_annotation_coach_context(profile_root: Path) -> dict[str, Any]:
             "created_at": row.get("created_at", ""),
         })
     return {
-        "current": attempts.current(),
+        "current": current_task.model_dump(mode="json") if current_task else attempts.current(),
+        "annotation_projection": attempts.current(),
         "recent_attempts": compact_attempts,
         "confirmed_weaknesses": confirmed_weaknesses[-5:],
         "memory_summary": _memory_summary(profile_root),
