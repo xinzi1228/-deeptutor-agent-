@@ -2,6 +2,8 @@
 
 教练在各个环节的分支判断规则。集成 universal-diagnostic-tutor 的 error_to_intervention、readiness_gate、understanding_check 协议。
 
+> 本矩阵只用于选择教学表达和干预建议。正式评分、学习记录、修订版本和阶段推进以服务端状态机为准；教练不能通过自然语言或自由工具调用覆盖这些事实。服务端给出的工具、检索和时间预算优先于下文的建议动作。
+
 ---
 
 ## 1. 形成性评估决策矩阵（理论与实践通用）

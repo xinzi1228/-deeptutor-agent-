@@ -48,6 +48,11 @@ from deeptutor.services.llm.request_compat import (
     is_stream_options_unsupported,
     is_tool_schema_unsupported,
 )
+from deeptutor.services.teaching_orchestration import (
+    TeachingRunPolicy,
+    ToolBudget,
+    build_progressive_answer,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from deeptutor.agents.chat.agentic_pipeline import AgenticChatPipeline
@@ -198,6 +203,7 @@ class AgentLoopState:
 
     rounds: int = 0
     tool_steps: int = 0
+    tool_calls: int = 0
     sources: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -234,6 +240,8 @@ class AgentLoop:
         client: Any,
         enabled_tools: list[str],
         tool_schemas: list[dict[str, Any]] | None,
+        teaching_policy: TeachingRunPolicy | None = None,
+        teaching_budget: ToolBudget | None = None,
     ) -> None:
         self.pipeline = pipeline
         self.context = context
@@ -241,17 +249,45 @@ class AgentLoop:
         self.client = client
         self.enabled_tools = enabled_tools
         self.tool_schemas = tool_schemas
+        self.teaching_policy = teaching_policy
+        self.teaching_budget = teaching_budget
 
     async def run(self) -> None:
         state = AgentLoopState()
         # Optional async pre-pass briefings (e.g. explore_context) run BEFORE
         # the answer stage so they form their own preceding activity group and
         # their grounding can ride in the loop's user-message seed.
+        if self.teaching_policy is not None:
+            await self.pipeline._emit_teaching_progress(
+                self.stream,
+                "context.loaded",
+                zh="已读取当前学习任务和档案上下文",
+                en="Current task and learning context loaded",
+            )
         capability_briefing = await self.pipeline._capability_pre_loop_briefings(
             self.context, self.stream
         )
         async with self.stream.stage(LOOP_STAGE, source="chat"):
-            seed_block = await self.pipeline._retrieve_kb_seed_block(self.context, self.stream)
+            seed_block = ""
+            should_retrieve_seed = bool(self.context.knowledge_bases)
+            if should_retrieve_seed and self.teaching_budget is not None:
+                should_retrieve_seed = self.teaching_budget.reserve_retrieval()
+            if should_retrieve_seed:
+                if self.teaching_policy is not None:
+                    await self.pipeline._emit_teaching_progress(
+                        self.stream,
+                        "retrieval.started",
+                        zh="正在检索已审核学习资料",
+                        en="Searching reviewed learning materials",
+                    )
+                seed_block = await self.pipeline._retrieve_kb_seed_block(self.context, self.stream)
+                if self.teaching_policy is not None:
+                    await self.pipeline._emit_teaching_progress(
+                        self.stream,
+                        "retrieval.completed",
+                        zh="资料检索完成",
+                        en="Material search completed",
+                    )
             capability_seed = self.pipeline._capability_pre_loop_seed(self.context)
             seed_block = "\n\n".join(
                 block
@@ -268,6 +304,13 @@ class AgentLoop:
                 kb_seed=seed_block,
                 include_tool_manifest=bool(self.tool_schemas),
             )
+            if self.teaching_policy is not None:
+                await self.pipeline._emit_teaching_progress(
+                    self.stream,
+                    "answer.composing",
+                    zh="正在组织回答",
+                    en="Composing the answer",
+                )
             outcome = await self._run_loop(
                 messages=messages,
                 state=state,
@@ -281,6 +324,59 @@ class AgentLoop:
                 stage=LOOP_STAGE,
                 metadata={"trace_kind": "sources"},
             )
+        progressive = None
+        if self.teaching_policy is not None:
+            artifact_ids = [
+                str(source.get("artifact_id") or "")
+                for source in state.sources
+                if isinstance(source, dict) and source.get("artifact_id")
+            ]
+            progressive = build_progressive_answer(
+                outcome.final_text,
+                policy=self.teaching_policy,
+                sources=state.sources,
+                artifact_ids=artifact_ids,
+            )
+            if progressive.uncertainty and progressive.uncertainty not in outcome.final_text:
+                warning = f"\n\n> 可靠性提示：{progressive.uncertainty}"
+                await self.stream.content(
+                    warning,
+                    source="chat",
+                    stage=LOOP_STAGE,
+                    metadata={"teaching_contract": "source_required"},
+                )
+                outcome.final_text += warning
+                progressive = build_progressive_answer(
+                    outcome.final_text,
+                    policy=self.teaching_policy,
+                    sources=state.sources,
+                    artifact_ids=artifact_ids,
+                )
+            await self.pipeline._emit_teaching_progress(
+                self.stream,
+                "answer.core",
+                zh="核心回答已生成",
+                en="Core answer generated",
+                metadata={"summary": progressive.summary},
+            )
+            await self.pipeline._emit_teaching_progress(
+                self.stream,
+                "run.completed" if outcome.completed else "run.degraded",
+                zh="回答完成" if outcome.completed else "等待你的补充",
+                en="Response completed" if outcome.completed else "Waiting for your input",
+                metadata={"completed": outcome.completed},
+            )
+        result_metadata: dict[str, Any] = {}
+        if progressive is not None and self.teaching_policy is not None:
+            result_metadata = {
+                "teaching_policy": self.teaching_policy.to_dict(),
+                "progressive_answer": progressive.to_dict(),
+                "teaching_budget": (
+                    self.teaching_budget.snapshot().to_dict()
+                    if self.teaching_budget is not None
+                    else {}
+                ),
+            }
         await emit_capability_result(
             self.stream,
             {
@@ -289,6 +385,8 @@ class AgentLoop:
                 "engine": "agent_loop",
                 "rounds": state.rounds,
                 "tool_steps": state.tool_steps,
+                "tool_calls": state.tool_calls,
+                **result_metadata,
             },
             source="chat",
             usage=self.pipeline.usage,
@@ -321,7 +419,12 @@ class AgentLoop:
         recent_calls: deque[str] = deque(maxlen=_LOOP_REPEAT_WINDOW)
         warned: set[str] = set()
         dropped: set[str] = set()
-        for _round in range(max(1, self.pipeline.effective_max_rounds(self.context))):
+        round_limit = max(1, self.pipeline.effective_max_rounds(self.context))
+        if self.teaching_policy is not None:
+            round_limit = min(round_limit, self.teaching_policy.max_tool_calls + 2)
+        for _round in range(round_limit):
+            if self.teaching_budget is not None and self.teaching_budget.soft_expired and state.rounds:
+                return await self._forced_finish(messages, state, reason="soft_timeout")
             try:
                 result = await self._call_llm(
                     messages=messages,
@@ -506,6 +609,38 @@ class AgentLoop:
                     self.context.session_id,
                 )
 
+            if self.teaching_budget is not None:
+                kept_tool_calls, rejected = self.teaching_budget.admit_tool_calls(
+                    kept_tool_calls
+                )
+                if rejected:
+                    reason_summary = ", ".join(
+                        f"{item.tool_name or '(unknown)'}:{item.reason}" for item in rejected
+                    )
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                "服务端教学策略拒绝了部分工具调用："
+                                f"{reason_summary}。请基于已获得结果直接回答。"
+                            ),
+                        }
+                    )
+                    await self.stream.progress(
+                        "部分工具调用超过本次教学预算，已停止",
+                        source="chat",
+                        stage=LOOP_STAGE,
+                        metadata={
+                            "teaching_event": "tool.rejected",
+                            "rejections": [
+                                {"tool": item.tool_name, "reason": item.reason}
+                                for item in rejected
+                            ],
+                        },
+                    )
+                if not kept_tool_calls:
+                    continue
+
             messages.append(assistant_message_with_tool_calls(result.text, kept_tool_calls))
             dispatch = await self.pipeline._dispatch_tool_calls(
                 tool_calls=kept_tool_calls,
@@ -515,6 +650,7 @@ class AgentLoop:
                 stage=LOOP_STAGE,
             )
             state.tool_steps += 1
+            state.tool_calls += len(kept_tool_calls)
             state.sources.extend(dispatch.sources)
             messages.extend(dispatch.tool_messages)
 

@@ -53,6 +53,8 @@ from deeptutor.services.llm import (
 )
 from deeptutor.services.llm.context_window import resolve_effective_context_window
 from deeptutor.services.prompt import get_prompt_manager
+from deeptutor.services.teaching_orchestration import ToolBudget, build_teaching_run_policy
+from deeptutor.services.teaching_orchestration.policy import render_policy_prompt
 from deeptutor.tools.builtin import PARTNER_BUILTIN_TOOL_NAMES
 
 logger = logging.getLogger(__name__)
@@ -309,6 +311,31 @@ class AgenticChatPipeline:
         await self._prepare_kb_manifests(context)
         self._exec_enabled = await self._exec_allowed(context)
         enabled_tools = self._compose_enabled_tools(context)
+        policy = None
+        budget = None
+        teaching_enabled = (
+            str(context.metadata.get("active_persona") or "") == "annotation-coach"
+            or context.config_overrides.get("teaching_orchestration") is True
+        )
+        if (context.active_capability or "chat") == "chat" and teaching_enabled:
+            policy = build_teaching_run_policy(context, enabled_tools)
+            budget = ToolBudget(policy)
+            enabled_tools = list(policy.allowed_tools)
+            context.metadata["teaching_run_policy"] = policy.to_dict()
+            context.metadata["teaching_policy_prompt"] = render_policy_prompt(policy)
+            await self._emit_teaching_progress(
+                stream,
+                "run.accepted",
+                zh="已接收问题",
+                en="Question received",
+            )
+            await self._emit_teaching_progress(
+                stream,
+                "intent.resolved",
+                zh="已识别学习需求",
+                en="Learning intent identified",
+                metadata={"intent": policy.intent.value},
+            )
         use_native_tools = bool(enabled_tools) and self._can_use_native_tool_calling()
         tool_schemas = (
             self._build_llm_tool_schemas(enabled_tools, context) if use_native_tools else None
@@ -324,8 +351,64 @@ class AgenticChatPipeline:
             client=self._build_openai_client(),
             enabled_tools=enabled_tools if use_native_tools else [],
             tool_schemas=tool_schemas,
+            teaching_policy=policy,
+            teaching_budget=budget,
         )
-        await loop.run()
+        if budget is None:
+            await loop.run()
+            return
+        try:
+            async with asyncio.timeout(max(0.001, budget.remaining_hard_seconds)):
+                await loop.run()
+        except TimeoutError as exc:
+            hard_timeout = budget.hard_expired
+            await self._emit_teaching_progress(
+                stream,
+                "run.failed",
+                zh=(
+                    "回答超过时间预算，已停止后续操作；你可以重试"
+                    if hard_timeout
+                    else "模型服务响应超时；你可以重试"
+                ),
+                en=(
+                    "The response exceeded its time budget; you can retry"
+                    if hard_timeout
+                    else "The model provider timed out; you can retry"
+                ),
+                metadata={
+                    "retryable": True,
+                    "reason": "hard_timeout" if hard_timeout else "provider_timeout",
+                },
+                error=True,
+            )
+            message = "教学回答超过 30 秒硬性时间预算" if hard_timeout else "模型服务请求超时"
+            raise RuntimeError(message) from exc
+        except asyncio.CancelledError:
+            await self._emit_teaching_progress(
+                stream,
+                "run.cancelled",
+                zh="已取消，本次已完成的内容会保留",
+                en="Cancelled; completed partial work will be preserved",
+                metadata={"retryable": True},
+            )
+            raise
+
+    async def _emit_teaching_progress(
+        self,
+        stream: StreamBus,
+        event: str,
+        *,
+        zh: str,
+        en: str,
+        metadata: dict[str, Any] | None = None,
+        error: bool = False,
+    ) -> None:
+        payload = {"teaching_event": event, **(metadata or {})}
+        message = zh if self.language == "zh" else en
+        if error:
+            await stream.error(message, source="chat", stage="teaching", metadata=payload)
+        else:
+            await stream.progress(message, source="chat", stage="teaching", metadata=payload)
 
     # ---- prompt assembly -------------------------------------------------
 
@@ -336,7 +419,7 @@ class AgenticChatPipeline:
         *,
         include_tool_manifest: bool = True,
     ) -> str:
-        return self._prompt_assembler.system_prompt(
+        prompt = self._prompt_assembler.system_prompt(
             context=context,
             tool_manifest=self._tool_manifest(enabled_tools),
             kb_note=self._kb_system_note(context),
@@ -348,6 +431,8 @@ class AgenticChatPipeline:
             capability_blocks=self._capability_system_blocks(context),
             include_tool_manifest=include_tool_manifest,
         )
+        policy_prompt = str(context.metadata.get("teaching_policy_prompt") or "").strip()
+        return f"{prompt}\n\n{policy_prompt}" if policy_prompt else prompt
 
     def _build_loop_messages(
         self,

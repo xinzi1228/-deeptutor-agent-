@@ -68,6 +68,7 @@ import ContextReferenceTree, {
   type ContextTreeItem,
 } from "./ContextReferenceTree";
 import { AssistantActivity } from "./TracePanels";
+import { ResponseProgress } from "./ResponseProgress";
 import { agentGlyph } from "@/components/agents/agent-icons";
 import { useConnectedAgentKinds } from "@/hooks/useConnectedAgentKinds";
 
@@ -459,6 +460,7 @@ const AssistantMessage = memo(function AssistantMessage({
 
   return (
     <>
+      <ResponseProgress events={events} isStreaming={Boolean(isStreaming)} />
       {/* Activity block pinned to the TOP: the status header
           ("DeepTutor Exploring… · 8s" → "DeepTutor responded. · 10s") with
           the exploring trace nested beneath it — expanded while DeepTutor is

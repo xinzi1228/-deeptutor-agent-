@@ -507,6 +507,45 @@ async def test_tool_round_then_finish(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_annotation_coach_emits_deterministic_teaching_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = _Registry()
+    client = _ScriptedChatClient([[_llm_chunk(content="先看结论，再做当前一步。")]])
+    pipeline = AgenticChatPipeline(language="zh")
+    pipeline.registry = registry
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _context: [])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+
+    events = await _run(
+        pipeline,
+        UnifiedContext(
+            session_id="s1",
+            user_message="解释一下目标检测",
+            metadata={"active_persona": "annotation-coach", "turn_id": "t1"},
+        ),
+    )
+
+    teaching_events = [
+        str(event.metadata.get("teaching_event"))
+        for event in events
+        if event.metadata.get("teaching_event")
+    ]
+    assert teaching_events == [
+        "run.accepted",
+        "intent.resolved",
+        "context.loaded",
+        "answer.composing",
+        "answer.core",
+        "run.completed",
+    ]
+    result = _result(events)
+    assert result.metadata["teaching_policy"]["intent"] == "theory"
+    assert result.metadata["progressive_answer"]["summary"] == "先看结论，再做当前一步。"
+    assert result.metadata["teaching_budget"]["tool_calls"] == 0
+
+
+@pytest.mark.asyncio
 async def test_midloop_llm_failure_salvages_turn_with_forced_finish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
