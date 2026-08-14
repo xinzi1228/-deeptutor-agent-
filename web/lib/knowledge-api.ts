@@ -114,6 +114,115 @@ export interface KnowledgeBaseFile {
   mime_type?: string | null;
 }
 
+export type CitationTrustLevel =
+  | "authoritative"
+  | "high"
+  | "medium"
+  | "limited";
+
+export interface KnowledgeCitation {
+  id: string;
+  title: string;
+  excerpt?: string;
+  source_name?: string;
+  source_path?: string;
+  source_type?: string;
+  page?: string;
+  chapter?: string;
+  trust_level: CitationTrustLevel;
+  score?: number;
+  retrieval_modes?: string[];
+  kb_id?: string;
+  course_id?: string;
+  admin_details?: {
+    content_hash?: string;
+    source_path?: string;
+    version?: string;
+    review_status?: string;
+    review_record_id?: string;
+  };
+}
+
+export interface HybridRetrievalResponse {
+  query: string;
+  kb_id: string;
+  course_id?: string;
+  citations: KnowledgeCitation[];
+  context: string;
+  keyword_count: number;
+  semantic_count: number;
+  semantic: {
+    enabled: boolean;
+    restricted: boolean;
+    reason?: string;
+    checks: Record<string, boolean>;
+    provider?: string;
+  };
+}
+
+function citationText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function citationTrust(value: unknown): CitationTrustLevel {
+  return value === "authoritative" ||
+    value === "high" ||
+    value === "medium" ||
+    value === "limited"
+    ? value
+    : "limited";
+}
+
+/** Normalize persisted/live `sources` events and drop query-only fake citations. */
+export function extractKnowledgeCitations(
+  events: Array<{
+    type?: string;
+    metadata?: Record<string, unknown>;
+  }>,
+): KnowledgeCitation[] {
+  const rows = events.flatMap((event) => {
+    if (event.type !== "sources") return [];
+    const sources = event.metadata?.sources;
+    return Array.isArray(sources) ? sources : [];
+  });
+  const unique = new Map<string, KnowledgeCitation>();
+  rows.forEach((raw, index) => {
+    if (!raw || typeof raw !== "object") return;
+    const source = raw as Record<string, unknown>;
+    const sourcePath = citationText(source.source_path || source.source);
+    const title = citationText(source.title || source.source_name) ||
+      sourcePath.split(/[\\/]/).pop() || "";
+    if (!title) return;
+    const id =
+      citationText(source.id || source.chunk_id) ||
+      `${sourcePath || title}:${citationText(source.page)}:${index}`;
+    if (unique.has(id)) return;
+    const details = source.admin_details;
+    unique.set(id, {
+      id,
+      title,
+      excerpt: citationText(source.excerpt || source.content || source.snippet),
+      source_name: citationText(source.source_name) || title,
+      source_path: sourcePath,
+      source_type: citationText(source.source_type),
+      page: citationText(source.page || source.page_label),
+      chapter: citationText(source.chapter),
+      trust_level: citationTrust(source.trust_level),
+      score: typeof source.score === "number" ? source.score : undefined,
+      retrieval_modes: Array.isArray(source.retrieval_modes)
+        ? source.retrieval_modes.map(citationText).filter(Boolean)
+        : [],
+      kb_id: citationText(source.kb_id || source.kb_name),
+      course_id: citationText(source.course_id),
+      admin_details:
+        details && typeof details === "object"
+          ? (details as KnowledgeCitation["admin_details"])
+          : undefined,
+    });
+  });
+  return Array.from(unique.values());
+}
+
 const IMAGE_UPLOAD_EXTENSIONS = [
   ".bmp",
   ".gif",
@@ -478,6 +587,32 @@ export async function listKnowledgeBaseFiles(
     },
     { force: options?.force, ttlMs: 15_000 },
   );
+}
+
+export async function retrieveKnowledgeBase(payload: {
+  kbName: string;
+  query: string;
+  courseId?: string;
+  topK?: number;
+}): Promise<HybridRetrievalResponse> {
+  const response = await apiFetch(
+    apiUrl(`/api/v1/knowledge/${encodeURIComponent(payload.kbName)}/retrieve`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: payload.query,
+        course_id: payload.courseId ?? "",
+        top_k: payload.topK ?? 8,
+      }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await readErrorDetail(response, "Failed to retrieve knowledge"),
+    );
+  }
+  return (await response.json()) as HybridRetrievalResponse;
 }
 
 /** Build the `/api/v1/...` path for a raw KB file (caller can pass to apiUrl()). */

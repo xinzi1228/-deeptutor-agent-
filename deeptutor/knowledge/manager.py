@@ -12,6 +12,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import sys
@@ -26,7 +27,7 @@ from deeptutor.knowledge.kb_types import (
     external_root_of,
     is_connected_kb,
 )
-from deeptutor.knowledge.manifest import iter_kb_documents
+from deeptutor.knowledge.manifest import document_root, iter_kb_documents
 from deeptutor.services.file_io import atomic_write_json
 from deeptutor.services.rag.factory import (
     DEFAULT_PROVIDER,
@@ -53,6 +54,54 @@ logger = logging.getLogger(__name__)
 # let a list-call mid-creation racy-delete the entry. 60s is comfortably longer
 # than the create handshake while still keeping multi-day zombies out.
 _ORPHAN_PRUNE_GRACE_SECONDS = 60
+_EMBEDDING_ACCEPTANCE_KEYS = (
+    "connectivity",
+    "sample_index",
+    "retrieval_quality",
+    "citation_location",
+    "permission_isolation",
+)
+_KEYWORD_TEXT_SUFFIXES = {".md", ".markdown", ".txt", ".json", ".csv"}
+
+
+def _retrieval_tokens(value: str) -> list[str]:
+    text = str(value or "").casefold()
+    tokens = re.findall(r"[a-z0-9]+(?:[/._-][a-z0-9]+)*", text)
+    for chunk in re.findall(r"[\u4e00-\u9fff]+", text):
+        tokens.append(chunk)
+        if len(chunk) > 2:
+            tokens.extend(chunk[index : index + 2] for index in range(len(chunk) - 1))
+    return list(dict.fromkeys(token for token in tokens if token))
+
+
+def _passage_at(text: str, tokens: list[str], *, width: int = 180) -> tuple[str, int]:
+    lowered = text.casefold()
+    positions = [lowered.find(token) for token in tokens]
+    positions = [position for position in positions if position >= 0]
+    position = min(positions) if positions else 0
+    start = max(0, position - width // 2)
+    end = min(len(text), position + width)
+    excerpt = re.sub(r"\s+", " ", text[start:end]).strip()
+    return (f"…{excerpt}" if start else excerpt) + ("…" if end < len(text) else ""), position
+
+
+def _page_and_chapter(text: str, position: int) -> tuple[str, str]:
+    line_end = text.find("\n", max(0, position))
+    prefix = text[: len(text) if line_end < 0 else line_end]
+    pages = re.findall(r"<!--\s*source-page:\s*(\d+)\s*-->", prefix)
+    headings = re.findall(r"^#{1,6}\s+(.+?)\s*$", prefix, re.MULTILINE)
+    return (pages[-1] if pages else "", headings[-1].strip() if headings else "")
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(block)
+    except OSError:
+        return ""
+    return "sha256:" + digest.hexdigest()
 
 
 def _entry_updated_after(kb_entry: dict | None, cutoff: datetime) -> bool:
@@ -499,6 +548,125 @@ class KnowledgeBaseManager:
         self.config = self._load_config()
         entry = self.config.get("knowledge_bases", {}).get(name)
         return dict(entry) if isinstance(entry, dict) else None
+
+    def get_retrieval_policy(self, name: str) -> dict[str, Any]:
+        """Return persisted scope/review facts and the five-check semantic gate."""
+        entry = self.get_kb_entry(name)
+        if entry is None:
+            raise ValueError(f"Knowledge base not found: {name}")
+        checks_raw = entry.get("embedding_acceptance")
+        checks = {
+            key: bool(checks_raw.get(key)) if isinstance(checks_raw, dict) else False
+            for key in _EMBEDDING_ACCEPTANCE_KEYS
+        }
+        versions = entry.get("index_versions")
+        ready_versions = [
+            str(row.get("version") or row.get("name") or "")
+            for row in versions
+            if isinstance(versions, list) and isinstance(row, dict) and row.get("ready")
+        ] if isinstance(versions, list) else []
+        version = str(
+            entry.get("active_reviewed_version")
+            or entry.get("active_version")
+            or (ready_versions[-1] if ready_versions else "")
+        )
+        semantic_ready = all(checks.values()) and not bool(entry.get("embedding_mismatch"))
+        return {
+            "status": str(entry.get("status") or "unknown"),
+            "course_id": str(entry.get("course_id") or ""),
+            # Legacy ready KBs predate per-document review metadata. Treating the
+            # assigned/owner-visible version as approved preserves compatibility;
+            # an explicit non-approved state always fails closed downstream.
+            "review_status": str(entry.get("review_status") or "approved"),
+            "review_record_id": str(entry.get("review_record_id") or ""),
+            "version": version,
+            "provider": normalize_provider_name(entry.get("rag_provider")),
+            "source_type": str(entry.get("source_type") or "user_document"),
+            "embedding_acceptance": checks,
+            "semantic_ready": semantic_ready,
+            "semantic_restricted_reason": (
+                ""
+                if semantic_ready
+                else "Embedding 尚未依次通过连接、小样本索引、检索质量、引用定位和权限隔离验收"
+            ),
+        }
+
+    def keyword_search_documents(
+        self,
+        name: str,
+        query: str,
+        *,
+        top_k: int = 12,
+    ) -> list[dict[str, Any]]:
+        """Exact/term retrieval over local text artifacts with real file provenance."""
+        entry = self.get_kb_entry(name)
+        if entry is None:
+            raise ValueError(f"Knowledge base not found: {name}")
+        root = document_root(self.base_dir / name, entry)
+        if root is None or not root.is_dir():
+            return []
+        tokens = _retrieval_tokens(query)
+        if not tokens:
+            return []
+        policy = self.get_retrieval_policy(name)
+        metadata: dict[str, Any] = {}
+        metadata_path = root / ".retrieval-meta.json"
+        if metadata_path.is_file():
+            try:
+                parsed = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if isinstance(parsed, dict):
+                    metadata = parsed
+            except (OSError, json.JSONDecodeError):
+                metadata = {}
+        hits: list[dict[str, Any]] = []
+        for path in iter_kb_documents(root):
+            if path.suffix.casefold() not in _KEYWORD_TEXT_SUFFIXES:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8", errors="ignore")[:500_000]
+            except OSError:
+                continue
+            lowered = text.casefold()
+            counts = [lowered.count(token) for token in tokens]
+            total = sum(counts)
+            if total <= 0:
+                continue
+            excerpt, position = _passage_at(text, tokens)
+            page, chapter = _page_and_chapter(text, position)
+            relative = path.relative_to(root).as_posix()
+            document_meta = metadata.get(relative)
+            if not isinstance(document_meta, dict):
+                document_meta = {}
+            title_match = re.search(r"^#\s+(.+?)\s*$", text, re.MULTILINE)
+            hits.append(
+                {
+                    "title": str(
+                        document_meta.get("title")
+                        or (title_match.group(1).strip() if title_match else path.stem)
+                    ),
+                    "excerpt": excerpt,
+                    "source": relative,
+                    "source_path": relative,
+                    "source_type": str(
+                        document_meta.get("source_type") or policy["source_type"]
+                    ),
+                    "page": str(document_meta.get("page") or page),
+                    "chapter": str(document_meta.get("chapter") or chapter),
+                    "score": min(1.0, total / max(1, len(tokens) * 3)),
+                    "content_hash": _file_sha256(path),
+                    "review_status": str(
+                        document_meta.get("review_status") or policy["review_status"]
+                    ),
+                    "review_record_id": str(
+                        document_meta.get("review_record_id")
+                        or policy["review_record_id"]
+                    ),
+                    "version": str(document_meta.get("version") or policy["version"]),
+                    "course_id": str(document_meta.get("course_id") or policy["course_id"]),
+                }
+            )
+        hits.sort(key=lambda row: (-float(row["score"]), str(row["title"]).casefold()))
+        return hits[: max(1, min(int(top_k or 12), 40))]
 
     def get_kb_status(self, name: str) -> dict | None:
         """Get status and progress for a knowledge base."""

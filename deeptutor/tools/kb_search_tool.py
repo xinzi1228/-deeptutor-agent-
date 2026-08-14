@@ -123,8 +123,37 @@ class KbSearchTool(BaseTool):
         lines = [f"知识库命中（{len(hits)} 条）: "]
         for h in hits:
             lines.append(f"- 【{h['title']}】({h['category']})\n  {h['snippet']}\n  来源: {h['source']}")
+        from deeptutor.services.knowledge_retrieval.citations import (
+            citation_payload,
+            normalize_citation,
+        )
+
+        sources = []
+        for hit in hits:
+            category = str(hit.get("category") or "")
+            source_marker = f"{hit.get('title', '')} {hit.get('source', '')}".upper()
+            source_type = (
+                "national_standard"
+                if "GB/T" in source_marker
+                else "official_documentation"
+                if category == "02-行业标准"
+                else "built_in"
+            )
+            citation = normalize_citation(
+                {
+                    **hit,
+                    "excerpt": hit.get("snippet"),
+                    "source_type": source_type,
+                    "review_status": "approved",
+                    "version": "builtin-v1",
+                },
+                kb_id="builtin:annotation-kb",
+                retrieval_mode="keyword",
+            )
+            sources.append(citation_payload(citation, is_admin=False))
         return ToolResult(
             content="\n".join(lines),
+            sources=sources,
             metadata={"kb_search": {"hits": hits, "query": query}},
         )
 

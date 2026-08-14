@@ -231,6 +231,32 @@ def resolve_for_rag(kb_ref: str | None) -> KnowledgeResource | None:
     return resource
 
 
+def resolve_for_retrieval(
+    kb_ref: str | None,
+    *,
+    course_id: str = "",
+) -> tuple[KnowledgeResource, KnowledgeBaseManager, dict[str, Any]]:
+    """Resolve one searchable, reviewed KB inside the active user's scope."""
+    if not kb_ref:
+        raise HTTPException(status_code=400, detail="Knowledge base is required")
+    resource = resolve_kb(str(kb_ref), require_write=False)
+    manager = manager_for_resource(resource)
+    policy = manager.get_retrieval_policy(resource.name)
+    if policy["status"] != "ready":
+        raise HTTPException(status_code=409, detail="Knowledge base is not ready for retrieval")
+    if policy["review_status"] not in {"approved", "published"}:
+        raise HTTPException(status_code=403, detail="Knowledge base version is not approved")
+    requested_course = str(course_id or "").strip()
+    scoped_course = str(policy.get("course_id") or "").strip()
+    if requested_course and scoped_course and requested_course != scoped_course:
+        raise HTTPException(status_code=403, detail="Knowledge base is outside this course")
+    if resource.assigned:
+        from .audit import log_usage
+
+        log_usage("knowledge_base", resource.id, "hybrid_retrieval")
+    return resource, manager, policy
+
+
 def resolve_kb_metadata(kb_ref: str | None) -> dict[str, Any] | None:
     """Access-checked KB metadata (``type`` / ``vault_path`` / …) for ``kb_ref``.
 

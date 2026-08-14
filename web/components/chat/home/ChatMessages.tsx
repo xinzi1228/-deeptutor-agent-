@@ -30,6 +30,7 @@ import type { SelectedHistorySession } from "@/components/chat/HistorySessionPic
 import type { SelectedQuestionEntry } from "@/components/chat/QuestionBankPicker";
 import { ChatChartCard } from "@/components/chat/home/ChatChartCard";
 import { ExpertFleetBoard } from "@/components/chat/home/ExpertFleetBoard";
+import { CitationList } from "@/components/citations/CitationCard";
 import AssistantResponse from "@/components/common/AssistantResponse";
 import {
   InlineFileCardProvider,
@@ -52,6 +53,7 @@ import {
 import { extractVisualizeResult } from "@/lib/visualize-types";
 import type { StreamEvent } from "@/lib/unified-ws";
 import { hasVisibleMarkdownContent } from "@/lib/markdown-display";
+import { extractKnowledgeCitations } from "@/lib/knowledge-api";
 import type { SelectedBookReference } from "@/lib/book-references";
 import { buildVisiblePath, type SiblingInfo } from "@/lib/message-branches";
 import { shouldSubmitOnEnter } from "@/lib/composer-keyboard";
@@ -338,6 +340,11 @@ const AssistantMessage = memo(function AssistantMessage({
     return null;
   }, [events]);
 
+  const citations = useMemo(
+    () => extractKnowledgeCitations(events),
+    [events],
+  );
+
   // AI 预标注审阅教学: get_annotation_task 的 pre_annotation metadata 落盘到
   // localStorage, 供标注台 web/public/annotation_tool.html 的 loadPreAnnotation()
   // 读取并渲染 AI 预标注框。副作用集中在此一个 useEffect, 组件保持纯展示。
@@ -561,6 +568,7 @@ const AssistantMessage = memo(function AssistantMessage({
           {chartCard ? <ChatChartCard chart={chartCard as any} /> : null}
         </>
       )}
+      <CitationList citations={citations} />
       {/* Non-default branches (quiz, math animator, visualize) keep
           ask_user below the body. The default branch inlines the card
           via ``messageSegments``; the research branch renders its own

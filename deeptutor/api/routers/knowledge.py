@@ -28,7 +28,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from deeptutor.api.utils.progress_broadcaster import ProgressBroadcaster
 from deeptutor.api.utils.task_id_manager import TaskIDManager
@@ -52,6 +52,7 @@ from deeptutor.multi_user.knowledge_access import (
 )
 from deeptutor.services.config import PROJECT_ROOT, load_config_with_main
 from deeptutor.services.file_io import atomic_write_json
+from deeptutor.services.knowledge_retrieval.hybrid import retrieve_knowledge
 from deeptutor.services.rag.factory import (
     DEFAULT_PROVIDER,
     GRAPHRAG_PROVIDER,
@@ -84,6 +85,21 @@ router = APIRouter()
 # Constants for byte conversions
 BYTES_PER_GB = 1024**3
 BYTES_PER_MB = 1024**2
+EMBEDDING_ACCEPTANCE_KEYS = {
+    "connectivity",
+    "sample_index",
+    "retrieval_quality",
+    "citation_location",
+    "permission_isolation",
+}
+GOVERNED_RETRIEVAL_CONFIG_KEYS = {
+    "embedding_acceptance",
+    "review_status",
+    "review_record_id",
+    "active_reviewed_version",
+    "course_id",
+    "source_type",
+}
 
 
 def format_bytes_human_readable(size_bytes: int) -> str:
@@ -177,6 +193,12 @@ class SupportedFileTypesInfo(BaseModel):
     extensions: list[str]
     accept: str
     max_file_size_bytes: int
+
+
+class HybridRetrieveRequest(BaseModel):
+    query: str
+    course_id: str = ""
+    top_k: int = Field(default=8, ge=1, le=20)
 
 
 IMAGE_ACCEPT_MIME_TYPES = {
@@ -1397,6 +1419,29 @@ async def update_kb_config(kb_name: str, config: dict):
         from deeptutor.services.rag.index_probe import has_ready_provider_index
 
         config = dict(config or {})
+        governed = GOVERNED_RETRIEVAL_CONFIG_KEYS.intersection(config)
+        if governed and not get_current_user().is_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only administrators can change governed retrieval settings",
+            )
+        if "embedding_acceptance" in config:
+            raw_acceptance = config.get("embedding_acceptance")
+            if not isinstance(raw_acceptance, dict) or set(raw_acceptance) != EMBEDDING_ACCEPTANCE_KEYS:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Embedding acceptance must contain exactly the five required checks",
+                )
+            if any(not isinstance(value, bool) for value in raw_acceptance.values()):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Embedding acceptance check values must be boolean",
+                )
+            config["embedding_acceptance"] = {
+                key: bool(raw_acceptance[key]) for key in sorted(EMBEDDING_ACCEPTANCE_KEYS)
+            }
+            config["embedding_acceptance_actor"] = get_current_user().id
+            config["embedding_acceptance_updated_at"] = datetime.now().isoformat()
         if "rag_provider" in config:
             requested_provider = _validate_registered_provider(config.get("rag_provider"))
             service = get_kb_config_service()
@@ -1969,6 +2014,23 @@ def _resolve_kb_raw_file_or_404(kb_name: str, filename: str) -> Path:
         raise HTTPException(status_code=404, detail="File not found")
 
     return target
+
+
+@router.post("/{kb_name}/retrieve")
+async def retrieve_knowledge_base(kb_name: str, payload: HybridRetrieveRequest):
+    """Return access-scoped hybrid evidence using the shared citation contract."""
+    try:
+        result = await retrieve_knowledge(
+            query=payload.query,
+            kb_ref=kb_name,
+            course_id=payload.course_id,
+            top_k=payload.top_k,
+        )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result.to_payload(is_admin=get_current_user().is_admin)
 
 
 @router.get("/{kb_name}/files")

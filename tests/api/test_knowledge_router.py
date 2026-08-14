@@ -209,6 +209,40 @@ def test_supported_file_types_returns_upload_policy() -> None:
     assert "image/png" in payload["accept"]
 
 
+def test_hybrid_retrieve_endpoint_returns_role_scoped_citations(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Result:
+        def to_payload(self, *, is_admin: bool = False):
+            captured["is_admin"] = is_admin
+            return {
+                "query": "边界框",
+                "kb_id": "admin:kb:demo",
+                "citations": [{"id": "citation:1", "title": "教材", "trust_level": "high"}],
+                "semantic": {"enabled": False, "restricted": True, "checks": {}},
+                "keyword_count": 1,
+                "semantic_count": 0,
+                "context": "教材内容",
+            }
+
+    async def _retrieve(**kwargs):
+        captured.update(kwargs)
+        return _Result()
+
+    monkeypatch.setattr(knowledge_router_module, "retrieve_knowledge", _retrieve)
+    with TestClient(_build_app()) as client:
+        response = client.post(
+            "/api/v1/knowledge/demo/retrieve",
+            json={"query": "边界框", "course_id": "course-a", "top_k": 5},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["citations"][0]["title"] == "教材"
+    assert captured["kb_ref"] == "demo"
+    assert captured["course_id"] == "course-a"
+    assert captured["top_k"] == 5
+
+
 def test_create_kb_does_not_require_llm_precheck(monkeypatch, tmp_path: Path) -> None:
     manager = _FakeKBManager(tmp_path / "knowledge_bases")
     monkeypatch.setattr(knowledge_router_module, "get_kb_manager", lambda: manager)
@@ -913,6 +947,37 @@ def test_update_config_coerces_legacy_provider_to_llamaindex() -> None:
 
     assert response.status_code in {200, 204}
     assert fake_service.config.get("rag_provider") == "llamaindex"
+
+
+def test_student_cannot_change_governed_retrieval_settings(monkeypatch) -> None:
+    monkeypatch.setattr(
+        knowledge_router_module,
+        "get_current_user",
+        lambda: type("User", (), {"is_admin": False, "id": "student-1"})(),
+    )
+    with TestClient(_build_app()) as client:
+        response = client.put(
+            "/api/v1/knowledge/demo/config",
+            json={"review_status": "approved"},
+        )
+
+    assert response.status_code == 403
+
+
+def test_embedding_acceptance_requires_exactly_five_boolean_checks(monkeypatch) -> None:
+    monkeypatch.setattr(
+        knowledge_router_module,
+        "get_current_user",
+        lambda: type("User", (), {"is_admin": True, "id": "admin-1"})(),
+    )
+    with TestClient(_build_app()) as client:
+        response = client.put(
+            "/api/v1/knowledge/demo/config",
+            json={"embedding_acceptance": {"connectivity": True}},
+        )
+
+    assert response.status_code == 400
+    assert "exactly the five" in response.json()["detail"]
 
 
 def test_update_config_preserves_known_provider() -> None:

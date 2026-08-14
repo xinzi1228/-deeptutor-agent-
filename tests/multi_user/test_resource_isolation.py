@@ -44,5 +44,5 @@ def test_partner_data_is_admin_anchored_not_user_scoped(as_user) -> None:
         attacker_dir = manager._partners_dir
 
     assert victim_dir == attacker_dir
-    assert str(victim_dir).endswith("data/partners")
+    assert victim_dir.parts[-2:] == ("data", "partners")
     assert "u_victim" not in str(victim_dir)

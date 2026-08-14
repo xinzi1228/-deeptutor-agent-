@@ -118,7 +118,35 @@ def _rag_sources(result: dict[str, Any], *, query: str, kb_name: str) -> list[di
     retrieved = [item for item in (result.get("sources") or []) if isinstance(item, dict)]
     if not retrieved:
         return [{"type": "rag", "query": query, "kb_name": kb_name}]
-    return [{"type": "rag", "kb_name": kb_name, **item} for item in retrieved]
+    from deeptutor.services.knowledge_retrieval.citations import (
+        citation_payload,
+        normalize_citation,
+    )
+
+    try:
+        from deeptutor.multi_user.context import get_current_user
+
+        is_admin = get_current_user().is_admin
+    except Exception:
+        is_admin = False
+    rows: list[dict[str, Any]] = []
+    for item in retrieved:
+        citation = normalize_citation(
+            item,
+            kb_id=kb_name,
+            defaults={"review_status": "approved"},
+            retrieval_mode="semantic",
+        )
+        rows.append(
+            {
+                "type": "rag",
+                "kb_name": kb_name,
+                "chunk_id": item.get("chunk_id"),
+                "title": item.get("title"),
+                **citation_payload(citation, is_admin=is_admin),
+            }
+        )
+    return rows
 
 
 class RAGTool(_PromptHintsMixin, BaseTool):
@@ -166,9 +194,18 @@ class RAGTool(_PromptHintsMixin, BaseTool):
 
         # Corrective-RAG relevance check: flag low-relevance retrievals so the
         # coach retries with a rewritten query instead of fabricating.
-        from deeptutor.tools.rag_tool import assess_relevance
+        from deeptutor.tools import rag_tool as rag_module
 
-        relevance = assess_relevance(result, query)
+        assess_relevance = getattr(rag_module, "assess_relevance", None)
+        relevance = (
+            assess_relevance(result, query)
+            if callable(assess_relevance)
+            else {
+                "relevant": bool(result.get("sources") or content),
+                "reason": "检索已返回内容",
+                "suggested_query": query,
+            }
+        )
         metadata = dict(result)
         metadata["relevance"] = relevance
         if not relevance["relevant"]:
