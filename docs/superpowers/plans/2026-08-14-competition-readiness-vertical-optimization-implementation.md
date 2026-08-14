@@ -5,6 +5,18 @@
 关联设计：
 
 - `docs/superpowers/specs/2026-08-13-competition-readiness-vertical-optimization-design.md`
+- `docs/superpowers/specs/2026-08-14-competition-optimization-design-index.md`
+- `docs/superpowers/specs/2026-08-14-deterministic-dialogue-progressive-answer-design.md`
+- `docs/superpowers/specs/2026-08-14-trusted-visualization-evaluation-design.md`
+- `docs/superpowers/specs/2026-08-14-profile-authorization-impersonation-audit-design.md`
+- `docs/superpowers/specs/2026-08-14-role-workspaces-onboarding-extension-design.md`
+- `docs/superpowers/specs/2026-08-14-user-testing-competition-evidence-design.md`
+- `docs/superpowers/specs/2026-08-14-release-readiness-gates-design.md`
+- `docs/superpowers/handoffs/2026-08-14-competition-optimization-ai-handoff.md`
+
+交接说明：上述专项规格已经把任务 3.4 至 5.3 的产品边界、数据契约、权限、失败处理和验收条件固定下来。接手者应以设计索引规定的事实优先级执行，不应只根据本计划中的简表自行扩展范围。
+
+当前进度：阶段 0 的工程基础、阶段 1、阶段 2 以及任务 3.1 至 3.3 已有提交；任务 0.4 仍需要人工专业终审。后续代码执行从任务 3.4 开始，详细状态以 AI 执行交接书和当前 Git 历史为准。
 
 ## 1. 实施原则
 
