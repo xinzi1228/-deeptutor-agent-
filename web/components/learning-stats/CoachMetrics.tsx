@@ -13,7 +13,16 @@ function growth(v: number | null): string {
   return `${s > 0 ? "+" : ""}${s}%`;
 }
 
-export function CoachMetricsPanel({ metrics }: { metrics: CoachMetrics | null }) {
+export function CoachMetricsPanel({
+  metrics,
+  loading = false,
+}: {
+  metrics: CoachMetrics | null;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return <div aria-label="正在加载教练绩效" className="h-36 animate-pulse rounded-2xl bg-[var(--muted)]/50" />;
+  }
   if (!metrics) return null;
 
   const rows = [

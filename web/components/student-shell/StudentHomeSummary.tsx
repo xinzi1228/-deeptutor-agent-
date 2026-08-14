@@ -7,28 +7,35 @@ import { useTranslation } from "react-i18next";
 
 import ContinueLearningCard from "@/components/student-shell/ContinueLearningCard";
 import { useCurrentLearningTask } from "@/components/current-task/CurrentLearningTaskContext";
-import { getLearningOverview, getLearningReport, type LearningReport, type ProfileOverview } from "@/lib/learning-stats-api";
+import type { LearningReport, ProfileOverview } from "@/lib/learning-stats-api";
+import { getStudentHomeDashboard } from "@/lib/student-dashboard-api";
+import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 
 export default function StudentHomeSummary({ onStartChat }: { onStartChat: () => void }) {
   const router = useRouter();
   const { t } = useTranslation();
   const { task, loading } = useCurrentLearningTask();
+  const { active } = useLearningProfile();
+  const activeProfileId = active?.id;
   const [overview, setOverview] = useState<ProfileOverview | null>(null);
   const [report, setReport] = useState<LearningReport | null>(null);
 
   useEffect(() => {
+    if (!activeProfileId) return;
     let cancelled = false;
-    void Promise.all([getLearningOverview(), getLearningReport()])
-      .then(([overviewResult, reportResult]) => {
+    const controller = new AbortController();
+    void getStudentHomeDashboard(activeProfileId, controller.signal)
+      .then((result) => {
         if (cancelled) return;
-        setOverview(overviewResult.overview);
-        setReport(reportResult);
+        setOverview(result.overview);
+        setReport(result.report);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, []);
+  }, [activeProfileId]);
 
   const continueLearning = () => {
     if (task?.mode === "teaching_annotation") {

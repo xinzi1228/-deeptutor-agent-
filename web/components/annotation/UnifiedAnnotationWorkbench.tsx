@@ -13,6 +13,8 @@ import {
   Undo2,
 } from "lucide-react";
 import { apiFetch, apiUrl } from "@/lib/api";
+import { invalidateStudentDashboard } from "@/lib/student-dashboard-api";
+import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 
 export type AnnotationTask = {
   id: string;
@@ -65,6 +67,8 @@ export default function UnifiedAnnotationWorkbench({
   onSelectTask,
   onLiveState,
 }: Props) {
+  const { active } = useLearningProfile();
+  const activeProfileId = active?.id;
   const [predictions, setPredictions] = useState<Array<Record<string, unknown>>>(() => emptyPredictions(task));
   const [history, setHistory] = useState<Array<Array<Record<string, unknown>>>>([]);
   const [future, setFuture] = useState<Array<Array<Record<string, unknown>>>>([]);
@@ -154,12 +158,13 @@ export default function UnifiedAnnotationWorkbench({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || "提交失败");
+      if (activeProfileId) invalidateStudentDashboard(activeProfileId);
       setResult({ metrics: data.grade?.metrics || data.attempt?.metrics || {}, report: data.grade?.report || data.attempt?.report || "提交成功" });
       onLiveState?.({ task_id: task.id, mode: "teaching", stage: "submitted", metrics: data.grade?.metrics || data.attempt?.metrics || {} });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "提交失败");
     } finally { setSubmitting(false); }
-  }, [onLiveState, predictions, submitting, task]);
+  }, [activeProfileId, onLiveState, predictions, submitting, task]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -3,7 +3,17 @@
 import { Network, AlertTriangle, CheckCircle2, ArrowDownRight, Unlock } from "lucide-react";
 import type { KnowledgeGraphData } from "@/lib/learning-stats-api";
 
-export function KnowledgeGraphPanel({ data }: { data: KnowledgeGraphData }) {
+export function KnowledgeGraphPanel({
+  data,
+  loading = false,
+}: {
+  data: KnowledgeGraphData | null;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return <div aria-label="正在加载知识图谱" className="h-52 animate-pulse rounded-2xl bg-[var(--muted)]/50" />;
+  }
+  if (!data) return null;
   const graph = data.graph;
   const { mastery, risk_chains } = data;
   const hasGraph = (graph?.nodes ?? 0) > 0;

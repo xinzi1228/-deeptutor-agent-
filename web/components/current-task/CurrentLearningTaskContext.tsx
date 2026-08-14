@@ -3,8 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
-import { fetchCurrentLearningTask, openCurrentLearningTask, type CurrentLearningTask } from "@/lib/current-learning-task-api";
+import { openCurrentLearningTask, type CurrentLearningTask } from "@/lib/current-learning-task-api";
 import { ProfileScopedRequest } from "@/lib/profile-scoped-request";
+import { getStudentHomeDashboard, invalidateStudentDashboard } from "@/lib/student-dashboard-api";
 
 type Value = {
   task: CurrentLearningTask | null;
@@ -33,7 +34,7 @@ export function CurrentLearningTaskProvider({ children }: { children: ReactNode 
     const request = scopeRef.current.begin();
     setLoading(true);
     try {
-      const payload = await fetchCurrentLearningTask(request.signal);
+      const payload = await getStudentHomeDashboard(active.id, request.signal);
       if (scopeRef.current.accepts(request.generation)) setTask(payload.task);
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
@@ -46,7 +47,7 @@ export function CurrentLearningTaskProvider({ children }: { children: ReactNode 
     scopeRef.current.switchProfile();
     if (!active) return;
     const request = scopeRef.current.begin();
-    void fetchCurrentLearningTask(request.signal)
+    void getStudentHomeDashboard(active.id, request.signal)
       .then((payload) => {
         if (scopeRef.current.accepts(request.generation)) setTask(payload.task);
       })
@@ -63,6 +64,7 @@ export function CurrentLearningTaskProvider({ children }: { children: ReactNode 
       request.signal,
     );
     if (scopeRef.current.accepts(request.generation) && next.profile_id === active.id) {
+      invalidateStudentDashboard(active.id);
       setTask((current) => (!current || next.version >= current.version ? next : current));
     }
   }, [active, visibleTask?.version]);

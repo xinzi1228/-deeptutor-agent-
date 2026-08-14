@@ -388,6 +388,7 @@ from deeptutor.api.routers import (
     shares,
     skills,
     standards,
+    student_dashboard,
     subagents,
     system,
     unified_ws,
@@ -488,6 +489,12 @@ app.include_router(
     prefix="/api/v1/current-learning-task",
     tags=["current-learning-task"],
     dependencies=_auth,
+)
+app.include_router(
+    student_dashboard.router,
+    prefix="/api/v1/student-dashboard",
+    tags=["student-dashboard"],
+    dependencies=_profile_private,
 )
 app.include_router(
     mcp_settings.router,

@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import {
-  getLearningOverview,
-  getLearningReport,
   getWorkspaceViews,
   getExtensionCatalog,
   getLearningPathDiagram,
@@ -21,7 +19,6 @@ import {
   getCoursePlanDocx,
   getTraceLog,
   getTeachingFlow,
-  getForesightStats,
   getCoachMetrics,
   reflectMemory,
   getKnowledgeGraph,
@@ -45,6 +42,8 @@ import {
 import { StatCards } from "@/components/learning-stats/StatCards";
 import { apiFetch, apiUrl } from "@/lib/api";
 import type { VisualizationArtifact } from "@/components/chat/home/VisualizationArtifactCard";
+import { getStudentGrowthDashboard } from "@/lib/student-dashboard-api";
+import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 
 const RadarChart = dynamic(() => import("@/components/learning-stats/RadarChart").then((module) => module.RadarChart), { ssr: false });
 const F1Curve = dynamic(() => import("@/components/learning-stats/F1Curve").then((module) => module.F1Curve), { ssr: false });
@@ -69,6 +68,9 @@ const TABS: Array<{ key: Tab; label: string }> = [
 ];
 
 export default function ProgressPage() {
+  const { active } = useLearningProfile();
+  const activeProfileIdRef = useRef<string | null>(active?.id ?? null);
+  activeProfileIdRef.current = active?.id ?? null;
   const loadStartedAt = useRef(0);
   const loadedTabs = useRef(new Set<Tab>(["overview"]));
   const [tab, setTab] = useState<Tab>("overview");
@@ -91,45 +93,60 @@ export default function ProgressPage() {
   const [knowledgeGraph, setKnowledgeGraph] = useState<KnowledgeGraphData | null>(null);
   const [teachingFlow, setTeachingFlow] = useState<TeachingFlowState | null>(null);
   const [visualizations, setVisualizations] = useState<VisualizationArtifact[]>([]);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [graphLoading, setGraphLoading] = useState(false);
 
   useEffect(() => {
+    loadedTabs.current = new Set<Tab>(["overview"]);
+    setLoading(true);
+    setError(null);
+    setDetailsExpanded(false);
+    setDetailsLoading(false);
+    setRecordsLoading(false);
+    setGraphLoading(false);
+    setOverview(null);
+    setLearningReport(null);
+    setForesight(null);
+    setWorkspaceViews(null);
+    setExtensions([]);
+    setLearningPath(null);
+    setVisualizations([]);
+    setDimensions([]);
+    setF1Points([]);
+    setSkillTree(null);
+    setDecisions([]);
+    setCoursePlan(null);
+    setTraces([]);
+    setTeachingFlow(null);
+    setEvaluations([]);
+    setCoachMetrics(null);
+    setKnowledgeGraph(null);
+  }, [active?.id]);
+
+  useEffect(() => {
+    const candidateProfileId = active?.id;
+    if (!candidateProfileId) return;
+    const profileId: string = candidateProfileId;
     loadStartedAt.current = performance.now();
     let cancelled = false;
+    const controller = new AbortController();
     async function load() {
       try {
-        const [ov, report, workspace, extensionData, radar, f1, tree, fs, artwork] = await Promise.all([
-          getLearningOverview(),
-          getLearningReport(),
-          getWorkspaceViews(),
-          getExtensionCatalog(),
-          getRadarDimensions(),
-          getF1Trend(),
-          getSkillTree(),
-          getForesightStats(),
-          apiFetch(apiUrl("/api/v1/profile/visualizations?limit=6"), { cache: "no-store" }).then((response) => response.ok ? response.json() : { artifacts: [] }),
-        ]);
+        const core = await getStudentGrowthDashboard(profileId, controller.signal);
         if (cancelled) return;
-        setOverview(ov.overview);
-        setLearningReport(report);
-        setWorkspaceViews(workspace.views);
-        setExtensions(extensionData.extensions);
-        setDimensions(radar.dimensions);
-        setF1Points(f1.points);
-        setSkillTree(tree.tree);
-        setForesight(fs);
-        setVisualizations(artwork.artifacts || []);
+        setOverview(core.overview);
+        setLearningReport(core.report);
+        setForesight(core.foresight);
         emitPerformanceMetric({
           name: "progress_core_visible",
           route: "/progress",
           duration_ms: performance.now() - loadStartedAt.current,
           stage: "overview",
         });
-        const pathExtension = extensionData.extensions.find((item) => item.id === "learning-path-diagram");
-        if (pathExtension?.enabled) {
-          getLearningPathDiagram().then((value) => !cancelled && setLearningPath(value.diagram)).catch(() => undefined);
-        }
       } catch (err: any) {
-        if (!cancelled) setError(err.message || "Failed to load");
+        if (!cancelled && !(err instanceof DOMException && err.name === "AbortError")) setError(err.message || "Failed to load");
         if (!cancelled) emitPerformanceMetric({
           name: "progress_core_visible",
           route: "/progress",
@@ -143,54 +160,89 @@ export default function ProgressPage() {
       }
     }
     load();
-    return () => { cancelled = true; };
-  }, []);
+    return () => { cancelled = true; controller.abort(); };
+  }, [active?.id]);
+
+  async function loadOverviewDetails() {
+    if (detailsLoading || detailsExpanded) return;
+    const profileId = active?.id;
+    if (!profileId) return;
+    setDetailsExpanded(true);
+    setDetailsLoading(true);
+    try {
+      const [workspace, extensionData, radar, f1, tree, artwork] = await Promise.all([
+        getWorkspaceViews(),
+        getExtensionCatalog(),
+        getRadarDimensions(),
+        getF1Trend(),
+        getSkillTree(),
+        apiFetch(apiUrl("/api/v1/profile/visualizations?limit=6"), { cache: "no-store" }).then((response) => response.ok ? response.json() : { artifacts: [] }),
+      ]);
+      if (activeProfileIdRef.current !== profileId) return;
+      setWorkspaceViews(workspace.views);
+      setExtensions(extensionData.extensions);
+      setDimensions(radar.dimensions);
+      setF1Points(f1.points);
+      setSkillTree(tree.tree);
+      setVisualizations(artwork.artifacts || []);
+      const pathExtension = extensionData.extensions.find((item) => item.id === "learning-path-diagram");
+      if (pathExtension?.enabled) {
+        const diagram = (await getLearningPathDiagram()).diagram;
+        if (activeProfileIdRef.current === profileId) setLearningPath(diagram);
+      }
+    } catch (reason) {
+      if (activeProfileIdRef.current === profileId) {
+        setDetailsExpanded(false);
+        setError(reason instanceof Error ? reason.message : "成长详情加载失败");
+      }
+    } finally {
+      if (activeProfileIdRef.current === profileId) setDetailsLoading(false);
+    }
+  }
 
   useEffect(() => {
+    const profileId = active?.id;
+    if (!profileId) return;
     if (tab === "overview" || tab === "achievements" || loadedTabs.current.has(tab)) return;
     loadedTabs.current.add(tab);
     if (tab === "records") {
+      setRecordsLoading(true);
       void Promise.all([
         getDecisions(),
         getCoursePlan().catch(() => ({ plan: null as CoursePlan | null })),
         getTraceLog().catch(() => ({ traces: [] as TraceItem[] })),
         getTeachingFlow().catch(() => null),
       ]).then(([dec, plan, tr, flow]) => {
+        if (activeProfileIdRef.current !== profileId) return;
         setDecisions(dec.decisions);
         setCoursePlan(plan.plan || null);
         setTraces(tr.traces);
         setTeachingFlow(flow);
-      }).catch((reason) => setError(reason instanceof Error ? reason.message : "记录加载失败"));
+      }).catch((reason) => {
+        if (activeProfileIdRef.current === profileId) setError(reason instanceof Error ? reason.message : "记录加载失败");
+      })
+        .finally(() => {
+          if (activeProfileIdRef.current === profileId) setRecordsLoading(false);
+        });
     } else if (tab === "graph") {
+      setGraphLoading(true);
       void Promise.all([
         getEvaluations(),
         getCoachMetrics(),
         getKnowledgeGraph().catch(() => null),
       ]).then(([ev, cm, graph]) => {
+        if (activeProfileIdRef.current !== profileId) return;
         setEvaluations(ev.evaluations);
         setCoachMetrics(cm);
         setKnowledgeGraph(graph);
-      }).catch((reason) => setError(reason instanceof Error ? reason.message : "图谱加载失败"));
+      }).catch((reason) => {
+        if (activeProfileIdRef.current === profileId) setError(reason instanceof Error ? reason.message : "图谱加载失败");
+      })
+        .finally(() => {
+          if (activeProfileIdRef.current === profileId) setGraphLoading(false);
+        });
     }
-  }, [tab]);
-
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-2xl px-6 py-20 text-center">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-        </div>
-      </div>
-    );
-  }
+  }, [active?.id, tab]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -236,8 +288,21 @@ export default function ProgressPage() {
         ))}
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
       {tab === "overview" && (
-        <>
+        loading ? (
+          <div className="space-y-4" aria-label="正在加载成长摘要">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[0, 1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-2xl bg-[var(--muted)]/60" />)}
+            </div>
+            <div className="h-36 animate-pulse rounded-2xl bg-[var(--muted)]/50" />
+          </div>
+        ) : <>
           <StatCards overview={overview} foresight={foresight} />
 
           {learningReport && (
@@ -268,6 +333,26 @@ export default function ProgressPage() {
             </section>
           )}
 
+          <button
+            type="button"
+            onClick={() => void loadOverviewDetails()}
+            disabled={detailsLoading}
+            className="flex w-full items-center justify-between rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] px-5 py-4 text-left transition hover:border-[var(--primary)]/40 disabled:opacity-70"
+          >
+            <span>
+              <span className="block text-sm font-semibold">更多成长分析</span>
+              <span className="mt-1 block text-xs text-[var(--muted-foreground)]">按需查看待整理问题、能力雷达、成长曲线和学习作品</span>
+            </span>
+            <span className="text-xs text-[var(--primary)]">{detailsLoading ? "加载中…" : detailsExpanded ? "已展开" : "展开"}</span>
+          </button>
+
+          {detailsLoading && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="h-28 animate-pulse rounded-2xl bg-[var(--muted)]/50" />
+              <div className="h-28 animate-pulse rounded-2xl bg-[var(--muted)]/50" />
+            </div>
+          )}
+
           {visualizations.length > 0 && <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5"><div className="mb-3"><h2 className="text-sm font-semibold">学习可视化作品</h2><p className="mt-1 text-xs text-[var(--muted-foreground)]">主对话、标注教练和报告共享的已校验作品</p></div><div className="grid gap-4 lg:grid-cols-2">{visualizations.map((artifact) => <VisualizationArtifactCard key={artifact.id} artifact={artifact} />)}</div></section>}
 
           {workspaceViews && (
@@ -287,7 +372,7 @@ export default function ProgressPage() {
             </section>
           )}
 
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
+          {detailsExpanded && !detailsLoading && <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
             <div className="mb-3">
               <h2 className="text-sm font-semibold">我的扩展</h2>
               <p className="mt-1 text-xs text-[var(--muted-foreground)]">只提供老师审核过的功能；不会安装外部命令或读取其他同学的数据。</p>
@@ -320,7 +405,7 @@ export default function ProgressPage() {
                 </div>
               ))}
             </div>
-          </section>
+          </section>}
 
           {learningPath && (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
@@ -339,7 +424,7 @@ export default function ProgressPage() {
             </section>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-5">
+          {detailsExpanded && !detailsLoading && <div className="grid gap-6 lg:grid-cols-5">
             <div className="space-y-3 lg:col-span-3">
               <h3 className="text-sm font-semibold">五维能力雷达</h3>
               <RadarChart dimensions={dimensions} />
@@ -347,17 +432,22 @@ export default function ProgressPage() {
             <div className="space-y-3 lg:col-span-2">
               <SkillTree tree={skillTree} />
             </div>
-          </div>
+          </div>}
 
-          <div className="space-y-3">
+          {detailsExpanded && !detailsLoading && <div className="space-y-3">
             <h3 className="text-sm font-semibold">F1 成长曲线</h3>
             <F1Curve points={f1Points} />
-          </div>
+          </div>}
         </>
       )}
 
       {tab === "records" && (
-        <>
+        recordsLoading ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="h-48 animate-pulse rounded-2xl bg-[var(--muted)]/50" />
+            <div className="h-48 animate-pulse rounded-2xl bg-[var(--muted)]/50" />
+          </div>
+        ) : <>
           <div className="grid gap-6 lg:grid-cols-2">
             <DecisionLogPanel decisions={decisions} />
             {coursePlan && (
@@ -410,16 +500,16 @@ export default function ProgressPage() {
 
       {tab === "graph" && (
         <>
-          {knowledgeGraph && (
+          {(knowledgeGraph || graphLoading) && (
             <div className="space-y-3">
               <h3 className="text-sm font-semibold">知识图谱</h3>
-              <KnowledgeGraphPanel data={knowledgeGraph} />
+              <KnowledgeGraphPanel data={knowledgeGraph} loading={graphLoading} />
             </div>
           )}
 
-          <EvaluationPanel evaluations={evaluations} />
+          {!graphLoading && <EvaluationPanel evaluations={evaluations} />}
 
-          <CoachMetricsPanel metrics={coachMetrics} />
+          <CoachMetricsPanel metrics={coachMetrics} loading={graphLoading} />
         </>
       )}
     </div>
