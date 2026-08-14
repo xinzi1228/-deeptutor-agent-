@@ -1,0 +1,4 @@
+interface:
+  display_name: "教材内容分析"
+  short_description: "从结构化教材按页提取术语、知识点、候选题并提交人工审核"
+  default_prompt: "使用 $textbook-analysis 从已导入教材中提取带源页的待审核教学候选。"

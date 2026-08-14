@@ -46,6 +46,7 @@ from deeptutor.tools.route_input_tool import RouteInputTool
 from deeptutor.tools.struggle_tool import StruggleDetectTool
 from deeptutor.tools.task_bank_tool import GetAnnotationTaskTool
 from deeptutor.tools.teaching_flow_tool import TeachingFlowTool
+from deeptutor.tools.textbook_candidate_tool import TextbookCandidateTool
 from deeptutor.tools.verify_foresight_tool import VerifyForesightTool
 from deeptutor.tools.verify_output_tool import VerifyOutputTool
 from deeptutor.tools.visualization_artifact_tool import CreateVisualizationTool
@@ -1678,6 +1679,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     VerifyOutputTool,
     KbSearchTool,
     DelegateExpertTool,
+    TextbookCandidateTool,
     JobAnalysisTool,
     WriteLearningRecordTool,
     RenderLearningPathTool,
@@ -1829,6 +1831,7 @@ __all__ = [
     "VerifyOutputTool",
     "KbSearchTool",
     "DelegateExpertTool",
+    "TextbookCandidateTool",
     "JobAnalysisTool",
     "WriteLearningRecordTool",
     "GenerateIouDemoTool",

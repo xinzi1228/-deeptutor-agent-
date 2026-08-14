@@ -81,6 +81,7 @@ ALWAYS_ON_TOOLS: tuple[str, ...] = (
     "verify_output",
     "kb_search",
     "delegate_to_expert",
+    "textbook_candidate",
     "job_analysis",
     "get_annotation_task",
     "annotation_check",

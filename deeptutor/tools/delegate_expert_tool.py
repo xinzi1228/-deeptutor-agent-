@@ -1,6 +1,6 @@
 """DelegateExpertTool — delegate a sub-task to a specialist expert.
 
-The master agent hands a self-contained brief + task data to one of the six
+The master agent hands a self-contained brief + task data to one specialist
 expert cards. The expert runs as an isolated AgentLoop (≤5 rounds) with a
 restricted per-expert tool whitelist (专人专事) — it NEVER inherits the
 master's conversation history (context isolation — dispatching-parallel-agents
@@ -41,6 +41,7 @@ EXPERT_IDS: tuple[str, ...] = (
     "chart_designer",
     "diagram_designer",
     "illustration_designer",
+    "textbook_analyst",
 )
 
 # Every whitelist is a subset of the always-on tool set (ALWAYS_ON_TOOLS in
@@ -97,6 +98,9 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
     # Image generation remains a user-configured, user-toggleable capability.
     # This specialist only produces a safe prompt; the master invokes imagegen.
     "illustration_designer": (),
+    # Admin-only content-governance worker. The tool itself enforces the
+    # structured-textbook boundary and can only create review candidates.
+    "textbook_analyst": ("textbook_candidate",),
 }
 
 
@@ -106,6 +110,16 @@ def load_expert_card(expert_id: str) -> str:
     if not md.exists():
         return ""
     return md.read_text(encoding="utf-8")
+
+
+def _is_admin_actor() -> bool:
+    """Resolve the active role lazily so tool-registry startup stays acyclic."""
+    try:
+        from deeptutor.multi_user.context import get_current_user
+
+        return bool(get_current_user().is_admin)
+    except Exception:
+        return False
 
 
 def _build_messages(expert_id: str, card: str, brief: str, task_data: str) -> tuple[str, str]:
@@ -129,10 +143,10 @@ class DelegateExpertTool(BaseTool):
         return ToolDefinition(
             name="delegate_to_expert",
             description=(
-                "Delegate a focused sub-task to a specialist expert (9 experts: "
+                "Delegate a focused sub-task to a specialist expert (10 experts: "
                 "learning_planner / task_guide / grading_expert / struggle_detective / "
                 "report_analyst / session_steward / chart_designer / diagram_designer / "
-                "illustration_designer). The expert runs as an isolated "
+                "illustration_designer / textbook_analyst). The expert runs as an isolated "
                 "AgentLoop (≤5 rounds) with a restricted tool whitelist (专人专事) and "
                 "does NOT inherit the conversation history. Provide a SELF-CONTAINED "
                 "brief + task_data. The expert returns its conclusion for the master "
@@ -166,6 +180,11 @@ class DelegateExpertTool(BaseTool):
         if expert_id not in EXPERT_IDS:
             return ToolResult(
                 content=f"Error: expert_id 必须是 {', '.join(EXPERT_IDS)} 之一。",
+                success=False,
+            )
+        if expert_id == "textbook_analyst" and not _is_admin_actor():
+            return ToolResult(
+                content="Error: 教材分析专家只面向管理员内容治理工作台。",
                 success=False,
             )
         brief = str(kwargs.get("brief") or "").strip()

@@ -159,6 +159,7 @@ def test_expert_ids_include_teaching_and_visualization_specialists():
         "learning_planner", "task_guide", "grading_expert",
         "struggle_detective", "report_analyst", "session_steward",
         "chart_designer", "diagram_designer", "illustration_designer",
+        "textbook_analyst",
     }
 
 
@@ -202,6 +203,18 @@ async def test_execute_invalid_expert_fails():
     tool = DelegateExpertTool()
     result = await tool.execute(expert_id="hacker", brief="x")
     assert result.success is False
+
+
+@pytest.mark.asyncio
+async def test_textbook_expert_is_admin_only(monkeypatch):
+    monkeypatch.setattr(
+        "deeptutor.tools.delegate_expert_tool._is_admin_actor", lambda: False
+    )
+    result = await DelegateExpertTool().execute(
+        expert_id="textbook_analyst", brief="提取教材候选"
+    )
+    assert result.success is False
+    assert "只面向管理员" in result.content
 
 
 @pytest.mark.asyncio
