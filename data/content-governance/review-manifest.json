@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "manifest_version": "2026.08.14-candidate.1",
+  "source_catalog_version": "2026.08.14-candidate.1",
+  "formal_content_modified": false,
+  "human_approval_count": 0,
+  "candidate_count": 34,
+  "candidates": [
+    {
+      "id": "candidate_5a3e4d9ea050bd2a",
+      "content_location": "README.md:18",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_41c2838927b024f7",
+      "content_location": "data/user/workspace/annotation_kb/01-基础概念/01-什么是数据标注.md:40",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_0ffcc72bce5e38d8",
+      "content_location": "data/user/workspace/annotation_kb/01-基础概念/03-IOU交并比详解.md:73",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_f0d06944fdbaab26",
+      "content_location": "data/user/workspace/annotation_kb/01-基础概念/04-精确率与召回率.md:77",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_0f0b1670c6e3a056",
+      "content_location": "data/user/workspace/annotation_kb/01-基础概念/05-标注一致性检验.md:73",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_967c912110464a9e",
+      "content_location": "data/user/workspace/annotation_kb/01-基础概念/07-边界框标注规范.md:78",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_ad88d0aed6facb58",
+      "content_location": "data/user/workspace/annotation_kb/01-基础概念/09-标注质量控制流程.md:91",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_aa2e3e882fc44e8b",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/01-GBT41867概述.md:1",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "rewrite_standard_overview",
+      "proposed_source_ids": [
+        "source_gbt_41867_2022",
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "重写整篇标准概述：41867 仅说明人工智能术语，数据标注流程另建 42755 概述；章节待合法全文人工核对。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_9e0b69460816be72",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/01-GBT41867概述.md:5",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "rewrite_standard_overview",
+      "proposed_source_ids": [
+        "source_gbt_41867_2022",
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "重写整篇标准概述：41867 仅说明人工智能术语，数据标注流程另建 42755 概述；章节待合法全文人工核对。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_7f44e356dbb6568c",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/01-GBT41867概述.md:52",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "rewrite_standard_overview",
+      "proposed_source_ids": [
+        "source_gbt_41867_2022",
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "重写整篇标准概述：41867 仅说明人工智能术语，数据标注流程另建 42755 概述；章节待合法全文人工核对。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_179c9094fe803bd1",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/06-数据标注安全规范.md:120",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_security_scope",
+      "proposed_source_ids": [
+        "source_gbt_45674_2025"
+      ],
+      "proposed_change": "删除错误标准归因；先判断是否属于生成式人工智能数据标注安全场景，再决定是否引用 45674。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_2a25c2a00f90c440",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/07-标注人员培训要求.md:3",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "align_occupational_competency",
+      "proposed_source_ids": [
+        "source_mohrss_ai_trainer_2021"
+      ],
+      "proposed_change": "将岗位和培训能力改为人社部职业标准来源；保留项目课程映射时明确标记为教学设计。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_782cd4257af2e1bd",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/07-标注人员培训要求.md:129",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "align_occupational_competency",
+      "proposed_source_ids": [
+        "source_mohrss_ai_trainer_2021"
+      ],
+      "proposed_change": "将岗位和培训能力改为人社部职业标准来源；保留项目课程映射时明确标记为教学设计。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_a266bc7e69810eac",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/08-标注数据交付标准.md:3",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_17910ee229ac48f1",
+      "content_location": "data/user/workspace/annotation_kb/02-行业标准/08-标注数据交付标准.md:109",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_13440bb83da21f39",
+      "content_location": "data/user/workspace/annotation_kb/04-质量管控/01-质检流程设计.md:101",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_38b9a76e680d8f11",
+      "content_location": "data/user/workspace/annotation_kb/04-质量管控/02-抽检比例与策略.md:98",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_0310bbf03b4b9b86",
+      "content_location": "data/user/workspace/annotation_kb/04-质量管控/06-多人标注一致性.md:140",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_00171cf12bae395c",
+      "content_location": "data/user/workspace/annotation_kb/06-项目管理/07-数据安全与合规.md:74",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_security_scope",
+      "proposed_source_ids": [
+        "source_gbt_45674_2025"
+      ],
+      "proposed_change": "删除错误标准归因；先判断是否属于生成式人工智能数据标注安全场景，再决定是否引用 45674。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_161ab507eb397d75",
+      "content_location": "data/user/workspace/annotation_kb/06-项目管理/08-基于AI能力图谱的教学计划.md:111",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "align_occupational_competency",
+      "proposed_source_ids": [
+        "source_mohrss_ai_trainer_2021"
+      ],
+      "proposed_change": "将岗位和培训能力改为人社部职业标准来源；保留项目课程映射时明确标记为教学设计。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_db9136ad15eeb644",
+      "content_location": "data/user/workspace/annotation_kb/06-项目管理/10-标注行业发展趋势.md:57",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_08f0e5cc49d9015c",
+      "content_location": "data/user/workspace/annotation_kb/06-项目管理/10-标注行业发展趋势.md:82",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_185d097df23a3ae5",
+      "content_location": "data/user/workspace/competency_tree.json:7",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "align_occupational_competency",
+      "proposed_source_ids": [
+        "source_mohrss_ai_trainer_2021"
+      ],
+      "proposed_change": "将岗位和培训能力改为人社部职业标准来源；保留项目课程映射时明确标记为教学设计。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_d1426e21e1f3e779",
+      "content_location": "data/user/workspace/personas/annotation-coach/PERSONA.md:306",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "replace_citation_example",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "把错误标准号示例改为 42755；在未核对全文前不保留虚构章节号。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_7e0e2e9832a9061c",
+      "content_location": "deeptutor/services/persona/presets/annotation-coach/PERSONA.md:306",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "replace_citation_example",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "把错误标准号示例改为 42755；在未核对全文前不保留虚构章节号。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_c5431a8ff1f67c7d",
+      "content_location": "deeptutor/services/persona/presets/annotation-coach/references/resources.md:10",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "replace_citation_example",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "把错误标准号示例改为 42755；在未核对全文前不保留虚构章节号。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_81b7304ee8a788ae",
+      "content_location": "deeptutor/skills/builtin/annotation-coach-flows/references/resources.md:10",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "replace_citation_example",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "把错误标准号示例改为 42755；在未核对全文前不保留虚构章节号。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_4f2f45c2c652067a",
+      "content_location": "deeptutor/skills/builtin/annotation-guide/references/text-guide.md:70",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_d7d2b0ab19bfdec1",
+      "content_location": "deeptutor/skills/builtin/annotation-guide/references/video-guide.md:84",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_57345d6955bc2c58",
+      "content_location": "deeptutor/tools/competency_tool.py:23",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_9fe11ef27064e725",
+      "content_location": "deeptutor/tools/job_analysis_tool.py:75",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "align_occupational_competency",
+      "proposed_source_ids": [
+        "source_mohrss_ai_trainer_2021"
+      ],
+      "proposed_change": "将岗位和培训能力改为人社部职业标准来源；保留项目课程映射时明确标记为教学设计。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_dc4cfe4d224cca0e",
+      "content_location": "docs/specs/phase1-theory.md:33",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "verify_annotation_procedure_claim",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "移除对 41867 的流程或质量归因；由人工依据 42755 合法全文逐条核对，无法核实的阈值降级为项目经验。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_df82551477d9e344",
+      "content_location": "docs/specs/standards-trace-design.md:10",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "replace_citation_example",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "把错误标准号示例改为 42755；在未核对全文前不保留虚构章节号。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    },
+    {
+      "id": "candidate_b07dcd576bec4ccb",
+      "content_location": "docs/specs/standards-trace-design.md:72",
+      "current_reference": "GB/T 41867-2022",
+      "risk": "critical",
+      "action": "replace_citation_example",
+      "proposed_source_ids": [
+        "source_gbt_42755_2023"
+      ],
+      "proposed_change": "把错误标准号示例改为 42755；在未核对全文前不保留虚构章节号。",
+      "status": "awaiting_human_review",
+      "ai_generated": true,
+      "reviewer": null,
+      "reviewed_at": null
+    }
+  ]
+}

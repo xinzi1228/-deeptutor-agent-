@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026.08.14-candidate.1",
+  "status": "candidate_sources_verified_by_official_identity_pages",
+  "sources": [
+    {
+      "id": "source_gbt_41867_2022",
+      "title": "信息技术 人工智能 术语",
+      "source_type": "national_standard",
+      "normative": true,
+      "claim_scope": "background",
+      "standard_number": "GB/T 41867-2022",
+      "url": "https://std.samr.gov.cn/gb/search/gbDetailed?id=EB58F4DA9092B2A2E05397BE0A0A7D33",
+      "verification_scope": "标准号、标准名称、归口信息",
+      "allowed_usage": "仅用于人工智能术语定义；不得作为数据标注流程、质量阈值或人员要求的依据",
+      "full_text_review_required": true
+    },
+    {
+      "id": "source_gbt_42755_2023",
+      "title": "人工智能 面向机器学习的数据标注规程",
+      "source_type": "national_standard",
+      "normative": true,
+      "claim_scope": "mandatory_requirement",
+      "standard_number": "GB/T 42755-2023",
+      "url": "https://std.samr.gov.cn/gb/search/gbDetailed?id=FC816D04FEB462EBE05397BE0A0AD5FA",
+      "published_at": "2023-05-23",
+      "effective_at": "2023-12-01",
+      "status": "current",
+      "verification_scope": "标准号、标准名称、状态、发布日期、实施日期、适用范围摘要",
+      "allowed_usage": "可作为机器学习数据标注流程框架的候选依据；具体章节和阈值仍需合法全文人工核对",
+      "full_text_review_required": true
+    },
+    {
+      "id": "source_gbt_45674_2025",
+      "title": "网络安全技术 生成式人工智能数据标注安全规范",
+      "source_type": "national_standard",
+      "normative": true,
+      "claim_scope": "mandatory_requirement",
+      "standard_number": "GB/T 45674-2025",
+      "url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=407584DD0FA2BA19E62E85D3469290B0",
+      "published_at": "2025-04-25",
+      "effective_at": "2025-11-01",
+      "status": "current",
+      "verification_scope": "标准号、名称、状态、发布日期、实施日期",
+      "allowed_usage": "仅用于生成式人工智能数据标注安全场景，不泛化为所有标注任务的通用质量规范",
+      "full_text_review_required": true
+    },
+    {
+      "id": "source_mohrss_ai_trainer_2021",
+      "title": "人工智能训练师国家职业技能标准（2021年版）",
+      "source_type": "official_documentation",
+      "normative": true,
+      "claim_scope": "mandatory_requirement",
+      "standard_number": "职业编码 4-04-05-05",
+      "url": "https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/rcrs_4225/jnrc/202112/W020211227626977039770.pdf",
+      "publisher": "人力资源社会保障部、工业和信息化部",
+      "chapter": "1.3、1.4、3、4",
+      "verification_scope": "职业定义、数据标注员工种、五级职业技能等级、数据标注与审核能力要求",
+      "allowed_usage": "用于岗位能力图谱和分级培养目标；具体能力表引用需记录章节或页码"
+    },
+    {
+      "id": "source_project_task_bank_2026_08_14",
+      "title": "标注星图内置题库项目经验",
+      "source_type": "project_experience",
+      "normative": false,
+      "claim_scope": "example_threshold",
+      "file_hash": "sha256:AE4BB0CE471D54143D7EACCE97CB360F45C906F273140881E2799778271A9848",
+      "path": "data/user/workspace/task_bank.json",
+      "allowed_usage": "只能显示为教学示例、项目阈值或练习规则，不得声称为国家标准强制值"
+    },
+    {
+      "id": "source_project_competency_tree_2026_08_14",
+      "title": "标注星图能力树项目设计",
+      "source_type": "project_experience",
+      "normative": false,
+      "claim_scope": "recommendation",
+      "file_hash": "sha256:16B5C99FE58B68276B819A28AC16DB42A92F8522886EC6438FD90EA8D30225AD",
+      "path": "data/user/workspace/competency_tree.json",
+      "allowed_usage": "作为教学路径设计；岗位等级和技能要求应另行关联人社部职业标准"
+    }
+  ]
+}
