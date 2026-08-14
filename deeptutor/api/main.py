@@ -363,6 +363,7 @@ from deeptutor.api.routers import (
     capability_center,
     chat,
     co_writer,
+    content_governance,
     cron,
     dashboard,
     imports,
@@ -474,6 +475,12 @@ app.include_router(
 )
 app.include_router(
     settings.router, prefix="/api/v1/settings", tags=["settings"], dependencies=_auth
+)
+app.include_router(
+    content_governance.router,
+    prefix="/api/v1/content-governance",
+    tags=["content-governance"],
+    dependencies=_admin,
 )
 app.include_router(
     mcp_settings.router,
