@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { TrendingUp } from "lucide-react";
+import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import {
   getLearningOverview,
   getLearningReport,
@@ -68,6 +69,7 @@ const TABS: Array<{ key: Tab; label: string }> = [
 ];
 
 export default function ProgressPage() {
+  const loadStartedAt = useRef(0);
   const loadedTabs = useRef(new Set<Tab>(["overview"]));
   const [tab, setTab] = useState<Tab>("overview");
   const [loading, setLoading] = useState(true);
@@ -91,6 +93,7 @@ export default function ProgressPage() {
   const [visualizations, setVisualizations] = useState<VisualizationArtifact[]>([]);
 
   useEffect(() => {
+    loadStartedAt.current = performance.now();
     let cancelled = false;
     async function load() {
       try {
@@ -115,12 +118,26 @@ export default function ProgressPage() {
         setSkillTree(tree.tree);
         setForesight(fs);
         setVisualizations(artwork.artifacts || []);
+        emitPerformanceMetric({
+          name: "progress_core_visible",
+          route: "/progress",
+          duration_ms: performance.now() - loadStartedAt.current,
+          stage: "overview",
+        });
         const pathExtension = extensionData.extensions.find((item) => item.id === "learning-path-diagram");
         if (pathExtension?.enabled) {
           getLearningPathDiagram().then((value) => !cancelled && setLearningPath(value.diagram)).catch(() => undefined);
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || "Failed to load");
+        if (!cancelled) emitPerformanceMetric({
+          name: "progress_core_visible",
+          route: "/progress",
+          duration_ms: performance.now() - loadStartedAt.current,
+          outcome: "error",
+          stage: "overview",
+          error_type: "server",
+        });
       } finally {
         if (!cancelled) setLoading(false);
       }

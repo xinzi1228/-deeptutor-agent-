@@ -374,6 +374,7 @@ from deeptutor.api.routers import (
     memory,
     notebook,
     partners,
+    performance_metrics,
     personas,
     plugins_api,
     profile,
@@ -496,6 +497,12 @@ app.include_router(
 )
 app.include_router(
     profile.router, prefix="/api/v1/profile", tags=["profile"], dependencies=_profile_private
+)
+app.include_router(
+    performance_metrics.router,
+    prefix="/api/v1/performance",
+    tags=["performance"],
+    dependencies=_auth,
 )
 app.include_router(
     annotation.router,

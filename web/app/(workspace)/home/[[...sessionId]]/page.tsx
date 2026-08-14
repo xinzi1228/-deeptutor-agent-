@@ -80,6 +80,7 @@ import {
 } from "@/lib/tools-settings";
 import { downloadChatMarkdown } from "@/lib/chat-export";
 import { createShare } from "@/lib/shares-api";
+import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import type { SpaceMemoryFile } from "@/lib/space-items";
 import {
   selectedBooksToPayload,
@@ -249,6 +250,7 @@ export default function ChatPage() {
   } = useUnifiedChat();
 
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const chatSendStartedAtRef = useRef<number | null>(null);
   // A connected agent to preselect once it loads, from `?agent=<name>` on the
   // URL (the partner list page links here to drop straight into a chat with a
   // partner). Captured once at first client render — the URL is rewritten to
@@ -613,6 +615,17 @@ export default function ChatPage() {
     };
   }, [state.activeCapability, state.language, state.messages, state.sessionId]);
   const lastMessage = state.messages[state.messages.length - 1];
+  useEffect(() => {
+    const startedAt = chatSendStartedAtRef.current;
+    if (startedAt === null || lastMessage?.role !== "assistant" || !lastMessage.content.trim()) return;
+    emitPerformanceMetric({
+      name: "chat_first_token",
+      route: "/home",
+      duration_ms: performance.now() - startedAt,
+      stage: "streaming",
+    });
+    chatSendStartedAtRef.current = null;
+  }, [lastMessage?.content, lastMessage?.role]);
   const {
     containerRef: messagesContainerRef,
     endRef: messagesEndRef,
@@ -1261,6 +1274,8 @@ export default function ChatPage() {
         (attachments.some((a) => a.type === "image")
           ? t("Please analyze the attached image(s).")
           : "");
+      const metricStartedAt = performance.now();
+      chatSendStartedAtRef.current = metricStartedAt;
       // Persona is NOT passed per-call here: it is a session-level
       // preference (state.personaSelection) that sendMessage resolves and
       // sends with every turn.
@@ -1275,6 +1290,12 @@ export default function ChatPage() {
         undefined,
         memoryPayload,
       );
+      requestAnimationFrame(() => emitPerformanceMetric({
+        name: "chat_status_visible",
+        route: "/home",
+        duration_ms: performance.now() - metricStartedAt,
+        stage: "optimistic",
+      }));
       shouldAutoScrollRef.current = true;
       setAttachments([]);
       setSelectedBookReferences([]);

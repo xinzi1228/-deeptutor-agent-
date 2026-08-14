@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
 import AnnotationProgress from "@/components/annotation/AnnotationProgress";
 import { apiFetch, apiUrl } from "@/lib/api";
+import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import type { AnnotationTask } from "@/components/annotation/UnifiedAnnotationWorkbench";
 
 const AnnotationCoach = dynamic(
@@ -29,6 +30,17 @@ export default function AnnotationPage() {
   const [professionalUrl, setProfessionalUrl] = useState("");
   const [professionalLoading, setProfessionalLoading] = useState(false);
 
+  const switchMode = useCallback((nextMode: "image" | "text" | "audio" | "video" | "pro") => {
+    const startedAt = performance.now();
+    setMode(nextMode);
+    requestAnimationFrame(() => emitPerformanceMetric({
+      name: "annotation_mode_switch",
+      route: "/annotation",
+      duration_ms: performance.now() - startedAt,
+      stage: nextMode,
+    }));
+  }, []);
+
   useEffect(() => {
     fetch("/api/v1/annotation/tasks").then((res) => res.ok ? res.json() : Promise.reject()).then((data) => {
       setTasks(data.tasks || []);
@@ -47,6 +59,7 @@ export default function AnnotationPage() {
 
   const chooseTask = useCallback(async (taskId: string) => {
     if (!taskId) return;
+    const startedAt = performance.now();
     setSelectedTask(taskId);
     try {
       const res = await fetch(`/api/v1/annotation/tasks/${encodeURIComponent(taskId)}`);
@@ -54,17 +67,32 @@ export default function AnnotationPage() {
       const { task } = await res.json();
       setSelectedTaskData(task);
       setMode(task.modal);
+      emitPerformanceMetric({
+        name: "annotation_task_visible",
+        route: "/annotation",
+        duration_ms: performance.now() - startedAt,
+        stage: "teaching",
+      });
       void apiFetch(apiUrl("/api/v1/annotation/activity"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task_id: taskId, mode: "teaching", stage: "selected", summary: { title: task.title, modal: task.modal, task_type: task.type } }),
       }).catch(() => undefined);
     } catch {
+      emitPerformanceMetric({
+        name: "annotation_task_visible",
+        route: "/annotation",
+        duration_ms: performance.now() - startedAt,
+        outcome: "error",
+        stage: "teaching",
+        error_type: "server",
+      });
       // 保持当前工作台；选择器仍可重试
     }
   }, []);
 
   const chooseProfessionalTask = async (taskId: string) => {
+    const startedAt = performance.now();
     setSelectedTask(taskId);
     setProfessionalLoading(true);
     setProfessionalUrl("");
@@ -76,7 +104,21 @@ export default function AnnotationPage() {
       }
       const data = await response.json();
       setProfessionalUrl(data.workbench_url);
+      emitPerformanceMetric({
+        name: "annotation_task_visible",
+        route: "/annotation",
+        duration_ms: performance.now() - startedAt,
+        stage: "professional",
+      });
     } catch (error) {
+      emitPerformanceMetric({
+        name: "annotation_task_visible",
+        route: "/annotation",
+        duration_ms: performance.now() - startedAt,
+        outcome: "error",
+        stage: "professional",
+        error_type: "server",
+      });
       setLabelStudio((current) => ({ available: false, configured: current?.configured, management_url: current?.management_url, detail: error instanceof Error ? error.message : "专业任务准备失败" }));
     } finally {
       setProfessionalLoading(false);
@@ -127,7 +169,7 @@ export default function AnnotationPage() {
         </div>
         <div className="flex rounded-lg border border-[var(--border)] bg-[var(--card)] p-1">
           <button
-            onClick={() => setMode("image")}
+            onClick={() => switchMode("image")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "image"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
@@ -138,7 +180,7 @@ export default function AnnotationPage() {
             图片标注
           </button>
           <button
-            onClick={() => setMode("text")}
+            onClick={() => switchMode("text")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "text"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
@@ -149,7 +191,7 @@ export default function AnnotationPage() {
             文本标注
           </button>
           <button
-            onClick={() => setMode("audio")}
+            onClick={() => switchMode("audio")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "audio"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
@@ -160,7 +202,7 @@ export default function AnnotationPage() {
             音频标注
           </button>
           <button
-            onClick={() => setMode("video")}
+            onClick={() => switchMode("video")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "video"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
@@ -171,7 +213,7 @@ export default function AnnotationPage() {
             视频标注
           </button>
           <button
-            onClick={() => setMode("pro")}
+            onClick={() => switchMode("pro")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               mode === "pro"
                 ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
