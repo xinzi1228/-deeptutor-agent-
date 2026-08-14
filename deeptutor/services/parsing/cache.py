@@ -139,7 +139,10 @@ def _absolutize_img_paths(blocks: list[dict], content_dir: Path) -> list[dict]:
         if not isinstance(img_path, str) or not img_path:
             continue
         p = Path(img_path)
-        if p.is_absolute():
+        # A POSIX-rooted asset path stays absolute even when this cache is
+        # loaded on Windows. ``WindowsPath('/abs/x.png').is_absolute()`` is
+        # false without a drive, so also preserve explicit root separators.
+        if p.is_absolute() or img_path.startswith(("/", "\\")):
             continue
         if ".." in p.parts:
             logger.warning("Skipping traversal img_path in content_list: %s", img_path)
