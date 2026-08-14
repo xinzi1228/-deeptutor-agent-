@@ -8,6 +8,7 @@ import AnnotationProgress from "@/components/annotation/AnnotationProgress";
 import { apiFetch, apiUrl } from "@/lib/api";
 import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import type { AnnotationTask } from "@/components/annotation/UnifiedAnnotationWorkbench";
+import { useCurrentLearningTask } from "@/components/current-task/CurrentLearningTaskContext";
 
 const AnnotationCoach = dynamic(
   () => import("@/components/annotation/AnnotationCoach"),
@@ -21,6 +22,7 @@ const UnifiedAnnotationWorkbench = dynamic(
 
 export default function AnnotationPage() {
   const { t } = useTranslation();
+  const { openTask } = useCurrentLearningTask();
   const [mode, setMode] = useState<"image" | "text" | "audio" | "video" | "pro">("image");
   const [tasks, setTasks] = useState<Array<{ id: string; title: string; type: string; modal: "image" | "text" | "audio" | "video"; difficulty: string }>>([]);
   const [professionalTasks, setProfessionalTasks] = useState<typeof tasks>([]);
@@ -67,6 +69,7 @@ export default function AnnotationPage() {
       const { task } = await res.json();
       setSelectedTaskData(task);
       setMode(task.modal);
+      await openTask({ courseId: "annotation-foundations", taskId, mode: "teaching_annotation" });
       emitPerformanceMetric({
         name: "annotation_task_visible",
         route: "/annotation",
@@ -89,7 +92,7 @@ export default function AnnotationPage() {
       });
       // 保持当前工作台；选择器仍可重试
     }
-  }, []);
+  }, [openTask]);
 
   const chooseProfessionalTask = async (taskId: string) => {
     const startedAt = performance.now();
@@ -104,6 +107,7 @@ export default function AnnotationPage() {
       }
       const data = await response.json();
       setProfessionalUrl(data.workbench_url);
+      await openTask({ courseId: "annotation-professional", taskId, mode: "professional_annotation" });
       emitPerformanceMetric({
         name: "annotation_task_visible",
         route: "/annotation",
