@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Rocket, type LucideIcon } from "lucide-react";
+import { ArrowRight, ChevronRight, Rocket, Sparkles, type LucideIcon } from "lucide-react";
 
 import { apiFetch, apiUrl } from "@/lib/api";
 import {
@@ -123,6 +123,10 @@ export default function SettingsHub() {
           </button>
         )}
       </header>
+
+      {!studentMode && (
+        <MigrationBanner />
+      )}
 
       {!studentMode && <SettingsStatusPanel />}
 
@@ -277,6 +281,53 @@ function NetworkPreviewRow({
       >
         {network.apiBase || tr({ zh: "本地", en: "local" })}
       </span>
+    </div>
+  );
+}
+
+/**
+ * One-time migration hint shown to admins on the settings hub: the admin
+ * settings content now lives under the five admin centers (`/admin/*`). The
+ * old settings routes stay functional (compat), so this is a pointer, not a
+ * hard redirect. Dismissed state is remembered per browser.
+ */
+function MigrationBanner() {
+  const KEY = "annotationsky.admin-migration-notice.v1";
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(KEY) === "1";
+  });
+
+  if (dismissed) return null;
+
+  const dismiss = () => {
+    window.localStorage.setItem(KEY, "1");
+    setDismissed(true);
+  };
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-500/10 to-blue-500/5 px-4 py-3">
+      <Sparkles size={16} className="shrink-0 text-violet-600" />
+      <p className="min-w-0 flex-1 text-[12.5px] leading-relaxed text-[var(--muted-foreground)]">
+        系统设置已按“内容治理 / 教学配置 / AI 能力 / 扩展与集成 / 系统运维”五中心重组，
+        高级配置现在统一收口到管理员工作台。旧设置入口保留兼容访问。
+      </p>
+      <div className="flex shrink-0 items-center gap-2">
+        <Link
+          href="/admin"
+          className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white"
+        >
+          前往工作台
+          <ArrowRight size={13} />
+        </Link>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+        >
+          知道了
+        </button>
+      </div>
     </div>
   );
 }
