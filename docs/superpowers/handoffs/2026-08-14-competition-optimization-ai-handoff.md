@@ -50,6 +50,7 @@
 | 4.1 | 统一角色权限、30分钟代管与逐写审计 | `40ddb440` |
 | 4.2 | 管理员五中心工作台、教师工作台与信息架构 | `98b2d2ca` |
 | 4.3 | 初始化向导状态机与扩展白名单收口 | `163909f6` |
+| 4.4 | 真实用户测试服务、报告与竞赛证据包 | `03dd8ef0` |
 
 较早提交已实现可视化作品管理、生图模型选择、专家目录、教练会话隔离、专业模式桥接等基础能力。接手时必须重新核对代码；专项设计中列出的评测、可信数据、四入口共享和状态恢复仍以验收结果为准。
 
@@ -85,7 +86,7 @@
 
 先后端授权，后前端导航。管理员五中心固定为内容治理、教学配置、AI 能力、扩展与集成、系统运维。学生不能自建、强制导入或任意执行工具。
 
-状态：任务 4.2 已完成（`98b2d2ca`），任务 4.3 已完成（`163909f6`），详情见本文件末尾“任务 4.2 交付记录”与“任务 4.3 交付记录”。任务 4.4（真实用户测试与竞赛证据包）尚未开始。
+状态：任务 4.2 已完成（`98b2d2ca`）、任务 4.3 已完成（`163909f6`）、任务 4.4 代码已完成（`03dd8ef0`），详情见本文件末尾交付记录。任务 4.4 的真实用户执行（2 名学生 + 1 名职教教师两轮测试）属人工验收，尚未进行。任务 5.1 至 5.3 尚未开始。
 
 ### 任务 E：真实用户测试
 
@@ -282,6 +283,55 @@ npm run build
   - 未暂存用户未跟踪文件；git diff --check 通过
 提交号：163909f6
 下一任务是否满足前置条件：是。任务 4.4（真实用户测试与竞赛证据包）可开始。
+```
+
+## 15. 任务 4.4 交付记录（2026-08-15）
+
+```text
+任务：4.4 真实用户测试与竞赛证据包（代码与服务部分）
+对应规格：docs/superpowers/specs/2026-08-14-user-testing-competition-evidence-design.md
+实现结果：
+  - 新增 usability_study 服务：匿名参与者(S01/S02/T01)、知情同意
+    (participate/screen_record/audio_record/quote/retention)、不可变 StudyRun、
+    事件导入、人工修订历史(append-only)、删除请求审计
+  - 确定性报告生成器：指标聚合、A/B 配对、中位数/范围、缺失值保留 null；
+    拒绝规则覆盖非法参与者/缺同意/未知任务版本/事件时间倒序/指标引用不存在/
+    哈希不匹配；草稿醒目标注“不可用于正式提交”
+  - 删除后重算：排除参与者并升版本；人工修正保留原值/修正值/理由/操作者
+  - 证据包导出：runs-index、metrics-summary、已批准原话、问题清单、源记录哈希，
+    全部脱敏，录屏/录音不进入包内
+  - 新增 /api/v1/usability-study 管理员路由（runs/events/corrections/deletions/
+    issues/quotes/report/export）
+  - 新增运维中心用户测试页 /admin/operations/usability（运行列表、报告摘要、
+    草稿警告、证据包导出）
+  - 新增竞赛文档：docs/competition/{usability-test-protocol,golden-demo-script,
+    submission-checklist}.md
+修改文件：
+  - 新增 deeptutor/services/usability_study/{models,store,report,__init__}.py、
+    deeptutor/api/routers/usability_study.py
+  - 修改 deeptutor/api/main.py 挂载路由
+  - 新增 tests/services/test_usability_report.py（10 项）
+  - 新增 web/app/(admin)/admin/operations/usability/page.tsx；修改 operations 页
+数据迁移：无。
+测试命令与结果：
+  - python -m pytest tests/services/test_usability_report.py -q → 10 项通过
+  - 全量 3723 passed / 12 skipped / 33 failed；33 项失败与基线完全一致
+    （可选依赖、POSIX/sandbox/win 差异），本任务未引入新失败
+  - cd web; npx tsc --noEmit → 通过；eslint 新增/修改前端文件 --quiet → 通过；
+    npm run test:node → 334 项通过；npm run build → 编译成功
+人工验收：未执行。需真实完成 2 名学生 + 1 名职教教师的两轮测试，并随机抽查
+  报告中的耗时、错误数和原话与事件记录及授权逐条核对。
+外部条件/未验证项：
+  - 真实参与者、知情同意签署与授权状态尚未录入
+  - 录屏/录音文件与授权状态索引尚未建立
+  - 竞赛电脑上的最终性能测量与三次黄金演示尚未执行（任务 5.x）
+安全与隔离检查：
+  - 仅存匿名编号；姓名/学号/学校/人脸不进默认证据包
+  - 删除请求写入审计，报告重算并标记版本；原话仅导出已批准项
+  - 路由 admin-gated；未暂存用户未跟踪文件；git diff --check 通过
+提交号：03dd8ef0
+下一任务是否满足前置条件：部分满足。代码/服务/文档就绪，但真实用户执行与
+  证据录入是任务 4.4 的人工验收门，且任务 5.1 黄金演示 E2E 依赖竞赛环境。
 ```
 
 ## 12. 最终交付判断
