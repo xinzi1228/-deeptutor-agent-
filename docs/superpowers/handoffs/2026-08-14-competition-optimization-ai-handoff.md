@@ -51,6 +51,7 @@
 | 4.2 | 管理员五中心工作台、教师工作台与信息架构 | `98b2d2ca` |
 | 4.3 | 初始化向导状态机与扩展白名单收口 | `163909f6` |
 | 4.4 | 真实用户测试服务、报告与竞赛证据包 | `03dd8ef0` |
+| 5.1 | 竞赛就绪检查器与黄金闭环 E2E | `fa827993` |
 
 较早提交已实现可视化作品管理、生图模型选择、专家目录、教练会话隔离、专业模式桥接等基础能力。接手时必须重新核对代码；专项设计中列出的评测、可信数据、四入口共享和状态恢复仍以验收结果为准。
 
@@ -86,7 +87,7 @@
 
 先后端授权，后前端导航。管理员五中心固定为内容治理、教学配置、AI 能力、扩展与集成、系统运维。学生不能自建、强制导入或任意执行工具。
 
-状态：任务 4.2 已完成（`98b2d2ca`）、任务 4.3 已完成（`163909f6`）、任务 4.4 代码已完成（`03dd8ef0`），详情见本文件末尾交付记录。任务 4.4 的真实用户执行（2 名学生 + 1 名职教教师两轮测试）属人工验收，尚未进行。任务 5.1 至 5.3 尚未开始。
+状态：任务 4.2（`98b2d2ca`）、4.3（`163909f6`）、4.4 代码（`03dd8ef0`）、5.1（`fa827993`）均已完成，详情见本文件末尾交付记录。任务 4.4 的真实用户执行与 5.1 的目标电脑三次演示属人工验收，尚未进行。任务 5.2、5.3 尚未开始。
 
 ### 任务 E：真实用户测试
 
@@ -332,6 +333,52 @@ npm run build
 提交号：03dd8ef0
 下一任务是否满足前置条件：部分满足。代码/服务/文档就绪，但真实用户执行与
   证据录入是任务 4.4 的人工验收门，且任务 5.1 黄金演示 E2E 依赖竞赛环境。
+```
+
+## 16. 任务 5.1 交付记录（2026-08-15）
+
+```text
+任务：5.1 黄金演示端到端测试（代码与自动化部分）
+对应规格：docs/superpowers/specs/2026-08-14-release-readiness-gates-design.md
+实现结果：
+  - 新增 scripts/competition_readiness_check.py：机器可读 JSON + 中文摘要，
+    覆盖运行时版本、前后端/Label Studio 连通性、模型/Embedding/imagegen
+    真实状态、存储/磁盘/端口/时钟、题库审核与黄金任务、明文密钥与扩展
+    策略、构建产物与提交版本；输出脱敏，标记阻断项与修复建议
+  - 新增 web/tests/e2e/golden-student-journey.spec.ts（6 项）：学生四入口、
+    档案锁/解锁、教学矩形框任务加载与模式切换幂等、专业模式降级、
+    刷新恢复、切换档案完全隔离
+  - 新增 web/tests/e2e/degraded-services.spec.ts（5 项）：对话模型不可用、
+    Embedding 未验收、Label Studio 不可用、网络中断恢复不重复写入、
+    可视化失败保持页面可用
+  - playwright.config.ts 增加 e2e 项目匹配 **/e2e/*.spec.ts，并支持
+    PW_BROWSER_CHANNEL 使用本机 Chrome/Edge 避免受限环境下载浏览器
+修改文件：
+  - 新增 scripts/competition_readiness_check.py、
+    web/tests/e2e/{golden-student-journey,degraded-services}.spec.ts
+  - 修改 web/playwright.config.ts
+数据迁移：无。
+测试命令与结果：
+  - python scripts/competition_readiness_check.py --json → 16 项检查正常输出；
+    当前环境（无运行后端/前端/模型）正确报阻断项
+  - cd web; npx playwright test tests/e2e/golden-student-journey.spec.ts
+    tests/e2e/degraded-services.spec.ts → 11 项全部通过（使用本机 Chrome，
+    WEB_BASE_URL=http://localhost:3782）
+  - npx tsc --noEmit、eslint 新增文件 --quiet → 通过
+  - 既有 compliance-and-ux.audit.ts 在基线配置下即失败（目标落地页已随 4.2
+    重构移除），非本次引入
+人工验收：未执行。需在目标竞赛电脑从干净启动连续三次运行黄金演示并记录
+  时长/故障/手工介入/外部服务状态（设计 §7）。
+外部条件/未验证项：
+  - 性能预算测量（冷启动/页面切换/成长首屏/首字/核心答案）需在竞赛电脑执行
+  - 真实模型/Embedding/Label Studio 在场时 E2E 需以真实后端复跑一遍
+安全与隔离检查：
+  - 检查器只输出脱敏状态与数量，不含密钥/Cookie/对话/标注正文
+  - E2E 使用独立档案与 route mock；测试结束清理 test-results，不触碰用户数据
+  - 未暂存用户未跟踪文件；git diff --check 通过
+提交号：fa827993
+下一任务是否满足前置条件：是（代码层面）。任务 5.2 全量回归与性能门禁、
+  5.3 文档同步待执行。
 ```
 
 ## 12. 最终交付判断
