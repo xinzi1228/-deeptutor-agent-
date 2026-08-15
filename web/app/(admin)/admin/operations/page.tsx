@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Network, ShieldCheck, Users } from "lucide-react";
+import { Activity, ClipboardCheck, Network, ShieldCheck, Users } from "lucide-react";
 
 import AdminCenterShell from "@/components/admin/AdminCenterShell";
 import { ADMIN_CENTERS } from "@/lib/capability-routes";
@@ -34,6 +34,12 @@ export default function AdminOperationsPage() {
           title="审计与安全"
           description="教师代管逐写审计仅记录请求与 SHA-256 内容哈希；密钥统一脱敏。"
           icon={<ShieldCheck className="h-4 w-4" />}
+        />
+        <QuickLink
+          href="/admin/operations/usability"
+          title="用户测试与竞赛证据"
+          description="匿名参与者测试运行、确定性报告与证据包导出。"
+          icon={<ClipboardCheck className="h-4 w-4" />}
         />
         <QuickLink
           href="/admin"

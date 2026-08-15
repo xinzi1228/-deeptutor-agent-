@@ -393,6 +393,7 @@ from deeptutor.api.routers import (
     system,
     textbook_ingestion,
     unified_ws,
+    usability_study,
     voice,
 )
 from deeptutor.api.routers import (
@@ -490,6 +491,11 @@ app.include_router(
     prefix="/api/v1/content-governance",
     tags=["content-governance"],
     dependencies=_admin,
+)
+app.include_router(
+    usability_study.router,
+    prefix="/api/v1/usability-study",
+    tags=["usability-study"],
 )
 app.include_router(
     current_learning_task.router,
