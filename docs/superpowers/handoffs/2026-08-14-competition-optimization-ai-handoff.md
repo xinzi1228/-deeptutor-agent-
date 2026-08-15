@@ -48,6 +48,7 @@
 | 3.4 | 确定性对话编排与渐进回答 | `71b47835` |
 | 3.5 | 可信可视化、40条标注教练评测集 | `d9b14c03` |
 | 4.1 | 统一角色权限、30分钟代管与逐写审计 | `40ddb440` |
+| 4.2 | 管理员五中心工作台、教师工作台与信息架构 | `98b2d2ca` |
 
 较早提交已实现可视化作品管理、生图模型选择、专家目录、教练会话隔离、专业模式桥接等基础能力。接手时必须重新核对代码；专项设计中列出的评测、可信数据、四入口共享和状态恢复仍以验收结果为准。
 
@@ -82,6 +83,8 @@
 规格：`../specs/2026-08-14-role-workspaces-onboarding-extension-design.md`
 
 先后端授权，后前端导航。管理员五中心固定为内容治理、教学配置、AI 能力、扩展与集成、系统运维。学生不能自建、强制导入或任意执行工具。
+
+状态：任务 4.2 已完成（`98b2d2ca`），详情见本文件末尾“任务 4.2 交付记录”。任务 4.3（初始化向导与白名单扩展收口）尚未开始。
 
 ### 任务 E：真实用户测试
 
@@ -180,6 +183,53 @@ npm run build
 ```
 
 禁止用“应该可以”“基本完成”替代测试结果。没有运行的测试明确写“未运行”。
+
+## 13. 任务 4.2 交付记录（2026-08-15）
+
+```text
+任务：4.2 管理员五中心与教师工作台（角色工作台的前端信息架构部分）
+对应规格：docs/superpowers/specs/2026-08-14-role-workspaces-onboarding-extension-design.md
+实现结果：
+  - 管理员五中心路由：/admin/content（内容治理）、/admin/teaching（教学配置）、
+    /admin/ai（AI 能力）、/admin/integrations（扩展与集成）、/admin/operations（系统运维）
+  - /admin 工作台首页：聚合系统健康、初始化进度、统一任务中心（内容待审 / 教材导入
+    失败 / 需复核）、五中心入口；保留七步初始化向导与脱敏报告下载
+  - 教师工作台 /teacher：默认只读，仅展示被授权学生（teacher_view / impersonate）的
+    当前任务、最近提交、问题与报告；无授权时显示解释性空态
+  - (admin) 布局加入 RoleRouteGate 与 AdminNav：/admin/* 仅管理员，越权 URL 返回
+    明确拒绝页；/teacher 仅要求已登录
+  - 旧入口兼容：/capabilities、/settings/status 跳转 /admin；设置中心为管理员显示
+    一次迁移提示；AdminLink 指向 /admin
+  - capability-routes.ts 成为五中心、角色门禁、旧路由跳转与设置归类的唯一来源；
+    settings-nav.ts 增加 center 归类
+修改文件：
+  - 新增 web/app/(admin)/admin/{content,teaching,ai,integrations,operations}/page.tsx、
+    web/app/(admin)/admin/page.tsx、web/app/(admin)/teacher/page.tsx
+  - 新增 web/components/admin/{AdminDashboard,AdminTaskCenter,AdminNav,AdminCenterShell,RoleRouteGate}.tsx、
+    web/components/teacher/TeacherDashboard.tsx
+  - 新增 web/tests/admin-information-architecture.test.ts
+  - 修改 web/lib/capability-routes.ts、web/lib/settings-nav.ts、
+    web/components/settings/SettingsHub.tsx、web/components/auth/AdminLink.tsx、
+    web/app/(utility)/capabilities/page.tsx、web/app/(admin)/layout.tsx
+数据迁移：无。教师工作台数据来自既有档案权限接口，未引入新的写入口。
+测试命令与结果：
+  - cd web; npm run test:node → 317 项通过（含新增信息架构测试 7 项）
+  - npx tsc --noEmit → 通过
+  - npx eslint <新增/修改前端文件> --quiet → 通过
+  - npm run build → 编译成功；npm run perf:check → 全部在预算内
+人工验收：未执行浏览器验收；需在目标环境确认五中心导航、越权 403、教师空态与迁移提示。
+外部条件/未验证项：
+  - 教师账号仍为 user 角色，后端没有“列出被分配学生”接口；教师工作台在无活跃
+    teacher_view/impersonate cookie 时展示空态，不伪造数据
+  - 内容治理、教材任务中心的实时计数依赖已存在的 admin API，未新增后端接口
+  - Embedding 五项验收、生图真实调用与 Label Studio 契约需在目标环境单独确认
+安全与隔离检查：
+  - 前端门禁仅镜像后端角色策略；真实授权仍由 deeptutor/services/authorization/policy.py 执行
+  - 任务中心只读取状态与计数，不读取对话正文、标注坐标或学生数据
+  - 未暂存用户未跟踪文件；git diff --check 通过
+提交号：98b2d2ca
+下一任务是否满足前置条件：是。任务 4.3（初始化向导与白名单扩展收口）可在本工作台上叠加。
+```
 
 ## 12. 最终交付判断
 
