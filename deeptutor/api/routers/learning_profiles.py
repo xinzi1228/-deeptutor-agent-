@@ -17,6 +17,7 @@ router = APIRouter()
 
 COOKIE_NAME = "dt_learning_profile"
 COOKIE_MAX_AGE = 12 * 3600
+TEACHER_COOKIE_MAX_AGE = 30 * 60
 
 
 def _cookie_attrs() -> dict:
@@ -61,6 +62,11 @@ class ChangePinRequest(BaseModel):
 
 class ResetPinRequest(BaseModel):
     new_pin: str
+
+
+class ImpersonateRequest(BaseModel):
+    reason: str = Field(min_length=2, max_length=200)
+    scopes: list[str] = Field(min_length=1, max_length=4)
 
 
 @router.get("")
@@ -170,18 +176,49 @@ async def teacher_view(profile_id: str, response: Response, _: TokenPayload = De
     if store.get(user.id, profile_id) is None:
         raise HTTPException(404, "学习档案不存在")
     raw, _ = grants.issue(user.id, profile_id, mode="teacher_view", actor_user_id=user.id)
-    response.set_cookie(value=raw, max_age=600, **_cookie_attrs())
+    response.set_cookie(value=raw, max_age=TEACHER_COOKIE_MAX_AGE, **_cookie_attrs())
     _audit(store, "teacher_view_started", profile_id, mode="teacher_view")
-    return {"ok": True, "read_only": True, "expires_in": 600}
+    return {"ok": True, "read_only": True, "expires_in": TEACHER_COOKIE_MAX_AGE}
 
 
 @router.post("/{profile_id}/impersonate")
-async def impersonate(profile_id: str, response: Response, _: TokenPayload = Depends(require_admin)) -> dict:
+async def impersonate(
+    profile_id: str,
+    body: ImpersonateRequest,
+    response: Response,
+    _: TokenPayload = Depends(require_admin),
+) -> dict:
     store, grants = _stores()
     user = get_current_user()
     if store.get(user.id, profile_id) is None:
         raise HTTPException(404, "学习档案不存在")
-    raw, _ = grants.issue(user.id, profile_id, mode="impersonate", actor_user_id=user.id)
-    response.set_cookie(value=raw, max_age=600, **_cookie_attrs())
-    _audit(store, "impersonation_started", profile_id, mode="impersonate")
-    return {"ok": True, "read_only": False, "expires_in": 600}
+    try:
+        raw, grant = grants.issue(
+            user.id,
+            profile_id,
+            mode="impersonate",
+            actor_user_id=user.id,
+            scopes=tuple(body.scopes),
+            reason=body.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    response.set_cookie(value=raw, max_age=TEACHER_COOKIE_MAX_AGE, **_cookie_attrs())
+    _audit(
+        store,
+        "impersonation_started",
+        profile_id,
+        mode="impersonate",
+        metadata={
+            "impersonation_id": grant.impersonation_id,
+            "reason": grant.reason,
+            "scopes": list(grant.scopes),
+        },
+    )
+    return {
+        "ok": True,
+        "read_only": False,
+        "expires_in": TEACHER_COOKIE_MAX_AGE,
+        "impersonation_id": grant.impersonation_id,
+        "scopes": list(grant.scopes),
+    }

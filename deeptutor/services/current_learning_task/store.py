@@ -17,11 +17,22 @@ class CurrentLearningTaskStore:
         self.idempotency_file = self.root / "idempotency.json"
         self._lock = threading.RLock()
 
+    @staticmethod
+    def _authorize(resource_id: str = "") -> None:
+        from deeptutor.services.authorization.policy import authorize_profile_operation
+
+        authorize_profile_operation(
+            "current_task.mutate",
+            resource_type="current_learning_task",
+            resource_id=str(resource_id)[:160],
+        )
+
     def get(self) -> CurrentLearningTask | None:
         value = self._read_json(self.state_file)
         return CurrentLearningTask.model_validate(value) if value else None
 
     def save(self, task: CurrentLearningTask) -> CurrentLearningTask:
+        self._authorize(task.task_id)
         atomic_write_json(self.state_file, task.model_dump(mode="json"))
         return task
 
@@ -31,6 +42,7 @@ class CurrentLearningTaskStore:
         return CurrentLearningTask.model_validate(value) if isinstance(value, dict) else None
 
     def remember(self, key: str, task: CurrentLearningTask) -> None:
+        self._authorize(task.task_id)
         rows = self._read_json(self.idempotency_file) or {}
         rows[key] = task.model_dump(mode="json")
         if len(rows) > 200:
@@ -38,6 +50,7 @@ class CurrentLearningTaskStore:
         atomic_write_json(self.idempotency_file, rows)
 
     def append_event(self, event: CurrentTaskEvent) -> None:
+        self._authorize(event.task_id)
         existing = self.events_file.read_text(encoding="utf-8") if self.events_file.exists() else ""
         prefix = existing if not existing or existing.endswith("\n") else existing + "\n"
         line = json.dumps(event.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))

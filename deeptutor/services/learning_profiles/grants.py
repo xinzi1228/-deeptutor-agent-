@@ -15,7 +15,7 @@ from .store import iso, parse_time, utc_now
 
 IDLE_MINUTES = 30
 ABSOLUTE_HOURS = 12
-TEACHER_MINUTES = 10
+TEACHER_MINUTES = 30
 
 
 def _digest(raw: str) -> str:
@@ -35,16 +35,61 @@ class ProfileGrantStore:
         except (OSError, json.JSONDecodeError, AttributeError):
             return []
         fields = ProfileGrant.__dataclass_fields__
-        return [ProfileGrant(**{k: v for k, v in row.items() if k in fields}) for row in rows if isinstance(row, dict)]
+        result: list[ProfileGrant] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            values = {k: v for k, v in row.items() if k in fields}
+            values["scopes"] = tuple(values.get("scopes") or ())
+            result.append(ProfileGrant(**values))
+        return result
 
     def _write(self, grants: list[ProfileGrant]) -> None:
         atomic_write_json(self.file, {"schema_version": 1, "grants": [asdict(item) for item in grants]})
 
-    def issue(self, owner_user_id: str, profile_id: str, *, mode: GrantMode = "student", actor_user_id: str = "") -> tuple[str, ProfileGrant]:
+    def issue(
+        self,
+        owner_user_id: str,
+        profile_id: str,
+        *,
+        mode: GrantMode = "student",
+        actor_user_id: str = "",
+        scopes: tuple[str, ...] = (),
+        reason: str = "",
+        impersonation_id: str = "",
+    ) -> tuple[str, ProfileGrant]:
+        if mode == "impersonate":
+            from deeptutor.services.authorization.policy import IMPERSONATION_ALLOWED
+
+            normalized_scopes = tuple(dict.fromkeys(str(item).strip() for item in scopes if str(item).strip()))
+            if not reason.strip():
+                raise ValueError("教师代管必须填写原因")
+            if not normalized_scopes:
+                raise ValueError("教师代管必须选择至少一个授权 scope")
+            if not set(normalized_scopes).issubset(IMPERSONATION_ALLOWED):
+                raise ValueError("教师代管包含不允许的授权 scope")
+            scopes = normalized_scopes
+            impersonation_id = impersonation_id or f"imp_{secrets.token_urlsafe(12)}"
+        else:
+            scopes = ()
+            reason = ""
+            impersonation_id = ""
         raw = secrets.token_urlsafe(32)
         now = utc_now()
         duration = timedelta(minutes=TEACHER_MINUTES) if mode != "student" else timedelta(hours=ABSOLUTE_HOURS)
-        grant = ProfileGrant(id_hash=_digest(raw), owner_user_id=owner_user_id, profile_id=profile_id, mode=mode, created_at=iso(now), last_activity_at=iso(now), absolute_expires_at=iso(now + duration), actor_user_id=actor_user_id or owner_user_id)
+        grant = ProfileGrant(
+            id_hash=_digest(raw),
+            owner_user_id=owner_user_id,
+            profile_id=profile_id,
+            mode=mode,
+            created_at=iso(now),
+            last_activity_at=iso(now),
+            absolute_expires_at=iso(now + duration),
+            actor_user_id=actor_user_id or owner_user_id,
+            scopes=scopes,
+            reason=reason.strip(),
+            impersonation_id=impersonation_id,
+        )
         with self._lock:
             grants = self._read()
             grants.append(grant)
@@ -71,7 +116,16 @@ class ProfileGrantStore:
                 grant = ProfileGrant(**{**asdict(grant), "last_activity_at": iso(now)})
                 grants[index] = grant
                 self._write(grants)
-        return ProfileAccessContext(owner_user_id=grant.owner_user_id, profile_id=grant.profile_id, mode=grant.mode, actor_user_id=grant.actor_user_id, read_only=grant.mode == "teacher_view")
+        return ProfileAccessContext(
+            owner_user_id=grant.owner_user_id,
+            profile_id=grant.profile_id,
+            mode=grant.mode,
+            actor_user_id=grant.actor_user_id,
+            read_only=grant.mode == "teacher_view",
+            scopes=grant.scopes,
+            reason=grant.reason,
+            impersonation_id=grant.impersonation_id,
+        )
 
     def revoke(self, raw: str, owner_user_id: str) -> bool:
         target = _digest(raw) if raw else ""

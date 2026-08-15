@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
-from datetime import datetime, timezone
 from typing import Any
 
 from deeptutor.services.learning_profiles.models import ProfileAccessContext
@@ -75,28 +74,34 @@ def authorize_learning_profile_mutation(
     profile = get_current_learning_profile()
     if profile is None:
         return None
-    if profile.read_only:
-        raise PermissionError("当前为教师只读视角，不能修改学生学习数据")
-    if profile.mode == "impersonate":
-        from deeptutor.multi_user.paths import get_current_path_service
-        from deeptutor.services.learning_profiles.audit import append_audit_event
-        from deeptutor.services.learning_profiles.models import ProfileAuditEvent
-        from deeptutor.services.learning_profiles.store import LearningProfileStore
+    lowered = path.lower()
+    if "/workspace/inbox/" in lowered and lowered.endswith("/organize"):
+        policy_operation = "inbox.organize"
+    elif "/workspace/inbox" in lowered:
+        policy_operation = "inbox.capture"
+    elif "/extensions/" in lowered:
+        policy_operation = "extension.preference"
+    elif "/chat" in lowered or "/ws" in lowered:
+        policy_operation = "chat.send"
+    elif "/memory" in lowered:
+        policy_operation = "memory.write"
+    elif "/sessions" in lowered:
+        policy_operation = "session.mutate"
+    elif "/annotation" in lowered or "/label-studio" in lowered:
+        policy_operation = "annotation.submit"
+    elif "." in operation:
+        policy_operation = operation
+    else:
+        policy_operation = "current_task.mutate"
 
-        workspace = get_current_path_service().get_workspace_dir()
-        store = LearningProfileStore(workspace)
-        append_audit_event(
-            store.audit_file,
-            ProfileAuditEvent(
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                event="impersonated_mutation",
-                owner_user_id=profile.owner_user_id,
-                profile_id=profile.profile_id,
-                actor_user_id=profile.actor_user_id,
-                mode=profile.mode,
-                metadata={"operation": str(operation)[:80], "path": str(path)[:240]},
-            ),
-        )
+    from deeptutor.services.authorization.policy import authorize_profile_operation
+
+    authorize_profile_operation(
+        policy_operation,
+        target_profile_id=profile.profile_id,
+        resource_type="request",
+        resource_id=str(path)[:240],
+    )
     return profile
 
 

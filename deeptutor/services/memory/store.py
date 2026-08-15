@@ -158,6 +158,16 @@ class MemoryStore:
     def __init__(self) -> None:
         self._write_locks: dict[str, asyncio.Lock] = {}
 
+    @staticmethod
+    def _authorize(resource_id: str = "") -> None:
+        from deeptutor.services.authorization.policy import authorize_profile_operation
+
+        authorize_profile_operation(
+            "memory.write",
+            resource_type="memory",
+            resource_id=str(resource_id)[:160],
+        )
+
     # ── L1 ────────────────────────────────────────────────────────────────
 
     async def emit(self, event: TraceEvent) -> None:
@@ -480,6 +490,7 @@ class MemoryStore:
         Raises :class:`ValueError` for invalid names (see
         :func:`validate_bucket_name`).
         """
+        self._authorize(f"bucket:{name}")
         validate_bucket_name(name)
         path = paths.buckets_dir() / name
         existed = path.exists()
@@ -492,6 +503,7 @@ class MemoryStore:
         Returns ``True`` if the directory existed before deletion,
         ``False`` otherwise. Raises :class:`ValueError` for invalid names.
         """
+        self._authorize(f"bucket:{name}")
         validate_bucket_name(name)
         path = paths.buckets_dir() / name
         existed = path.exists()
@@ -504,12 +516,14 @@ class MemoryStore:
 
     async def overwrite_doc(self, layer: Layer, key: str, md: str) -> None:
         """Direct user-driven save from the workbench editor."""
+        self._authorize(f"{layer}:{key}")
         path = self._path(layer, key)
         async with self._lock_for(path):
             await asyncio.to_thread(_atomic_write, path, md)
         _invalidate_read_cache()
 
     async def delete_entry(self, layer: Layer, key: str, entry_id: str) -> bool:
+        self._authorize(f"{layer}:{key}:{entry_id}")
         path = self._path(layer, key)
         return await self._mutate_entry(path, entry_id, Document.remove)
 
@@ -523,6 +537,7 @@ class MemoryStore:
         exists (idempotent: marking an already-stale entry is a no-op write
         that still returns ``True``).
         """
+        self._authorize(f"L2:{surface}:{entry_id}")
         if surface in paths.L3_SLOTS:
             raise ValueError(f"L3 slot {surface!r} cannot be marked stale")
         if surface not in paths.SURFACES:
@@ -540,6 +555,7 @@ class MemoryStore:
         (idempotent: unmarking an already-visible entry is a no-op write
         that still returns ``True``).
         """
+        self._authorize(f"L2:{surface}:{entry_id}")
         if surface in paths.L3_SLOTS:
             raise ValueError(f"L3 slot {surface!r} cannot be unmarked")
         if surface not in paths.SURFACES:
@@ -559,6 +575,7 @@ class MemoryStore:
         apply_ops: bool = True,
         bucket: str | None = None,
     ) -> ConsolidateResult:
+        self._authorize(f"L2:{surface}")
         path = paths.l2_file(surface, bucket)
         async with self._lock_for(path):
             result = await consolidator.consolidate_l2(
@@ -581,6 +598,7 @@ class MemoryStore:
         on_event: OnEvent | None = None,
         apply_ops: bool = True,
     ) -> ConsolidateResult:
+        self._authorize(f"L3:{slot}")
         if slot == "preferences":
             raise ValueError("preferences.md is not auto-consolidated")
         path = paths.l3_file(slot)
@@ -604,6 +622,7 @@ class MemoryStore:
         payload typically comes from a previous ``apply_ops=False``
         consolidate call surfaced to the user for review.
         """
+        self._authorize(f"{layer}:{key}")
         from deeptutor.services.memory.consolidator import _parse_ops_response
 
         path = self._path(layer, key)
@@ -637,6 +656,7 @@ class MemoryStore:
         """Write the chat-mode preference signal. The ``write_memory`` tool
         is the only caller; ``trace_id`` is the current chat turn's L1 id
         injected by runtime."""
+        self._authorize("L3:preferences")
         path = paths.l3_file("preferences")
         async with self._lock_for(path):
             doc = (
@@ -700,6 +720,7 @@ class MemoryStore:
         learning store; this is a compact human-readable mirror. The bullet
         is capped at the standard 240-char entry limit.
         """
+        self._authorize("L3:recent")
         path = paths.l3_file("recent")
         async with self._lock_for(path):
             doc = (

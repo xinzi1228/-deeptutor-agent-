@@ -37,6 +37,9 @@ class ProfileGrant:
     absolute_expires_at: str
     revoked_at: str = ""
     actor_user_id: str = ""
+    scopes: tuple[str, ...] = ()
+    reason: str = ""
+    impersonation_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,9 @@ class ProfileAccessContext:
     mode: GrantMode
     actor_user_id: str
     read_only: bool
+    scopes: tuple[str, ...] = ()
+    reason: str = ""
+    impersonation_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)

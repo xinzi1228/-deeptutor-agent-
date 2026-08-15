@@ -50,6 +50,16 @@ class AnnotationAttemptStore:
         self._task_observer = task_observer or self._notify_current_task
 
     @staticmethod
+    def _authorize(operation: str, resource_id: str = "") -> None:
+        from deeptutor.services.authorization.policy import authorize_profile_operation
+
+        authorize_profile_operation(
+            operation,
+            resource_type="annotation",
+            resource_id=str(resource_id)[:160],
+        )
+
+    @staticmethod
     def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         if not path.exists():
             return []
@@ -81,6 +91,7 @@ class AnnotationAttemptStore:
         return rows[-max(1, min(limit, 100)):]
 
     def save_draft(self, task_id: str, mode: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self._authorize("annotation.draft", task_id)
         clean_id = _SAFE_ID.sub("_", task_id.strip())[:100]
         if not clean_id:
             raise ValueError("缺少任务编号")
@@ -121,6 +132,7 @@ class AnnotationAttemptStore:
         revision: dict[str, Any] | None = None,
         detail: str = "",
     ) -> dict[str, Any] | None:
+        self._authorize("annotation.draft", task_id)
         with self._lock:
             draft = self.get_draft(task_id)
             if draft is None:
@@ -147,6 +159,7 @@ class AnnotationAttemptStore:
         sync_status: str = "local",
         revision: dict[str, Any] | None = None,
     ) -> tuple[dict[str, Any], bool]:
+        self._authorize("annotation.submit", task_id)
         key = idempotency_key.strip()[:160]
         if not key:
             raise ValueError("缺少幂等键")
@@ -195,6 +208,7 @@ class AnnotationAttemptStore:
         idempotency_key: str,
         source: str = "teaching_workbench",
     ) -> tuple[dict[str, Any], bool]:
+        self._authorize("annotation.submit", task_id)
         key = idempotency_key.strip()[:160]
         if not key:
             raise ValueError("缺少幂等键")
@@ -251,6 +265,7 @@ class AnnotationAttemptStore:
             return target
 
     def mark_submission_retry(self, idempotency_key: str, detail: str) -> dict[str, Any]:
+        self._authorize("annotation.submit", idempotency_key)
         current = next(
             (row for row in self._read_jsonl(self.pending_file) if row.get("idempotency_key") == idempotency_key),
             None,
@@ -267,6 +282,7 @@ class AnnotationAttemptStore:
     def mark_submission_synced(
         self, idempotency_key: str, *, revision: dict[str, Any]
     ) -> dict[str, Any]:
+        self._authorize("annotation.submit", idempotency_key)
         return self._update_pending(
             idempotency_key,
             sync_status="synced",
@@ -275,6 +291,7 @@ class AnnotationAttemptStore:
         )
 
     def finalize_submission(self, idempotency_key: str) -> tuple[dict[str, Any], bool]:
+        self._authorize("annotation.submit", idempotency_key)
         with self._lock:
             row = next(
                 (item for item in self._read_jsonl(self.pending_file) if item.get("idempotency_key") == idempotency_key),
@@ -334,6 +351,7 @@ class AnnotationAttemptStore:
         stage: str,
         summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        self._authorize("annotation.draft", task_id)
         current = {
             "schema_version": 1,
             "task_id": str(task_id)[:120],

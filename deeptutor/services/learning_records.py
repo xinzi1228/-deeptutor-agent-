@@ -63,6 +63,16 @@ class LearningRecordStore:
         )
         self._file = self._root / "records.jsonl"
 
+    @staticmethod
+    def _authorize(resource_id: str = "") -> None:
+        from deeptutor.services.authorization.policy import authorize_profile_operation
+
+        authorize_profile_operation(
+            "learning_record.append",
+            resource_type="learning_record",
+            resource_id=str(resource_id)[:160],
+        )
+
     @property
     def file(self) -> Path:
         return self._file
@@ -108,6 +118,7 @@ class LearningRecordStore:
         Lives outside the records stream so course shape and learner state
         stay separable. Returns the written file path.
         """
+        self._authorize("diagnosis_brief")
         self._ensure_dir()
         path = self._root / "brief.json"
         import json as _json
@@ -153,6 +164,7 @@ class LearningRecordStore:
 
     async def append_decision(self, decision: dict[str, Any]) -> dict[str, Any]:
         """Append one coach decision with its rationale (audit trail)."""
+        self._authorize(str(decision.get("id") or "coach_decision"))
         if "timestamp" not in decision:
             decision["timestamp"] = datetime.now(tz=timezone.utc).isoformat()
         self._ensure_dir()
@@ -193,6 +205,7 @@ class LearningRecordStore:
 
     async def append_evaluation(self, evaluation: dict[str, Any]) -> dict[str, Any]:
         """Persist a full adversarial teaching-plan evaluation."""
+        self._authorize(str(evaluation.get("id") or "teaching_evaluation"))
         if "timestamp" not in evaluation:
             evaluation["timestamp"] = datetime.now(tz=timezone.utc).isoformat()
         self._ensure_dir()
@@ -231,6 +244,7 @@ class LearningRecordStore:
 
         Returns the persisted record (timestamp added if absent).
         """
+        self._authorize(str(record.get("id") or record.get("task_id") or record.get("type") or "record"))
         self._normalize_record(record)
         # Asset snapshots make future reports auditable without changing old scores.
         if "asset_versions" not in record:
@@ -277,6 +291,7 @@ class LearningRecordStore:
         ``reflect()`` is a pure in-memory transformation of the JSONL truth —
         nothing is deleted, so it is reversible by un-archiving.
         """
+        self._authorize("reflection")
         records = self._read_records()
         if llm_dedup:
             from deeptutor.services import learning_records_dedup as dedup_mod
@@ -402,6 +417,7 @@ class LearningRecordStore:
         Hits become a ``correction``-style learning signal: the record keeps
         its foresight, gains ``foresight_verified=True`` + ``foresight_hit``.
         """
+        self._authorize(f"foresight:{index}")
         records = self._read_records()
         if not 0 <= index < len(records):
             return None

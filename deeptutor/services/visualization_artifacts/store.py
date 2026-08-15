@@ -17,7 +17,18 @@ class VisualizationArtifactStore:
         self.profile_root = Path(profile_root)
         self.root = self.profile_root / "artifacts" / "visualizations"
 
+    @staticmethod
+    def _authorize(resource_id: str = "") -> None:
+        from deeptutor.services.authorization.policy import authorize_profile_operation
+
+        authorize_profile_operation(
+            "visualization.mutate",
+            resource_type="visualization",
+            resource_id=str(resource_id)[:160],
+        )
+
     def save(self, artifact: VisualizationArtifact) -> Path:
+        self._authorize(artifact.id)
         path = self.root / f"{artifact.id}.json"
         atomic_write_json(path, artifact.to_dict())
         return path
@@ -39,6 +50,7 @@ class VisualizationArtifactStore:
         return value if isinstance(value, dict) else None
 
     def set_save_state(self, artifact_id: str, save_state: str) -> dict:
+        self._authorize(artifact_id)
         if save_state == "session":
             save_state = "ephemeral"
         if save_state not in {"ephemeral", "saved", "learning_material"}:
@@ -53,6 +65,7 @@ class VisualizationArtifactStore:
     def rerender_chart(self, artifact_id: str, chart_type: str) -> dict:
         """Change presentation only; the frozen dataset and values stay intact."""
 
+        self._authorize(artifact_id)
         next_type = str(chart_type or "").strip()
         if next_type not in _CHART_TYPES:
             raise ValueError("不支持的图表类型")
@@ -86,6 +99,7 @@ class VisualizationArtifactStore:
         return value
 
     def delete(self, artifact_id: str) -> bool:
+        self._authorize(artifact_id)
         path = self._path(artifact_id)
         if not path.exists():
             return False

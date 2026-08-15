@@ -88,3 +88,48 @@ def test_teacher_view_is_read_only(tmp_path):
     assert context is not None
     assert context.read_only is True
     assert context.mode == "teacher_view"
+
+
+def test_impersonation_requires_reason_and_explicit_scopes(tmp_path):
+    grants = ProfileGrantStore(tmp_path / "workspace")
+    profile_id = "lp_" + "a" * 24
+    with pytest.raises(ValueError, match="原因"):
+        grants.issue(
+            "u_teacher",
+            profile_id,
+            mode="impersonate",
+            scopes=("task.assign",),
+        )
+    with pytest.raises(ValueError, match="scope"):
+        grants.issue(
+            "u_teacher",
+            profile_id,
+            mode="impersonate",
+            reason="课堂辅导",
+        )
+    with pytest.raises(ValueError, match="不允许"):
+        grants.issue(
+            "u_teacher",
+            profile_id,
+            mode="impersonate",
+            reason="课堂辅导",
+            scopes=("annotation.submit",),
+        )
+
+
+def test_impersonation_context_preserves_auditable_authority(tmp_path):
+    grants = ProfileGrantStore(tmp_path / "workspace")
+    raw, issued = grants.issue(
+        "u_teacher",
+        "lp_" + "a" * 24,
+        mode="impersonate",
+        actor_user_id="teacher-1",
+        reason="课堂辅导",
+        scopes=("task.assign", "teacher_feedback.append"),
+    )
+    context = grants.validate(raw, "u_teacher")
+    assert context is not None
+    assert context.scopes == ("task.assign", "teacher_feedback.append")
+    assert context.reason == "课堂辅导"
+    assert context.impersonation_id == issued.impersonation_id
+    assert context.impersonation_id.startswith("imp_")
