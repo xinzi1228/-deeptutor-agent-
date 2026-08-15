@@ -102,6 +102,26 @@ def _admin_partner_summary() -> list[dict[str, Any]]:
     ]
 
 
+def _admin_extension_summary() -> list[dict[str, Any]]:
+    """The approved learning extensions an admin can assign to a learner.
+
+    Identity only (id/name/version) — permissions and tool lists are read from
+    the single curated catalog, never from a grant payload.
+    """
+    from deeptutor.services.extension_marketplace import CATALOG
+
+    return [
+        {
+            "extension_id": str(item.get("id") or ""),
+            "name": item.get("name") or "",
+            "version": str(item.get("version") or ""),
+            "review_status": str(item.get("review_status") or "approved"),
+        }
+        for item in CATALOG
+        if str(item.get("review_status") or "approved") == "approved"
+    ]
+
+
 def _require_assignable_user(user_id: str) -> tuple[str, dict[str, Any]]:
     user_record = get_user_by_id(user_id)
     if user_record is None:
@@ -127,6 +147,7 @@ async def admin_resources(_: object = Depends(require_admin)) -> dict[str, Any]:
         "knowledge_bases": _admin_kb_summary(),
         "skills": _admin_skill_summary(),
         "partners": _admin_partner_summary(),
+        "extensions": _admin_extension_summary(),
         "tools": tool_options["tools"],
         "mcp_tools": tool_options["mcp_tools"],
     }
@@ -157,6 +178,7 @@ async def put_user_grants(
             "kb_count": len(grant.get("knowledge_bases", []) or []),
             "skill_count": len(grant.get("skills", []) or []),
             "partner_count": len(grant.get("partners", []) or []),
+            "extension_count": len(grant.get("extensions", []) or []),
             "enabled_tools": grant.get("enabled_tools"),
             "mcp_tool_count": (
                 None if grant.get("mcp_tools") is None else len(grant.get("mcp_tools") or [])

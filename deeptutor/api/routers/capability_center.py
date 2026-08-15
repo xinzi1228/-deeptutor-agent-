@@ -11,17 +11,33 @@ from pydantic import BaseModel, Field
 
 from deeptutor.multi_user.context import get_current_learning_profile, get_current_user
 from deeptutor.multi_user.paths import get_current_path_service
-from deeptutor.services.file_io import atomic_write_json
+from deeptutor.services.config import get_model_catalog_service
+from deeptutor.services.onboarding import (
+    ALL_STEP_KEYS,
+    OPTIONAL_STEPS,
+    apply_action,
+    current_step,
+    fingerprint,
+    load_state,
+    mark_stale,
+    save_state,
+)
 
 router = APIRouter()
 Status = Literal["normal", "limited", "fault"]
 
 
 class OnboardingUpdate(BaseModel):
-    step: int = Field(ge=1, le=7)
+    # Legacy v1 wizard fields (kept for backward compatibility with saved
+    # clients that still submit integer steps). New clients use step_key +
+    # action on the resumable state machine.
+    step: int | None = Field(default=None, ge=1, le=7)
     completed: list[int] = Field(default_factory=list)
     skipped: list[int] = Field(default_factory=list)
-    dismissed: bool = False
+    dismissed: bool | None = None
+    step_key: str | None = None
+    action: Literal["done", "skip", "resume", "retest"] | None = None
+    detail: str = ""
 
 
 def _card(
@@ -166,17 +182,106 @@ def _onboarding_file():
     return get_current_path_service().get_settings_file("capability_center")
 
 
+def _live_onboarding_fingerprints() -> dict[str, str]:
+    """Deterministic fingerprints of each step's dependency config.
+
+    Passed steps record the fingerprint at ``done`` time; ``mark_stale``
+    compares against the live value so a changed dependency degrades the step
+    to ``stale`` instead of keeping a stale "passed".
+    """
+    from deeptutor.services.config import load_auth_settings
+
+    out: dict[str, str] = {}
+    # account_security: auth enabled + secret storage migrated
+    try:
+        auth = load_auth_settings()
+        migration = get_model_catalog_service().secret_migration_status()
+        out["account_security"] = fingerprint(
+            f"auth={bool(auth.get('enabled'))}",
+            f"migrated={not migration.migration_required}",
+        )
+    except Exception:
+        out["account_security"] = ""
+    # llm: active chat model id
+    catalog = get_model_catalog_service().load()
+    llm = get_model_catalog_service().get_active_model(catalog, "llm") or {}
+    out["llm"] = fingerprint("llm", llm.get("id") or llm.get("model") or llm.get("name"))
+    # embedding: active embedding model id
+    embedding = get_model_catalog_service().get_active_model(catalog, "embedding") or {}
+    out["embedding"] = fingerprint(
+        "embedding", embedding.get("id") or embedding.get("model") or embedding.get("name")
+    )
+    # knowledge_base: embedding model + ready KB count + names
+    try:
+        from deeptutor.multi_user.knowledge_access import current_kb_manager
+
+        manager = current_kb_manager()
+        names = sorted(manager.list_knowledge_bases())
+        ready = sum(
+            1
+            for name in names
+            if (manager.config.get("knowledge_bases", {}) or {}).get(name, {}).get("status")
+            == "ready"
+        )
+        out["knowledge_base"] = fingerprint(
+            "kb", embedding.get("id") or "", ",".join(names), f"ready={ready}"
+        )
+    except Exception:
+        out["knowledge_base"] = ""
+    # label_studio: gateway token configured
+    from deeptutor.services.label_studio_gateway import LabelStudioClient
+
+    try:
+        client = LabelStudioClient()
+        out["label_studio"] = fingerprint("ls", "configured" if client.token else "missing")
+    except Exception:
+        out["label_studio"] = ""
+    # imagegen (optional): active imagegen model id
+    image = get_model_catalog_service().get_active_model(catalog, "imagegen") or {}
+    out["imagegen"] = fingerprint(
+        "imagegen", image.get("id") or image.get("model") or image.get("name")
+    )
+    # mcp (optional): enabled server names
+    try:
+        from deeptutor.services.mcp import load_mcp_config
+
+        mcp_cfg = load_mcp_config()
+        enabled = sorted(
+            name for name, config in mcp_cfg.servers.items() if config.enabled
+        )
+        out["mcp"] = fingerprint("mcp", *enabled)
+    except Exception:
+        out["mcp"] = ""
+    # skill (optional): installed skill names
+    try:
+        from deeptutor.services.skill import get_skill_service
+
+        skills = sorted(info.name for info in get_skill_service().list_skills())
+        out["skill"] = fingerprint("skill", *skills)
+    except Exception:
+        out["skill"] = ""
+    # health_check: derived from live overall status + free disk
+    try:
+        system = _system_status()
+        overall = "ok" if system["status"] == "normal" else system["status"]
+        out["health_check"] = fingerprint("health", overall, f"free={system['details'].get('free_disk_gb')}")
+    except Exception:
+        out["health_check"] = ""
+    return out
+
+
 def _read_onboarding() -> dict[str, Any]:
     path = _onboarding_file()
-    default = {"step": 1, "completed": [], "skipped": [], "dismissed": False}
-    if not path.exists():
-        return default
-    import json
+    state = load_state(path)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return default
-    return {**default, **data} if isinstance(data, dict) else default
+        state = mark_stale(state, _live_onboarding_fingerprints())
+    except Exception:
+        pass
+    state["current_step"] = current_step(state)
+    state["completed"] = [key for key in ALL_STEP_KEYS if state["steps"].get(key, {}).get("status") == "passed"]
+    state["skipped"] = [key for key in ALL_STEP_KEYS if state["steps"].get(key, {}).get("status") == "skipped"]
+    state["optional"] = [key for key, _ in OPTIONAL_STEPS]
+    return state
 
 
 @router.get("/overview")
@@ -198,14 +303,51 @@ async def overview() -> dict[str, Any]:
     }
 
 
+@router.get("/onboarding")
+async def get_onboarding() -> dict[str, Any]:
+    """Read the resumable onboarding state machine (admin)."""
+    if not get_current_user().is_admin:
+        raise HTTPException(status_code=403, detail="只有管理员可以查看初始化进度")
+    return _read_onboarding()
+
+
 @router.put("/onboarding")
 async def update_onboarding(body: OnboardingUpdate) -> dict[str, Any]:
     if not get_current_user().is_admin:
         raise HTTPException(status_code=403, detail="只有管理员可以修改初始化进度")
-    payload = body.model_dump()
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-    atomic_write_json(_onboarding_file(), payload)
-    return payload
+    path = _onboarding_file()
+    state = load_state(path)
+    try:
+        if body.action is not None:
+            step_key = body.step_key or current_step(state)
+            if body.action == "done":
+                live = _live_onboarding_fingerprints()
+                state = apply_action(
+                    state, step_key, "done", detail=body.detail,
+                    fingerprint=live.get(step_key, ""),
+                )
+            else:
+                state = apply_action(state, step_key, body.action, detail=body.detail)
+        else:
+            # Legacy v1 payload: apply integer completed/skipped lists on top of
+            # the current state, mapping to the fixed core step order.
+            for number in body.completed:
+                state = apply_action(state, _legacy_key_for_index(number), "done")
+            for number in body.skipped:
+                state = apply_action(state, _legacy_key_for_index(number), "skip")
+        if body.dismissed is not None:
+            state["dismissed"] = body.dismissed
+        state["updated_at"] = datetime.now(timezone.utc).isoformat()
+        save_state(path, state)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _read_onboarding()
+
+
+def _legacy_key_for_index(index: int) -> str:
+    from deeptutor.services.onboarding import legacy_int_to_key
+
+    return legacy_int_to_key(index)
 
 
 @router.get("/diagnostics")

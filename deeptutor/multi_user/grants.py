@@ -20,6 +20,10 @@ def empty_grant(user_id: str) -> dict[str, Any]:
         "models": {"llm": []},
         "knowledge_bases": [],
         "skills": [],
+        # Learning extensions an admin has assigned (whitelist). A learner may
+        # only install / enable extensions on this list; installing new ones is
+        # an admin action. Shape matches ``skills``: list of dicts.
+        "extensions": [],
         # Partners an admin has assigned to this user. Partners stay
         # admin-managed (the /api/v1/partners CRUD router is admin-gated); a
         # grant only lets the user *see and consult* the named partners — same
@@ -69,7 +73,7 @@ def normalize_grant(user_id: str, payload: dict[str, Any] | None) -> dict[str, A
     if not isinstance(items, list):
         items = []
     base["models"]["llm"] = [dict(item) for item in items if isinstance(item, dict)]
-    for key in ("knowledge_bases", "skills", "partners"):
+    for key in ("knowledge_bases", "skills", "partners", "extensions"):
         values = payload.get(key) if isinstance(payload.get(key), list) else []
         base[key] = [dict(item) for item in values if isinstance(item, dict)]
     for key in ("enabled_tools", "mcp_tools"):

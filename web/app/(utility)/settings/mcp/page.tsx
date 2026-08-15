@@ -8,6 +8,7 @@ import { SettingsPageHeader } from "@/components/settings/shared";
 import {
   emptyMcpServerConfig,
   getMcpSettings,
+  isHighRiskMcpChange,
   testMcpServer,
   updateMcpSettings,
   type McpServerConfig,
@@ -112,7 +113,16 @@ export default function McpSettingsPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const status = await updateMcpSettings(next);
+      const current = servers ?? {};
+      const highRisk = isHighRiskMcpChange(current, next);
+      const confirmed = highRisk
+        ? window.confirm(
+            t("mcp.confirm_high_risk") ||
+              "添加或启用 MCP 服务器会运行主机命令，属于高风险变更。确认保存吗？",
+          )
+        : true;
+      if (!confirmed) return false;
+      const status = await updateMcpSettings(next, { confirmed });
       setServers(next);
       setStatusRows(status);
       return true;
@@ -122,7 +132,7 @@ export default function McpSettingsPage() {
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [servers, t]);
 
   const handleToggleExpanded = (name: string) => {
     setExpanded((prev) => {

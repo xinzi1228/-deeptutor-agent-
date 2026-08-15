@@ -10,6 +10,8 @@ Mounted at ``/api/v1/skills``.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -53,15 +55,17 @@ class InstallSkillRequest(BaseModel):
     """Install a hub skill into the caller's own skill layer.
 
     ``ref`` is a ``<hub>:<slug>[@version]`` reference (the bare hub prefix
-    defaults to ``eduhub``). The web "import from EduHub" flow always builds an
+    defaults to ``eduhub``). The web "Import from EduHub" flow always builds an
     ``eduhub:`` ref so a spoofed bridge message can't redirect the install to an
-    arbitrary registry.
+    arbitrary registry. Installing an unverified skill is a high-risk change and
+    requires ``confirmed=True``.
     """
 
     ref: str = Field(..., min_length=1, max_length=256)
     name: str | None = None
     force: bool = False
     allow_unverified: bool = False
+    confirmed: bool = False
 
 
 class CreateTagRequest(BaseModel):
@@ -248,6 +252,12 @@ async def install_skill(
 
     from deeptutor.services.skill.hub import HubError, install_from_hub
 
+    if payload.allow_unverified and not payload.confirmed:
+        raise HTTPException(
+            status_code=400,
+            detail="安装未经审核的 Skill 属于高风险变更，需要二次确认",
+        )
+
     service = get_skill_service()
     try:
         outcome = await asyncio.to_thread(
@@ -265,11 +275,36 @@ async def install_skill(
     except HubError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
+    _record_skill_install(payload, outcome)
+
     return {
         "skill": outcome.result.info.to_dict(),
         "verdict": {"status": outcome.verdict.status, "detail": outcome.verdict.detail},
         "version": outcome.ref.version,
     }
+
+
+def _record_skill_install(payload: "InstallSkillRequest", outcome: Any) -> None:
+    """Versioned change + rollback journal for hub skill installs (admin)."""
+    from datetime import datetime, timezone
+    import json as _json
+
+    from deeptutor.multi_user.paths import get_admin_path_service
+
+    path = get_admin_path_service().get_settings_dir() / "skill_changes.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "ref": payload.ref,
+        "installed_as": outcome.result.info.name,
+        "version": outcome.ref.version,
+        "verdict": outcome.verdict.status,
+        "allow_unverified": payload.allow_unverified,
+        "confirmed": payload.confirmed,
+        "forced": payload.force,
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(_json.dumps(record, ensure_ascii=False) + "\n")
 
 
 @router.put("/{name}")

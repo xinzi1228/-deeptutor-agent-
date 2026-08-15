@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from deeptutor.api.routers.auth import TokenPayload, require_admin
+from deeptutor.api.routers.auth import AUTH_ENABLED, TokenPayload, require_admin
 from deeptutor.services.learning_records import LearningStats
 from deeptutor.services.student_dashboard.service import build_learning_report_payload
 
@@ -36,6 +36,11 @@ class InboxOrganizeRequest(BaseModel):
 
 class ExtensionEnabledRequest(BaseModel):
     enabled: bool
+    confirmed: bool = False
+
+
+class ExtensionInstallRequest(BaseModel):
+    confirmed: bool = False
 
 
 class VisualizationStateRequest(BaseModel):
@@ -223,26 +228,85 @@ async def delete_profile_visualization(artifact_id: str) -> dict[str, bool]:
 
 @router.get("/extensions/catalog")
 async def extension_catalog() -> dict[str, Any]:
+    from deeptutor.multi_user.context import get_current_user
+    from deeptutor.multi_user.grants import load_grant
     from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
-    return {"extensions": ExtensionMarketplaceService().catalog()}
+
+    user = get_current_user()
+    service = ExtensionMarketplaceService()
+    assigned = {
+        str(item.get("extension_id") or "")
+        for item in (load_grant(user.id).get("extensions", []) or [])
+    }
+    items = service.catalog()
+    for item in items:
+        item["assigned"] = item["id"] in assigned
+        item["installable"] = bool(user.is_admin) or item["id"] in assigned
+        item["review_status"] = item.get("review_status", "approved")
+    # When auth is disabled every caller is treated as local admin; the same
+    # catalog is returned either way, but non-admin callers only get assigned
+    # entries surfaced as installable.
+    if not AUTH_ENABLED or user.is_admin:
+        return {"extensions": items}
+    return {"extensions": items}
 
 
 @router.post("/extensions/{extension_id}/install")
-async def install_extension(extension_id: str) -> dict[str, Any]:
+async def install_extension(
+    extension_id: str,
+    request: ExtensionInstallRequest | None = None,
+) -> dict[str, Any]:
+    from deeptutor.multi_user.context import get_current_user
+    from deeptutor.multi_user.grants import load_grant
     from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+
+    user = get_current_user()
+    assigned = {
+        str(item.get("extension_id") or "")
+        for item in (load_grant(user.id).get("extensions", []) or [])
+    }
     try:
-        return {"extension": ExtensionMarketplaceService().install(extension_id)}
+        return {
+            "extension": ExtensionMarketplaceService().install(
+                extension_id,
+                actor_is_admin=bool(user.is_admin),
+                assigned_ids=assigned,
+                confirmed=bool(request.confirmed) if request else False,
+            )
+        }
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.patch("/extensions/{extension_id}")
-async def set_extension_enabled(extension_id: str, request: ExtensionEnabledRequest) -> dict[str, Any]:
+async def set_extension_enabled(
+    extension_id: str, request: ExtensionEnabledRequest
+) -> dict[str, Any]:
+    from deeptutor.multi_user.context import get_current_user
+    from deeptutor.multi_user.grants import load_grant
     from deeptutor.services.extension_marketplace import ExtensionMarketplaceService
+
+    user = get_current_user()
+    assigned = {
+        str(item.get("extension_id") or "")
+        for item in (load_grant(user.id).get("extensions", []) or [])
+    }
     try:
-        return {"extension": ExtensionMarketplaceService().set_enabled(extension_id, request.enabled)}
+        return {
+            "extension": ExtensionMarketplaceService().set_enabled(
+                extension_id,
+                request.enabled,
+                actor_is_admin=bool(user.is_admin),
+                assigned_ids=assigned,
+                confirmed=bool(request.confirmed),
+            )
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.get("/extensions/learning-path")

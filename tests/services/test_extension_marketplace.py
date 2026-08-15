@@ -10,8 +10,8 @@ def test_catalog_is_curated_and_install_is_per_workspace(tmp_path):
     assert {item["id"] for item in catalog} == {
         "learning-path-diagram",
         "report-card-enhancer",
+        "experimental-vision-tagger",
     }
-    assert all(item["approved"] for item in catalog)
     assert not any(item["installed"] for item in catalog)
 
     installed = service.install("learning-path-diagram")

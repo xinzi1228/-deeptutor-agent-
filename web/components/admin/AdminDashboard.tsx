@@ -35,10 +35,12 @@ type Overview = {
   cards: Card[];
   is_admin: boolean;
   onboarding: {
-    step: number;
-    completed: number[];
-    skipped: number[];
+    version: number;
     dismissed: boolean;
+    current_step?: string;
+    completed?: string[];
+    skipped?: string[];
+    steps?: Record<string, { status: string; detail?: string }>;
   } | null;
   privacy: string;
   generated_at: string;
@@ -112,9 +114,9 @@ export default function AdminDashboard() {
   };
 
   const onboarded = overview?.onboarding
-    ? overview.onboarding.completed.length
+    ? overview.onboarding.completed?.length ?? 0
     : 0;
-  const onboardingTotal = overview?.onboarding ? 7 : 0;
+  const onboardingTotal = overview?.onboarding ? CORE_ONBOARDING_STEPS.length : 0;
   const hasRisk =
     overview?.cards.some((card) => card.status === "fault") ?? false;
 
@@ -307,15 +309,20 @@ function SummaryCard({
   return href ? <Link href={href}>{body}</Link> : body;
 }
 
-const ONBOARDING_STEPS = [
-  "检测运行环境",
-  "配置主对话模型",
-  "配置可选模型",
-  "导入第一份资料",
-  "启用审核扩展",
-  "创建学生档案",
-  "运行完整体检",
+const CORE_ONBOARDING_STEPS = [
+  { key: "account_security", label: "账号安全" },
+  { key: "llm", label: "对话模型" },
+  { key: "embedding", label: "Embedding" },
+  { key: "knowledge_base", label: "知识库" },
+  { key: "label_studio", label: "Label Studio" },
+  { key: "health_check", label: "完整体检" },
 ];
+
+const OPTIONAL_ONBOARDING_LABELS: Record<string, string> = {
+  imagegen: "生图",
+  mcp: "MCP",
+  skill: "Skill",
+};
 
 function Onboarding({
   data,
@@ -324,62 +331,57 @@ function Onboarding({
   data: NonNullable<Overview["onboarding"]>;
   onSaved: () => void;
 }) {
+  const steps = data.steps ?? {};
+  const currentKey = data.current_step ?? "account_security";
+  const currentIndex = Math.max(
+    0,
+    CORE_ONBOARDING_STEPS.findIndex((step) => step.key === currentKey),
+  );
+  const current = CORE_ONBOARDING_STEPS[currentIndex] ?? CORE_ONBOARDING_STEPS[0];
+
   const save = async (
-    step: number,
-    action: "done" | "skip" | "dismiss",
+    stepKey: string,
+    action: "done" | "skip" | "retest" | "resume" | "dismiss",
   ) => {
-    const completed =
-      action === "done"
-        ? Array.from(new Set([...data.completed, step]))
-        : data.completed;
-    const skipped =
-      action === "skip"
-        ? Array.from(new Set([...data.skipped, step]))
-        : data.skipped;
     await apiFetch(apiUrl("/api/v1/capability-center/onboarding"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        step: Math.min(step + 1, 7),
-        completed,
-        skipped,
-        dismissed: action === "dismiss",
-      }),
+      body: JSON.stringify({ step_key: stepKey, action }),
     });
     onSaved();
   };
-  const current = Math.min(Math.max(data.step, 1), 7);
+
   return (
     <section className="mt-6 rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 to-blue-500/5 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">
-            首次初始化 · 第 {current}/7 步
+            首次初始化 · 第 {currentIndex + 1}/{CORE_ONBOARDING_STEPS.length} 步
           </h2>
           <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-            {ONBOARDING_STEPS[current - 1]}
+            {current.label}
           </p>
         </div>
         <button
           type="button"
-          onClick={() => void save(current, "dismiss")}
+          onClick={() => void save(current.key, "dismiss")}
           className="text-xs text-[var(--muted-foreground)]"
         >
           暂时隐藏
         </button>
       </div>
       <div className="mt-4 grid grid-cols-7 gap-1.5">
-        {ONBOARDING_STEPS.map((label, index) => {
-          const number = index + 1;
-          const finished = data.completed.includes(number);
+        {CORE_ONBOARDING_STEPS.map((step, index) => {
+          const status = steps[step.key]?.status ?? "not_started";
+          const finished = status === "passed" || status === "skipped";
           return (
             <div
-              key={label}
-              title={label}
+              key={step.key}
+              title={`${step.label} · ${status}`}
               className={`h-1.5 rounded-full ${
                 finished
                   ? "bg-emerald-500"
-                  : number === current
+                  : index === currentIndex
                     ? "bg-violet-500"
                     : "bg-[var(--border)]"
               }`}
@@ -387,23 +389,38 @@ function Onboarding({
           );
         })}
       </div>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => void save(current, "done")}
+          onClick={() => void save(current.key, "done")}
           className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white"
         >
           这一步已完成
         </button>
-        {[3, 5].includes(current) && (
+        {steps[current.key]?.status === "passed" && (
           <button
             type="button"
-            onClick={() => void save(current, "skip")}
+            onClick={() => void save(current.key, "retest")}
+            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs"
+          >
+            重新验证
+          </button>
+        )}
+        {["embedding", "label_studio"].includes(current.key) && (
+          <button
+            type="button"
+            onClick={() => void save(current.key, "skip")}
             className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs"
           >
             稍后再配置（核心仍可用）
           </button>
         )}
+        <span className="ml-auto text-[11px] text-[var(--muted-foreground)]">
+          可选：{Object.entries(OPTIONAL_ONBOARDING_LABELS).map(([key, label]) => {
+            const status = steps[key]?.status ?? "not_started";
+            return `${label}${status === "passed" ? " ✓" : ""}`;
+          }).join(" · ")}
+        </span>
       </div>
     </section>
   );

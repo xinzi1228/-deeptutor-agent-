@@ -172,14 +172,32 @@ export async function getMcpSettings(): Promise<McpSettings> {
 
 export async function updateMcpSettings(
   servers: Record<string, McpServerConfig>,
+  options?: { confirmed?: boolean },
 ): Promise<McpStatusRow[]> {
   const response = await apiFetch(apiUrl(MCP_SETTINGS_PATH), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ servers }),
+    body: JSON.stringify({ servers, confirmed: Boolean(options?.confirmed) }),
   });
   const data = await asJson(response);
   return Array.isArray(data?.status) ? data.status.map(normalizeStatusRow) : [];
+}
+
+/**
+ * Detect whether a config change is high-risk (adding a server or enabling a
+ * previously-disabled one). The backend requires an explicit confirmation for
+ * these because a stdio server runs host commands.
+ */
+export function isHighRiskMcpChange(
+  before: Record<string, McpServerConfig>,
+  after: Record<string, McpServerConfig>,
+): boolean {
+  for (const [name, cfg] of Object.entries(after)) {
+    const prev = before[name];
+    if (!prev) return true;
+    if (cfg.enabled && !prev.enabled) return true;
+  }
+  return false;
 }
 
 export async function testMcpServer(
