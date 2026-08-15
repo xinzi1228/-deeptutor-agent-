@@ -49,6 +49,7 @@
 | 3.5 | 可信可视化、40条标注教练评测集 | `d9b14c03` |
 | 4.1 | 统一角色权限、30分钟代管与逐写审计 | `40ddb440` |
 | 4.2 | 管理员五中心工作台、教师工作台与信息架构 | `98b2d2ca` |
+| 4.3 | 初始化向导状态机与扩展白名单收口 | `163909f6` |
 
 较早提交已实现可视化作品管理、生图模型选择、专家目录、教练会话隔离、专业模式桥接等基础能力。接手时必须重新核对代码；专项设计中列出的评测、可信数据、四入口共享和状态恢复仍以验收结果为准。
 
@@ -84,7 +85,7 @@
 
 先后端授权，后前端导航。管理员五中心固定为内容治理、教学配置、AI 能力、扩展与集成、系统运维。学生不能自建、强制导入或任意执行工具。
 
-状态：任务 4.2 已完成（`98b2d2ca`），详情见本文件末尾“任务 4.2 交付记录”。任务 4.3（初始化向导与白名单扩展收口）尚未开始。
+状态：任务 4.2 已完成（`98b2d2ca`），任务 4.3 已完成（`163909f6`），详情见本文件末尾“任务 4.2 交付记录”与“任务 4.3 交付记录”。任务 4.4（真实用户测试与竞赛证据包）尚未开始。
 
 ### 任务 E：真实用户测试
 
@@ -229,6 +230,58 @@ npm run build
   - 未暂存用户未跟踪文件；git diff --check 通过
 提交号：98b2d2ca
 下一任务是否满足前置条件：是。任务 4.3（初始化向导与白名单扩展收口）可在本工作台上叠加。
+```
+
+## 14. 任务 4.3 交付记录（2026-08-15）
+
+```text
+任务：4.3 初始化向导与白名单扩展收口
+对应规格：docs/superpowers/specs/2026-08-14-role-workspaces-onboarding-extension-design.md
+实现结果：
+  - onboarding 升级为固定顺序可恢复状态机（deeptutor/services/onboarding）：
+    账号安全/对话模型/Embedding/知识库/Label Studio/完整体检 6 个核心步骤 +
+    生图/MCP/Skill 可选步骤；状态含 not_started/running/passed/failed/skipped/stale
+  - 每步可 done/skip/resume/retest/dismiss；重启从第一个未通过/未跳过步骤继续；
+    passed 记录依赖指纹，依赖配置变化自动降级 stale
+  - capability_center 新增 GET/PUT /onboarding，兼容旧整数 payload，overview
+    仍返回 onboarding；工作台初始化向导改用 step_key+action 协议
+  - 扩展市场白名单收口：学生只能安装/启用 grants.extensions 白名单内扩展；
+    安装新扩展为管理员操作；未审核扩展默认禁用、仅开发模式可用，竞赛模式只
+    加载固定白名单与锁定版本（extension_policy.json）
+  - 高风险变更需二次确认并记录版本/回滚：扩展安装/启用（confirmed）、MCP
+    服务器变更（PUT confirmed + mcp_changes.jsonl）、allow_unverified Skill
+    安装（confirmed + skill_changes.jsonl）
+  - 前端 MCP 保存检测高风险变更并弹确认；onboarding-resume.ts 镜像后端状态机
+修改文件：
+  - 新增 deeptutor/services/onboarding/__init__.py
+  - 修改 deeptutor/api/routers/{capability_center,mcp_settings,profile,skills}.py、
+    deeptutor/multi_user/{grants,router}.py、deeptutor/services/extension_marketplace.py
+  - 新增 web/lib/onboarding-resume.ts、web/tests/onboarding-resume.test.ts、
+    web/tests/mcp-policy.test.ts；修改 web/lib/mcp-api.ts、
+    web/app/(utility)/settings/mcp/page.tsx、web/components/admin/AdminDashboard.tsx
+  - 新增 tests/api/test_onboarding_resume.py、tests/security/test_extension_marketplace_policy.py
+数据迁移：无。onboarding 从 v1 整数 payload 迁移到 v2 状态机（legacy_int_to_key）。
+测试命令与结果：
+  - python -m pytest tests/api/test_onboarding_resume.py tests/security/test_extension_marketplace_policy.py -q → 35 项通过
+  - 相关回归（capability/mcp/grants/profile/extension）103 项通过；
+    全量 3713 passed / 12 skipped / 33 failed，33 项失败与基线完全一致（可选依赖、
+    POSIX 专属、sandbox/win 差异），本任务未引入新失败
+  - cd web; npm run test:node → 334 项通过（含 onboarding-resume 12 项、mcp-policy 5 项）
+  - npx tsc --noEmit → 通过；eslint 新增文件 --quiet → 通过；npm run build → 编译成功；
+    npm run perf:check → 全部在预算内
+人工验收：未执行浏览器验收；需在目标环境确认向导步骤流转、高风险确认弹窗与
+  白名单分配 UI（GrantEditor 的 extensions 字段）。
+外部条件/未验证项：
+  - extension_policy.json 竞赛模式与锁定版本需在目标环境配置后验证隔离
+  - MCP / Skill 高风险确认需要真实服务器与 Hub 场景验证
+  - 前端 GrantEditor 尚未暴露 extensions 白名单编辑（后端 grants 已支持）
+安全与隔离检查：
+  - 学生扩展写入按 grants.extensions 白名单执行；安装新扩展仅管理员
+  - 未审核扩展默认禁用并隔离于竞赛配置；高风险变更强制二次确认
+  - 日志/变更日志只记录扩展 id、动作、版本与前后快照，不含密钥或正文
+  - 未暂存用户未跟踪文件；git diff --check 通过
+提交号：163909f6
+下一任务是否满足前置条件：是。任务 4.4（真实用户测试与竞赛证据包）可开始。
 ```
 
 ## 12. 最终交付判断
