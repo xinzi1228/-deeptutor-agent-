@@ -52,6 +52,7 @@
 | 4.3 | 初始化向导状态机与扩展白名单收口 | `163909f6` |
 | 4.4 | 真实用户测试服务、报告与竞赛证据包 | `03dd8ef0` |
 | 5.1 | 竞赛就绪检查器与黄金闭环 E2E | `fa827993` |
+| 5.2 | 竞赛就绪性能预算与全量回归 | `89f6d928` |
 
 较早提交已实现可视化作品管理、生图模型选择、专家目录、教练会话隔离、专业模式桥接等基础能力。接手时必须重新核对代码；专项设计中列出的评测、可信数据、四入口共享和状态恢复仍以验收结果为准。
 
@@ -87,7 +88,7 @@
 
 先后端授权，后前端导航。管理员五中心固定为内容治理、教学配置、AI 能力、扩展与集成、系统运维。学生不能自建、强制导入或任意执行工具。
 
-状态：任务 4.2（`98b2d2ca`）、4.3（`163909f6`）、4.4 代码（`03dd8ef0`）、5.1（`fa827993`）均已完成，详情见本文件末尾交付记录。任务 4.4 的真实用户执行与 5.1 的目标电脑三次演示属人工验收，尚未进行。任务 5.2、5.3 尚未开始。
+状态：任务 4.2（`98b2d2ca`）、4.3（`163909f6`）、4.4 代码（`03dd8ef0`）、5.1（`fa827993`）、5.2（`89f6d928`）均已完成，详情见本文件末尾交付记录。任务 4.4 的真实用户执行、5.1/5.2 的目标电脑性能测量与三次演示属人工验收，尚未进行。任务 5.3（文档同步）尚未开始。
 
 ### 任务 E：真实用户测试
 
@@ -379,6 +380,45 @@ npm run build
 提交号：fa827993
 下一任务是否满足前置条件：是（代码层面）。任务 5.2 全量回归与性能门禁、
   5.3 文档同步待执行。
+```
+
+## 17. 任务 5.2 交付记录（2026-08-15）
+
+```text
+任务：5.2 构建、性能和回归门禁
+对应规格：docs/superpowers/specs/2026-08-14-release-readiness-gates-design.md §5/§6
+实现结果：
+  - 全量门禁复跑并记录结果（见下方测试命令）
+  - 新增 deeptutor/services/performance_metrics/budgets.py：把设计性能预算
+    编码为可机检规则（cold_start_interactive ≤3s、route_visible ≤1s、
+    progress_core_visible ≤2s、chat_status_visible ≤300ms、
+    chat_first_token ≤5s）；未采集指标返回 not_measured，不视为达标
+  - measure_student_journey.py 增加预算验收输出（PASS/FAIL/SKIP）
+修改文件：
+  - 新增 deeptutor/services/performance_metrics/budgets.py
+  - 修改 performance_metrics/__init__.py、scripts/measure_student_journey.py、
+    tests/services/test_performance_metrics.py（+4 项预算测试）
+数据迁移：无。
+测试命令与结果：
+  - python -m ruff check deeptutor tests → 基线 28 项错误，与改动前完全一致；
+    本次改动文件全部通过
+  - python -m pytest -q --ignore=test_channel_streaming.py →
+    3723 passed / 12 skipped / 33 failed（33 项与基线一致：可选依赖、
+    POSIX/sandbox/win 差异），未引入新失败
+  - cd web; npx tsc --noEmit → 通过；npm run test:node → 334 项通过；
+    npm run build → 编译成功；npm run perf:check → 全部路由在预算内
+  - python scripts/measure_student_journey.py --profile-root <root> → 空档案
+    正确报 not_measured，填充达标数据后 budgets_met=True
+人工验收：未执行。性能预算（冷启动 3s/页面切换 1s/成长首屏 2s/发送 300ms/
+  首字 5s）需在目标竞赛电脑用真实模型采集 p50/p95 后判定（§5）。
+外部条件/未验证项：
+  - 真实模型在场时的冷启动/首字测量未执行
+  - 超时可取消且不重复写入需在真实对话链路验证
+安全与隔离检查：
+  - 预算校验只读指标计数与耗时，不含正文/坐标/密钥
+  - 未暂存用户未跟踪文件；git diff --check 通过
+提交号：89f6d928
+下一任务是否满足前置条件：是。任务 5.3（文档同步）可执行。
 ```
 
 ## 12. 最终交付判断
