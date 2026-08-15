@@ -6,8 +6,10 @@ from pydantic import ValidationError
 import pytest
 
 from deeptutor.services.performance_metrics import (
+    BUDGETS_MS,
     PerformanceMetricInput,
     PerformanceMetricStore,
+    check_budgets,
 )
 
 
@@ -66,3 +68,57 @@ def test_store_keeps_profile_roots_isolated(tmp_path) -> None:
 
     assert first.summary()["total"] == 1
     assert second.summary()["total"] == 0
+
+
+# ── Budget validation (competition readiness §5) ──────────────────────────
+
+
+def test_budgets_pass_when_under_limits(tmp_path) -> None:
+    store = PerformanceMetricStore(tmp_path)
+    store.append(
+        PerformanceMetricInput(name="cold_start_interactive", route="/home", duration_ms=2000)
+    )
+    store.append(PerformanceMetricInput(name="route_visible", route="/home", duration_ms=500))
+    store.append(
+        PerformanceMetricInput(name="progress_core_visible", route="/progress", duration_ms=1500)
+    )
+    store.append(PerformanceMetricInput(name="chat_status_visible", route="/home", duration_ms=150))
+    store.append(PerformanceMetricInput(name="chat_first_token", route="/home", duration_ms=3000))
+
+    result = check_budgets(tmp_path)
+    assert result["all_measured"] is True
+    assert result["budgets_met"] is True
+    assert all(
+        result["metrics"][name]["status"] == "pass" for name in BUDGETS_MS
+    )
+
+
+def test_budget_over_limit_is_fail_not_pass(tmp_path) -> None:
+    store = PerformanceMetricStore(tmp_path)
+    store.append(
+        PerformanceMetricInput(name="chat_status_visible", route="/home", duration_ms=600)
+    )
+    result = check_budgets(tmp_path)
+    assert result["metrics"]["chat_status_visible"]["status"] == "over_budget"
+
+
+def test_unmeasured_budget_is_not_measured_not_pass(tmp_path) -> None:
+    result = check_budgets(tmp_path)
+    assert result["all_measured"] is False
+    assert result["budgets_met"] is False
+    assert result["metrics"]["cold_start_interactive"]["status"] == "not_measured"
+
+
+def test_budgets_cover_all_five_gates() -> None:
+    assert set(BUDGETS_MS) == {
+        "cold_start_interactive",
+        "route_visible",
+        "progress_core_visible",
+        "chat_status_visible",
+        "chat_first_token",
+    }
+    assert BUDGETS_MS["cold_start_interactive"] <= 3000
+    assert BUDGETS_MS["route_visible"] <= 1000
+    assert BUDGETS_MS["progress_core_visible"] <= 2000
+    assert BUDGETS_MS["chat_status_visible"] <= 300
+    assert BUDGETS_MS["chat_first_token"] <= 5000
