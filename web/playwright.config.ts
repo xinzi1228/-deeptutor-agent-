@@ -23,5 +23,15 @@ export default defineConfig({
       testMatch: "**/*.audit.ts",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "e2e",
+      testMatch: "**/e2e/*.spec.ts",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Prefer an installed Chrome/Edge so a fresh `playwright install`
+        // download is not required in a restricted/offline environment.
+        channel: process.env.PW_BROWSER_CHANNEL || "chrome",
+      },
+    },
   ],
 });
