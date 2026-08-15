@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
 from deeptutor.services.annotation_attempts import AnnotationAttemptStore
-from deeptutor.services.file_io import atomic_write_json
+from deeptutor.services.visualization_artifacts import freeze_dataset_snapshot
 
 
 def _numeric(value: Any) -> float | None:
@@ -113,24 +112,19 @@ class ReadLearningChartDataTool(BaseTool):
             "labels": labels,
             "datasets": datasets,
         }
-        snapshot = {
-            "schema_version": 1,
-            "dataset": dataset,
-            "source": source,
-            "unit": "比例（0-1）",
-            "source_updated_at": next(
+        snapshot = freeze_dataset_snapshot(
+            profile_root,
+            dataset_id=f"learning_metrics:{dataset}",
+            version=1,
+            query={"limit": limit},
+            source=source,
+            unit="比例（0-1）",
+            source_updated_at=next(
                 (stamp for stamp in reversed([row[2] for row in normalized]) if stamp),
                 datetime.now(timezone.utc).isoformat(),
             ),
-            "content": content,
-        }
-        digest = hashlib.sha256(
-            json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        ).hexdigest()[:20]
-        dataset_ref = f"dataset_{digest}"
-        snapshot["dataset_ref"] = dataset_ref
-        target = Path(profile_root) / "artifacts" / "visualization_datasets" / f"{dataset_ref}.json"
-        atomic_write_json(target, snapshot)
+            content=content,
+        )
         return ToolResult(
             content=json.dumps(snapshot, ensure_ascii=False),
             metadata={"dataset": snapshot},

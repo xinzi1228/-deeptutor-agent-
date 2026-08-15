@@ -14,6 +14,7 @@ import {
   ChatChartCard,
   type ChartData,
 } from "@/components/chat/home/ChatChartCard";
+import type { VisualizationArtifact } from "@/components/chat/home/VisualizationArtifactCard";
 import { readStoredLanguage } from "@/context/app-shell-storage";
 import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 
@@ -330,7 +331,14 @@ export default function AnnotationCoach({
     if (event.type === "session") {
       const meta = (event.metadata ?? {}) as { session_id?: string };
       const next = meta.session_id || event.session_id || "";
-      if (next) sessionIdRef.current = next;
+      if (next) {
+        sessionIdRef.current = next;
+        try {
+          window.localStorage.setItem(`${COACH_SESSION_KEY}.${profileKey}`, next);
+        } catch {
+          // localStorage 不可用则仅保留内存会话
+        }
+      }
       return;
     }
     if (event.type === "done") {
@@ -358,7 +366,13 @@ export default function AnnotationCoach({
       const toolMeta = (meta.tool_metadata ?? {}) as Record<string, unknown>;
       const chart = toolMeta.chart as ChartData | undefined;
       if (chart) {
-        setCards((prev) => [...prev, chart]);
+        setCards((prev) => {
+          const nextId = chart.type === "visualization" ? chart.data.id : "";
+          if (nextId && prev.some((item) => item.type === "visualization" && item.data.id === nextId)) {
+            return prev;
+          }
+          return [...prev, chart];
+        });
       }
       return;
     }
@@ -376,7 +390,39 @@ export default function AnnotationCoach({
         return [...prev, { role: "coach", content: event.content }];
       });
     }
-  }, [flashCoach]);
+  }, [flashCoach, profileKey]);
+
+  useEffect(() => {
+    if (!open || !sessionIdRef.current) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      limit: "30",
+      session_id: sessionIdRef.current,
+    });
+    void apiFetch(apiUrl(`/api/v1/profile/visualizations?${query.toString()}`), {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => response.ok ? response.json() : { artifacts: [] })
+      .then((payload: { artifacts?: VisualizationArtifact[] }) => {
+        if (controller.signal.aborted) return;
+        const restored = (payload.artifacts ?? []).map((artifact) => ({
+          type: "visualization" as const,
+          data: artifact,
+        }));
+        setCards((current) => {
+          const restoredIds = new Set(restored.map((item) => item.data.id));
+          return [
+            ...restored,
+            ...current.filter(
+              (item) => item.type !== "visualization" || !restoredIds.has(item.data.id),
+            ),
+          ];
+        });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [open, profileKey]);
 
   const ensureClient = useCallback(() => {
     if (clientRef.current) return clientRef.current;

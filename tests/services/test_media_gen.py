@@ -325,6 +325,12 @@ async def test_imagegen_tool_saves_public_artifact(monkeypatch: pytest.MonkeyPat
         assert artifacts, "tool produced no artifacts"
         assert artifacts[0]["url"].startswith("/api/outputs/")
         assert artifacts[0]["mime_type"] == "image/png"
+        visualization = result.metadata["chart"]["data"]
+        assert visualization["kind"] == "generated_image"
+        assert visualization["generation"]["prompt"] == "a cat"
+        assert visualization["generation"]["model_profile_id"]
+        assert visualization["generation"]["model_id"]
+        assert visualization["save_state"] == "ephemeral"
     finally:
         shutil.rmtree(
             get_path_service().get_task_workspace("chat", "test_imagegen_tool"),

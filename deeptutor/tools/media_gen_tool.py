@@ -213,10 +213,20 @@ class ImagegenTool(BaseTool):
         try:
             resolved = resolve_imagegen_runtime_config(profile_id=profile_id, model_id=model_id)
             resolved_model = f"{resolved.provider_name}/{resolved.model}"
+            resolved_profile_id = profile_id or resolved.provider_name
+            resolved_model_id = model_id or resolved.model
         except ValueError:
             # Direct unit tests may replace the generation facade without a
             # catalog.  Real calls cannot reach here without a configured model.
             resolved_model = model_id or "configured-imagegen"
+            resolved_profile_id = profile_id or "configured-imagegen"
+            resolved_model_id = model_id or "configured-imagegen"
+        try:
+            from deeptutor.multi_user.paths import get_current_learning_profile_root
+
+            learning_profile_root = get_current_learning_profile_root(require_unlocked=True)
+        except (PermissionError, RuntimeError):
+            learning_profile_root = None
         visualizations: list[dict[str, Any]] = []
         for index, media_artifact in enumerate(artifacts, start=1):
             title = "AI 概念示意图" if len(artifacts) == 1 else f"AI 概念示意图 {index}"
@@ -229,20 +239,21 @@ class ImagegenTool(BaseTool):
                     "source": "用户提示词（概念示意）",
                     "unit": "不适用",
                     "model": resolved_model,
-                    "save_state": "session",
+                    "save_state": "ephemeral",
+                    "generation": {
+                        "model_profile_id": resolved_profile_id,
+                        "model_id": resolved_model_id,
+                        "prompt": prompt,
+                    },
                     "content": {"prompt": prompt, "image_url": media_artifact.url},
                 },
+                profile_id=Path(learning_profile_root).name if learning_profile_root else "",
                 session_id=str(kwargs.get("_session_id") or ""),
+                message_id=str(kwargs.get("_message_id") or ""),
             )
             visualizations.append(visualization.to_dict())
-            try:
-                from deeptutor.multi_user.paths import get_current_learning_profile_root
-
-                profile_root = get_current_learning_profile_root(require_unlocked=True)
-                if profile_root is not None:
-                    VisualizationArtifactStore(profile_root).save(visualization)
-            except (PermissionError, RuntimeError):
-                logger.debug("image visualization was not persisted outside a profile context")
+            if learning_profile_root is not None:
+                VisualizationArtifactStore(learning_profile_root).save(visualization)
         result.metadata["visualizations"] = visualizations
         result.metadata["chart"] = {"type": "visualization", "data": visualizations[0]}
         result.metadata["model"] = resolved_model

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import re
 from typing import Any, Literal
 import uuid
 
@@ -25,16 +26,53 @@ class VisualizationArtifact:
     validation_status: str
     validation_message: str
     created_at: str
+    profile_id: str = ""
     session_id: str = ""
+    message_id: str = ""
+    dataset_ref: dict[str, Any] | None = None
+    generation: dict[str, Any] | None = None
     model: str = ""
-    save_state: str = "session"
-    schema_version: int = 1
+    save_state: str = "ephemeral"
+    schema_version: int = 2
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-def validate_visualization_request(payload: dict[str, Any], *, session_id: str = "") -> VisualizationArtifact:
+def _validated_dataset_ref(value: Any, *, unit: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError("数字图表必须提供结构化 dataset_ref")
+    dataset_id = str(value.get("dataset_id") or "").strip()
+    version = value.get("version")
+    query = value.get("query")
+    dataset_unit = str(value.get("unit") or "").strip()
+    sha256 = str(value.get("sha256") or "").strip().lower()
+    if not dataset_id:
+        raise ValueError("dataset_ref 缺少 dataset_id")
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise ValueError("dataset_ref.version 必须是正整数")
+    if not isinstance(query, dict):
+        raise ValueError("dataset_ref.query 必须是对象")
+    if not dataset_unit or dataset_unit != unit:
+        raise ValueError("dataset_ref.unit 必须与图表单位一致")
+    if not re.fullmatch(r"[a-f0-9]{64}", sha256):
+        raise ValueError("dataset_ref.sha256 必须是完整 SHA-256")
+    return {
+        "dataset_id": dataset_id,
+        "version": version,
+        "query": query,
+        "unit": dataset_unit,
+        "sha256": sha256,
+    }
+
+
+def validate_visualization_request(
+    payload: dict[str, Any],
+    *,
+    profile_id: str = "",
+    session_id: str = "",
+    message_id: str = "",
+) -> VisualizationArtifact:
     kind = str(payload.get("kind") or "").strip()
     title = str(payload.get("title") or "").strip()
     description = str(payload.get("description") or "").strip()
@@ -43,6 +81,8 @@ def validate_visualization_request(payload: dict[str, Any], *, session_id: str =
     source_ref = str(payload.get("source_ref") or "").strip()
     unit = str(payload.get("unit") or "").strip()
     content = payload.get("content")
+    dataset_ref: dict[str, Any] | None = None
+    generation: dict[str, Any] | None = None
     if kind not in {"chart", "diagram", "generated_image"}:
         raise ValueError("kind 必须是 chart、diagram 或 generated_image")
     if not title or len(title) > 120:
@@ -63,6 +103,7 @@ def validate_visualization_request(payload: dict[str, Any], *, session_id: str =
             raise ValueError("数字图表必须说明单位")
         if not source_ref.startswith("dataset_"):
             raise ValueError("数字图表必须引用 read_learning_chart_data 返回的 dataset_ref")
+        dataset_ref = _validated_dataset_ref(payload.get("dataset_ref"), unit=unit)
         if not isinstance(labels, list) or not labels or len(labels) > 100:
             raise ValueError("labels 需要是 1 到 100 项的数组")
         if not isinstance(datasets, list) or not datasets or len(datasets) > 12:
@@ -87,15 +128,38 @@ def validate_visualization_request(payload: dict[str, Any], *, session_id: str =
         image_url = str(content.get("image_url") or "").strip()
         if not prompt or not image_url:
             raise ValueError("生图作品必须保存提示词和生成结果地址")
+        raw_generation = payload.get("generation")
+        if not isinstance(raw_generation, dict):
+            raise ValueError("生图作品必须保存 generation 生成信息")
+        generation_prompt = str(raw_generation.get("prompt") or "").strip()
+        model_profile_id = str(raw_generation.get("model_profile_id") or "").strip()
+        model_id = str(raw_generation.get("model_id") or "").strip()
+        if generation_prompt != prompt or not model_profile_id or not model_id:
+            raise ValueError("生图作品必须保存匹配的模型配置、模型和提示词")
+        generation = {
+            "model_profile_id": model_profile_id,
+            "model_id": model_id,
+            "prompt": generation_prompt,
+        }
         protocol = "image"
         message = "这是概念示意图，不作为精确事实或数字证据"
+    save_state = str(payload.get("save_state") or "ephemeral")
+    if save_state == "session":
+        save_state = "ephemeral"
+    if save_state not in {"ephemeral", "saved", "learning_material"}:
+        raise ValueError("不支持的作品保存状态")
     return VisualizationArtifact(
         id=f"viz_{uuid.uuid4().hex}", kind=kind, title=title, description=description,
         alt_text=alt_text, render_protocol=protocol, content=content, source=source,
         source_ref=source_ref,
         unit=unit, source_updated_at=str(payload.get("source_updated_at") or ""),
         validation_status="validated", validation_message=message,
-        created_at=datetime.now(timezone.utc).isoformat(), session_id=session_id,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        profile_id=str(profile_id or ""),
+        session_id=session_id,
+        message_id=str(message_id or ""),
+        dataset_ref=dataset_ref,
+        generation=generation,
         model=str(payload.get("model") or ""),
-        save_state=str(payload.get("save_state") or "session"),
+        save_state=save_state,
     )

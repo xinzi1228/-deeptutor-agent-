@@ -545,6 +545,20 @@ async def test_annotation_coach_emits_deterministic_teaching_progress(
     assert result.metadata["teaching_budget"]["tool_calls"] == 0
 
 
+def test_visualization_tool_receives_server_owned_message_binding() -> None:
+    pipeline = AgenticChatPipeline(language="zh")
+    context = UnifiedContext(
+        session_id="coach-session-1",
+        user_message="画一张图",
+        metadata={"turn_id": "turn-message-1"},
+    )
+
+    kwargs = pipeline._augment_tool_kwargs("create_visualization", {}, context)
+
+    assert kwargs["_session_id"] == "coach-session-1"
+    assert kwargs["_message_id"] == "turn-message-1"
+
+
 @pytest.mark.asyncio
 async def test_midloop_llm_failure_salvages_turn_with_forced_finish(
     monkeypatch: pytest.MonkeyPatch,

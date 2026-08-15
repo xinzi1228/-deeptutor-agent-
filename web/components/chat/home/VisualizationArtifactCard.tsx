@@ -16,13 +16,28 @@ export type VisualizationArtifact = {
   content: Record<string, unknown>;
   source: string;
   source_ref?: string;
+  profile_id?: string;
+  session_id?: string;
+  message_id?: string;
+  dataset_ref?: {
+    dataset_id: string;
+    version: number;
+    query: Record<string, unknown>;
+    unit: string;
+    sha256: string;
+  } | null;
+  generation?: {
+    model_profile_id: string;
+    model_id: string;
+    prompt: string;
+  } | null;
   unit: string;
   source_updated_at: string;
   validation_status: string;
   validation_message: string;
   created_at: string;
   model?: string;
-  save_state?: "session" | "saved" | "learning_material";
+  save_state?: "session" | "ephemeral" | "saved" | "learning_material";
 };
 
 const CHART_VARIANTS = ["bar", "line", "radar", "doughnut"];
@@ -30,16 +45,33 @@ const CHART_VARIANTS = ["bar", "line", "radar", "doughnut"];
 export function VisualizationArtifactCard({ artifact }: { artifact: VisualizationArtifact }) {
   const [details, setDetails] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [variant, setVariant] = useState(0);
+  const [currentArtifact, setCurrentArtifact] = useState(artifact);
   const [saveState, setSaveState] = useState(artifact.save_state || "session");
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(true);
-  const originalType = String(artifact.content.chart_type || "bar");
-  const types = [originalType, ...CHART_VARIANTS.filter((item) => item !== originalType)];
-  const activeArtifact = artifact.kind === "chart"
-    ? { ...artifact, content: { ...artifact.content, chart_type: types[variant % types.length] } }
-    : artifact;
+  const activeArtifact = currentArtifact;
   const body = <ArtifactBody artifact={activeArtifact} />;
+
+  const rerender = async () => {
+    if (activeArtifact.kind !== "chart") return;
+    const currentType = String(activeArtifact.content.chart_type || "bar");
+    const types = [currentType, ...CHART_VARIANTS.filter((item) => item !== currentType)];
+    const nextType = types[1] || currentType;
+    setBusy(true);
+    try {
+      const response = await apiFetch(apiUrl(`/api/v1/profile/visualizations/${encodeURIComponent(artifact.id)}/rerender`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chart_type: nextType }),
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        if (payload.artifact) setCurrentArtifact(payload.artifact as VisualizationArtifact);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const updateSaveState = async (next: "saved" | "learning_material") => {
     setBusy(true);
@@ -69,7 +101,7 @@ export function VisualizationArtifactCard({ artifact }: { artifact: Visualizatio
     <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
       <div><div className="text-sm font-semibold text-[var(--foreground)]">{artifact.title}</div>{artifact.description && <div className="mt-0.5 text-xs text-[var(--muted-foreground)]">{artifact.description}</div>}</div>
       <div className="flex gap-1">
-        {artifact.kind === "chart" && <button type="button" onClick={() => setVariant((value) => value + 1)} className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)]" title="保持原始数据，换一种图"><RefreshCw className="h-4 w-4" /></button>}
+        {artifact.kind === "chart" && <button type="button" disabled={busy} onClick={() => void rerender()} className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)] disabled:opacity-50" title="服务端复验原始数据后换一种图"><RefreshCw className="h-4 w-4" /></button>}
         <button type="button" onClick={() => setDetails((value) => !value)} className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)]" title="查看原始数据与来源"><Eye className="h-4 w-4" /></button>
         <button type="button" onClick={() => setFullscreen(true)} className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)]" title="全屏查看"><Maximize2 className="h-4 w-4" /></button>
       </div>

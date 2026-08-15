@@ -42,6 +42,10 @@ class VisualizationStateRequest(BaseModel):
     save_state: str
 
 
+class VisualizationRerenderRequest(BaseModel):
+    chart_type: str
+
+
 def _all_records(scope: str | None = None) -> list[dict[str, Any]]:
     """Load learning records: canonical JSONL store first, L3 memory fallback."""
     try:
@@ -88,14 +92,24 @@ async def report_summary() -> dict[str, Any]:
 
 
 @router.get("/visualizations")
-async def profile_visualizations(limit: int = 12) -> dict[str, Any]:
+async def profile_visualizations(
+    limit: int = 12,
+    session_id: str | None = None,
+    message_id: str | None = None,
+) -> dict[str, Any]:
     from deeptutor.multi_user.paths import get_current_learning_profile_root
     from deeptutor.services.visualization_artifacts import VisualizationArtifactStore
 
     root = get_current_learning_profile_root(require_unlocked=True)
     if root is None:
         raise HTTPException(status_code=423, detail="请先解锁学习档案")
-    return {"artifacts": VisualizationArtifactStore(root).list(limit=max(1, min(limit, 30)))}
+    return {
+        "artifacts": VisualizationArtifactStore(root).list(
+            limit=max(1, min(limit, 30)),
+            session_id=session_id,
+            message_id=message_id,
+        )
+    }
 
 
 @router.get("/visualizations/{artifact_id}")
@@ -112,6 +126,60 @@ async def profile_visualization(artifact_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if artifact is None:
         raise HTTPException(status_code=404, detail="找不到该作品")
+    return {"artifact": artifact}
+
+
+@router.get("/visualizations/{artifact_id}/source")
+async def profile_visualization_source(artifact_id: str) -> dict[str, Any]:
+    """Return the current student's safe, public provenance view."""
+    from deeptutor.multi_user.paths import get_current_learning_profile_root
+    from deeptutor.services.visualization_artifacts import VisualizationArtifactStore
+
+    root = get_current_learning_profile_root(require_unlocked=True)
+    if root is None:
+        raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    try:
+        artifact = VisualizationArtifactStore(root).get(artifact_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="找不到该作品")
+    dataset_ref = artifact.get("dataset_ref")
+    public_ref = None
+    if isinstance(dataset_ref, dict):
+        public_ref = {
+            "dataset_id": dataset_ref.get("dataset_id"),
+            "version": dataset_ref.get("version"),
+            "query": dataset_ref.get("query"),
+            "unit": dataset_ref.get("unit"),
+        }
+    return {
+        "source": {
+            "name": artifact.get("source") or "概念图解",
+            "updated_at": artifact.get("source_updated_at") or "",
+            "dataset_ref": public_ref,
+        }
+    }
+
+
+@router.post("/visualizations/{artifact_id}/rerender")
+async def rerender_profile_visualization(
+    artifact_id: str, request: VisualizationRerenderRequest
+) -> dict[str, Any]:
+    from deeptutor.multi_user.paths import get_current_learning_profile_root
+    from deeptutor.services.visualization_artifacts import VisualizationArtifactStore
+
+    root = get_current_learning_profile_root(require_unlocked=True)
+    if root is None:
+        raise HTTPException(status_code=423, detail="请先解锁学习档案")
+    try:
+        artifact = VisualizationArtifactStore(root).rerender_chart(
+            artifact_id, request.chart_type
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"artifact": artifact}
 
 

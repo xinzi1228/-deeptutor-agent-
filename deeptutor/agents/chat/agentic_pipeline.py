@@ -1113,6 +1113,12 @@ class AgenticChatPipeline:
             if media_dir is not None:
                 media_dir.mkdir(parents=True, exist_ok=True)
                 kwargs["_workspace_dir"] = str(media_dir)
+            if tool_name == "imagegen":
+                kwargs["_session_id"] = context.session_id
+                kwargs["_message_id"] = turn_id
+        elif tool_name == "create_visualization":
+            kwargs["_session_id"] = context.session_id
+            kwargs["_message_id"] = turn_id
         elif tool_name == "cron":
             # Owner routing is supplied server-side — the model never picks
             # where a scheduled task's output lands.
