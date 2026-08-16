@@ -3,6 +3,7 @@
 > 用途：压缩上下文前的状态快照。恢复后据此无缝继续。
 > 状态：记忆分区 Phase 2 已完成（写入分区闭环）。**Git 约定：小改动只 commit 不 push，大版本（Phase/议题）完成后统一 push**。
 > 注意：另一 AI 会话正在实施三模态标注（远程 main 已有 `91f494c3` 提交），本会话的 3 个 commit 已 rebase 共存。
+> **2026-08-16 更新**：项目已完成 8/14 竞赛纵向优化 0.1-5.3 全部代码（见 `docs/superpowers/handoffs/2026-08-14-competition-optimization-ai-handoff.md`，已推送）。**当前进行中：Label Studio 专业模式代理 bug 修复（未 commit），详见 `docs/label-studio-fix-handoff.md`。**
 
 ---
 
