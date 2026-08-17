@@ -53,20 +53,20 @@ test("非法值回退到学生", () => {
   assert.equal(getViewIdentity(), "student");
 });
 
-test("useViewIdentity: AUTH 开启时 admin → staff（学生模式关闭）", () => {
+test("resolveViewIdentity: AUTH 开启时 admin → staff（学生模式关闭）", () => {
   assert.equal(resolveViewIdentity({ authEnabled: true, isAdmin: true }), "staff");
 });
 
-test("useViewIdentity: AUTH 开启时非 admin → student（学生模式开启）", () => {
+test("resolveViewIdentity: AUTH 开启时非 admin → student（学生模式开启）", () => {
   assert.equal(resolveViewIdentity({ authEnabled: true, isAdmin: false }), "student");
 });
 
-test("useViewIdentity: AUTH 关闭时回退到 localStorage 存储身份", () => {
+test("resolveViewIdentity: AUTH 关闭时回退到 localStorage 存储身份", () => {
   setViewIdentity("staff");
   assert.equal(resolveViewIdentity({ authEnabled: false }), "staff");
   assert.equal(resolveViewIdentity(), "staff");
 });
 
-test("useViewIdentity: AUTH 关闭且未存储时默认学生", () => {
+test("resolveViewIdentity: AUTH 关闭且未存储时默认学生", () => {
   assert.equal(resolveViewIdentity({ authEnabled: false }), "student");
 });

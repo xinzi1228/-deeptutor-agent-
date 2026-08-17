@@ -72,14 +72,11 @@ export function useViewIdentity(options?: {
   authEnabled?: boolean;
   isAdmin?: boolean;
 }): { identity: ViewIdentity; studentMode: boolean } {
-  const stored = useSyncExternalStore(
+  const identity = useSyncExternalStore(
     subscribeViewIdentity,
-    getViewIdentity,
-    (): ViewIdentity => "student",
+    () => resolveViewIdentity(options),
+    () => resolveViewIdentity(options),
   );
-
-  const identity =
-    options?.authEnabled === true ? resolveViewIdentity(options) : stored;
 
   return { identity, studentMode: identity === "student" };
 }
