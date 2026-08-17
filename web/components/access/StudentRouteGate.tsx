@@ -6,13 +6,15 @@ import { useTranslation } from "react-i18next";
 
 import { useAuthStatus } from "@/hooks/useAuthStatus";
 import { isStudentRouteAllowed } from "@/lib/student-experience";
+import { useViewIdentity } from "@/lib/view-identity";
 
 export default function StudentRouteGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuthStatus();
   const { t } = useTranslation();
-  const blocked = !auth.loading && auth.enabled && !auth.isAdmin && !isStudentRouteAllowed(pathname);
+  const { studentMode } = useViewIdentity({ authEnabled: auth.enabled, isAdmin: auth.isAdmin });
+  const blocked = !auth.loading && studentMode && !isStudentRouteAllowed(pathname);
 
   useEffect(() => {
     if (blocked) router.replace("/home");
