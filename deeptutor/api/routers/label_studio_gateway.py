@@ -223,6 +223,8 @@ def _rewrite_text(text: str) -> str:
         ('"/static/', f'"{PROXY_PREFIX}/static/'),
         ("'/static/", f"'{PROXY_PREFIX}/static/"),
         ("url(/static/", f"url({PROXY_PREFIX}/static/"),
+        ('"/react-app/', f'"{PROXY_PREFIX}/react-app/'),
+        ("'/react-app/", f"'{PROXY_PREFIX}/react-app/"),
         ('"/api/', f'"{PROXY_PREFIX}/api/'),
         ("'/api/", f"'{PROXY_PREFIX}/api/"),
         ('"/projects/', f'"{PROXY_PREFIX}/projects/'),
@@ -231,6 +233,13 @@ def _rewrite_text(text: str) -> str:
     )
     for old, new in pairs:
         text = text.replace(old, new)
+    # Normalize any double-prefix back to a single proxy prefix. Label
+    # Studio's HTML/JS can reference assets that were already rewritten
+    # (e.g. a nested bundle), which would otherwise produce
+    # /proxy/.../proxy/... paths that 404 on our side.
+    double = PROXY_PREFIX + PROXY_PREFIX
+    while double in text:
+        text = text.replace(double, PROXY_PREFIX)
     return text
 
 
@@ -350,9 +359,15 @@ async def proxy(path: str, request: Request) -> Response:
             return JSONResponse(payload, status_code=upstream.status_code)
         except (ValueError, json.JSONDecodeError):
             pass
-    if any(kind in content_type for kind in ("text/html", "text/css", "javascript")):
+    is_html = "text/html" in content_type
+    is_css = "text/css" in content_type
+    if is_html or is_css:
+        # Only HTML/CSS need URL rewriting. JS bundles (runtime/vendor/main,
+        # up to ~2.5MB) contain no bare /static/ or /react-app/ paths and
+        # rewriting them on every request is expensive (multiple full-file
+        # scans that add several seconds of latency through the proxy).
         rewritten = _rewrite_text(upstream.text)
-        if "text/html" in content_type:
+        if is_html:
             rewritten = _inject_realtime_bridge(rewritten, path)
         content = rewritten.encode("utf-8")
     headers: dict[str, str] = {"Cache-Control": upstream.headers.get("cache-control", "no-store")}
