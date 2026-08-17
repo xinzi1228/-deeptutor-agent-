@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useTranslation } from "react-i18next";
 import { login, fetchAuthStatus, checkIsFirstUser } from "@/lib/auth";
+import { setViewIdentity } from "@/lib/view-identity";
 
 function LoginPageContent() {
   const { t } = useTranslation();
@@ -20,9 +21,13 @@ function LoginPageContent() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [identity, setIdentity] = useState<"student" | "staff">("student");
+  const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
+
   useEffect(() => {
     // If already authenticated, skip login
     fetchAuthStatus().then((status) => {
+      setAuthEnabled(status?.enabled ?? true);
       if (status?.authenticated) {
         router.replace(next);
         return;
@@ -33,6 +38,11 @@ function LoginPageContent() {
       });
     });
   }, [router, next]);
+
+  function handleIdentityEnter() {
+    setViewIdentity(identity);
+    router.replace(identity === "student" ? "/home" : "/admin");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -68,7 +78,45 @@ function LoginPageContent() {
 
       {/* Card */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm px-8 py-8">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        {authEnabled === null ? (
+          <p className="text-center text-sm text-[var(--muted-foreground)]">
+            {t("Loading…")}
+          </p>
+        ) : authEnabled === false ? (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-2">
+              {(["student", "staff"] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setIdentity(id)}
+                  className={`rounded-xl border px-3 py-4 text-sm transition-colors ${
+                    identity === id
+                      ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]"
+                      : "border-[var(--border)] hover:bg-[var(--muted)]"
+                  }`}
+                >
+                  <span className="block font-medium">
+                    {id === "student" ? "学生" : "教师或管理员"}
+                  </span>
+                  <span className="mt-1 block text-xs text-[var(--muted-foreground)]">
+                    {id === "student" ? "学习、实训、成长、我的" : "五中心工作台与教师管理"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleIdentityEnter}
+              className="w-full py-2.5 px-4 rounded-lg font-medium text-sm
+                         bg-[var(--primary)] text-[var(--primary-foreground)]
+                         hover:opacity-90 active:opacity-80 transition-opacity"
+            >
+              进入
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email or username */}
           <div>
             <label
@@ -136,7 +184,8 @@ function LoginPageContent() {
           >
             {loading ? t("Signing in…") : t("Sign in")}
           </button>
-        </form>
+          </form>
+        )}
       </div>
 
       <p className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
