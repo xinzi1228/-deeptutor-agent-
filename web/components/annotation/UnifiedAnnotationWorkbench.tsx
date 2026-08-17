@@ -345,7 +345,12 @@ function TaskEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canR
 function Media({ task }: { task: AnnotationTask }) {
   if (task.image_url) return <img src={task.image_url} alt={task.title} className="mx-auto max-h-[440px] max-w-full rounded-xl object-contain" />;
   if (task.modal === "audio" && task.media_url) return <audio controls src={task.media_url} className="w-full" />;
-  if (task.modal === "video" && task.media_url) return <video controls src={task.media_url} className="max-h-[400px] w-full rounded-xl bg-black" />;
+  if (task.modal === "video" && task.media_url)
+    return (
+      <div className="relative w-full">
+        <video controls src={task.media_url} className="max-h-[70vh] min-h-[280px] w-full rounded-xl bg-black" />
+      </div>
+    );
   if (task.text) return <div className="rounded-xl bg-[var(--muted)]/40 p-5 text-sm leading-7">{task.text}</div>;
   return null;
 }
@@ -438,7 +443,7 @@ function BBoxEditor({ task, predictions, onChange, onUndo, onRedo, canUndo, canR
       <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedId={state.selectedId} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(id) => dispatch({ type: "select", id })} onCommit={commit} onImageSizeChange={(size) => { setBounds(size); onImageSizeChange(size); }} />
       <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 xl:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedId} issues={issues} onSelect={(id) => dispatch({ type: "select", id })} onLabelChange={changeLabel} onDelete={deleteBox} /></aside>
     </div>
-    <details className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 xl:hidden"><summary className="cursor-pointer text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="mt-3"><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedId} issues={issues} onSelect={(id) => dispatch({ type: "select", id })} onLabelChange={changeLabel} onDelete={deleteBox} /></div></details>
+    <details className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-lg xl:hidden"><summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="max-h-64 overflow-y-auto p-2"><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedId} issues={issues} onSelect={(id) => dispatch({ type: "select", id })} onLabelChange={changeLabel} onDelete={deleteBox} /></div></details>
     {issues.length > 0 && <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-700"><strong>本地质检发现 {issues.length} 项：</strong>{issues.slice(0, 3).map((issue) => <span key={`${issue.boxId}-${issue.code}`} className="ml-2">{issue.message}</span>)}</div>}
     <p className="text-center text-[11px] text-[var(--muted-foreground)]">先选类别再画框；V 选择 · B 画框 · Delete 删除 · Ctrl+S 保存草稿。</p>
   </div>;
