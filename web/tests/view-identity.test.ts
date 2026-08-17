@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test, beforeEach, afterEach } from "node:test";
-import { getViewIdentity, setViewIdentity, isStudentView, type ViewIdentity } from "../lib/view-identity";
+import { getViewIdentity, setViewIdentity, isStudentView } from "../lib/view-identity";
 
 const KEY = "deeptutor_view_identity";
 

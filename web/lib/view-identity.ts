@@ -15,13 +15,22 @@ const VALID: readonly ViewIdentity[] = ["student", "staff"];
  */
 export function getViewIdentity(): ViewIdentity {
   if (typeof window === "undefined") return "student";
-  const raw = window.localStorage.getItem(VIEW_IDENTITY_KEY);
-  return VALID.includes(raw as ViewIdentity) ? (raw as ViewIdentity) : "student";
+  try {
+    const raw = window.localStorage.getItem(VIEW_IDENTITY_KEY);
+    return VALID.includes(raw as ViewIdentity) ? (raw as ViewIdentity) : "student";
+  } catch {
+    // localStorage may be disabled (privacy mode / blocked cookies)
+    return "student";
+  }
 }
 
 export function setViewIdentity(identity: ViewIdentity): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(VIEW_IDENTITY_KEY, identity);
+  try {
+    window.localStorage.setItem(VIEW_IDENTITY_KEY, identity);
+  } catch {
+    // localStorage may be disabled - silently no-op
+  }
 }
 
 export function isStudentView(identity: ViewIdentity): boolean {
