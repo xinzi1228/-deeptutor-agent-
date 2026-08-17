@@ -28,7 +28,7 @@ function LoginPageContent() {
     // If already authenticated, skip login
     fetchAuthStatus().then((status) => {
       setAuthEnabled(status?.enabled ?? true);
-      if (status?.authenticated) {
+      if (status?.enabled && status?.authenticated) {
         router.replace(next);
         return;
       }
