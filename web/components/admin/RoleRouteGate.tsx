@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { roleAreaForPath } from "@/lib/capability-routes";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
+import { useViewIdentity } from "@/lib/view-identity";
 
 /**
  * Route-level role gate for the admin workspace shell.
@@ -14,8 +15,8 @@ import { useAuthStatus } from "@/hooks/useAuthStatus";
  * tools, Store). This component only mirrors that policy for navigation and
  * direct-URL access:
  *   • `/admin/*` — admin role required, otherwise an explicit 403 page.
- *   • `/teacher` — any authenticated session allowed (teachers are plain
- *     `user`-role accounts holding profile grants).
+ *   • `/teacher` — authenticated staff view required; student identity
+ *     (view-identity) is rejected with an explicit 403 page.
  *
  * It never redirects to a seemingly-empty config page: unauthorized access
  * gets a clear "拒绝访问" screen instead.
@@ -28,6 +29,10 @@ export default function RoleRouteGate({
   const pathname = usePathname() ?? "";
   const auth = useAuthStatus();
   const area = roleAreaForPath(pathname);
+  const { studentMode } = useViewIdentity({
+    authEnabled: auth.enabled,
+    isAdmin: auth.isAdmin,
+  });
 
   if (auth.loading) {
     return (
@@ -40,7 +45,7 @@ export default function RoleRouteGate({
   if (area === "admin" && (!auth.authenticated || !auth.isAdmin)) {
     return <ForbiddenScreen />;
   }
-  if (area === "teacher" && !auth.authenticated) {
+  if (area === "teacher" && (!auth.authenticated || studentMode)) {
     return <ForbiddenScreen />;
   }
 
