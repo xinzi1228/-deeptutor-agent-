@@ -14,6 +14,7 @@ import {
   type SessionSummary,
 } from "@/lib/session-api";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
+import { useViewIdentity } from "@/lib/view-identity";
 
 export default function UtilitySidebar() {
   const { t } = useTranslation();
@@ -22,7 +23,10 @@ export default function UtilitySidebar() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const auth = useAuthStatus();
-  const studentMode = auth.loading || (auth.enabled && !auth.isAdmin);
+  const { studentMode } = useViewIdentity({
+    authEnabled: auth.enabled,
+    isAdmin: auth.isAdmin,
+  });
   const hasLoadedSessionsRef = useRef(false);
 
   const refreshSessions = useCallback(async () => {

@@ -87,6 +87,7 @@ import {
   type SelectedBookReference,
 } from "@/lib/book-references";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
+import { useViewIdentity } from "@/lib/view-identity";
 import StudentHomeSummary from "@/components/student-shell/StudentHomeSummary";
 
 const NotebookRecordPicker = dynamic(
@@ -232,7 +233,10 @@ export default function ChatPage() {
   const sessionIdParam = params.sessionId?.[0] ?? null;
   const { setActiveSessionId, language: appLanguage } = useAppShell();
   const auth = useAuthStatus();
-  const studentMode = auth.loading || (auth.enabled && !auth.isAdmin);
+  const { studentMode } = useViewIdentity({
+    authEnabled: auth.enabled,
+    isAdmin: auth.isAdmin,
+  });
 
   const {
     state,
