@@ -11,6 +11,7 @@ import type { AnnotationScoreRecord } from "@/lib/learning-api";
 import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import type { AnnotationTask } from "@/components/annotation/UnifiedAnnotationWorkbench";
 import { useCurrentLearningTask } from "@/components/current-task/CurrentLearningTaskContext";
+import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 import {
   acquireAnnotationEditLease,
   checkpointProfessionalEditLease,
@@ -41,6 +42,7 @@ const UnifiedAnnotationWorkbench = dynamic(
 export default function AnnotationPage() {
   const { t } = useTranslation();
   const { openTask } = useCurrentLearningTask();
+  const { active } = useLearningProfile();
   const [mode, setMode] = useState<"image" | "text" | "audio" | "video" | "pro">("image");
   const [tasks, setTasks] = useState<Array<{ id: string; title: string; type: string; modal: "image" | "text" | "audio" | "video"; difficulty: string }>>([]);
   const [professionalTasks, setProfessionalTasks] = useState<typeof tasks>([]);
@@ -55,6 +57,9 @@ export default function AnnotationPage() {
   const [editAccess, setEditAccess] = useState<EditAccess>({ editable: false, lease: null, message: "请选择任务" });
   const draftSaverRef = useRef<(() => Promise<{ draftVersion: number; lease: AnnotationEditLease }>) | null>(null);
   const taskRequestVersion = useRef(0);
+  const restoredTaskRef = useRef(false);
+  const profileId = active?.id;
+  const lastTaskKey = profileId ? `deeptutor_last_annotation_task.${profileId}` : "deeptutor_last_annotation_task";
 
   useEffect(() => { setBrowserSessionId(getAnnotationBrowserSessionId()); }, []);
 
@@ -150,6 +155,9 @@ export default function AnnotationPage() {
       await acquireForTask(taskId, "teaching");
       if (requestVersion !== taskRequestVersion.current) return;
       setSelectedTaskData(task);
+      try {
+        window.localStorage.setItem(lastTaskKey, taskId);
+      } catch { /* ignore */ }
       setMode(task.modal);
       await openTask({ courseId: "annotation-foundations", taskId, mode: "teaching_annotation" });
       emitPerformanceMetric({
@@ -174,7 +182,19 @@ export default function AnnotationPage() {
       });
       // 保持当前工作台；选择器仍可重试
     }
-  }, [acquireForTask, browserSessionId, editAccess.editable, editAccess.lease, openTask, saveOwnedCheckpoint, selectedTask]);
+  }, [acquireForTask, browserSessionId, editAccess.editable, editAccess.lease, lastTaskKey, openTask, saveOwnedCheckpoint, selectedTask]);
+
+  useEffect(() => {
+    if (tasks.length === 0 || restoredTaskRef.current || !profileId) return;
+    restoredTaskRef.current = true;
+    let saved: string | null = null;
+    try {
+      saved = window.localStorage.getItem(lastTaskKey);
+    } catch { /* ignore */ }
+    if (!saved) return;
+    const exists = tasks.some((task) => task.id === saved);
+    if (exists) void chooseTask(saved);
+  }, [tasks, chooseTask, lastTaskKey, profileId]);
 
   const chooseProfessionalTask = async (taskId: string) => {
     const requestVersion = ++taskRequestVersion.current;
