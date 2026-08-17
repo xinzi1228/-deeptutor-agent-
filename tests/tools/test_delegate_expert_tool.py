@@ -159,7 +159,7 @@ def test_expert_ids_include_teaching_and_visualization_specialists():
         "learning_planner", "task_guide", "grading_expert",
         "struggle_detective", "report_analyst", "session_steward",
         "chart_designer", "diagram_designer", "illustration_designer",
-        "textbook_analyst",
+        "textbook_analyst", "file-analyst",
     }
 
 
@@ -313,8 +313,15 @@ def test_whitelist_per_expert():
     always_on = set(ALWAYS_ON_TOOLS)
     assert len(ALWAYS_ON_TOOLS) >= 27
     assert set(EXPERT_TOOL_WHITELISTS) == set(EXPERT_IDS)
+    # file-analyst is the documented exception: it reaches into the workspace
+    # with read-only parsing builtins (read_file/exec) that are registered but
+    # not always-on. Everything else must stay within the always-on surface.
+    non_always_on_extras: dict[str, set[str]] = {
+        "file-analyst": {"read_file", "exec"},
+    }
     for expert_id, whitelist in EXPERT_TOOL_WHITELISTS.items():
-        assert set(whitelist).issubset(always_on), f"{expert_id} 超出 always_on"
+        allowed = always_on | non_always_on_extras.get(expert_id, set())
+        assert set(whitelist).issubset(allowed), f"{expert_id} 超出 always_on"
         assert not banned.intersection(whitelist), f"{expert_id} 含禁用工具"
         assert "write_learning_record" not in whitelist, (
             f"{expert_id} 不应直接写学习记录（学习记录只由总控落盘）"

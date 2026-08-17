@@ -42,12 +42,16 @@ EXPERT_IDS: tuple[str, ...] = (
     "diagram_designer",
     "illustration_designer",
     "textbook_analyst",
+    "file-analyst",
 )
 
 # Every whitelist is a subset of the always-on tool set (ALWAYS_ON_TOOLS in
 # deeptutor.agents._shared.tool_composition) and deliberately excludes the
 # shared/system tools everywhere to prevent recursion / blocking / pollution:
 # delegate_to_expert, ask_user, write_memory, web_fetch, github, cron.
+# The one documented exception is file-analyst, which additionally reaches
+# read-only workspace parsing builtins (read_file / exec) — registered tools
+# that are not always-on but are safe (read-only / sandboxed).
 EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
     "learning_planner": (
         "competency_map",
@@ -101,6 +105,12 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
     # Admin-only content-governance worker. The tool itself enforces the
     # structured-textbook boundary and can only create review candidates.
     "textbook_analyst": ("textbook_candidate",),
+    # 文件解析专家：只读工作区文件（read_file/exec 是安全的内置工具，非共享/系统工具）。
+    "file-analyst": (
+        "read_file",
+        "exec",
+        "kb_search",
+    ),
 }
 
 
@@ -143,10 +153,10 @@ class DelegateExpertTool(BaseTool):
         return ToolDefinition(
             name="delegate_to_expert",
             description=(
-                "Delegate a focused sub-task to a specialist expert (10 experts: "
+                "Delegate a focused sub-task to a specialist expert (11 experts: "
                 "learning_planner / task_guide / grading_expert / struggle_detective / "
                 "report_analyst / session_steward / chart_designer / diagram_designer / "
-                "illustration_designer / textbook_analyst). The expert runs as an isolated "
+                "illustration_designer / textbook_analyst / file-analyst). The expert runs as an isolated "
                 "AgentLoop (≤5 rounds) with a restricted tool whitelist (专人专事) and "
                 "does NOT inherit the conversation history. Provide a SELF-CONTAINED "
                 "brief + task_data. The expert returns its conclusion for the master "

@@ -1,5 +1,5 @@
 {
-  "_note": "教学、可视化与教材治理专家角色索引（Source of truth）。coordinator + 10 experts。每个条目 file 指向角色文件。pytest 校验目录与索引双向一致 + frontmatter 完整。",
+  "_note": "教学、可视化与教材治理专家角色索引（Source of truth）。coordinator + 11 experts。每个条目 file 指向角色文件。pytest 校验目录与索引双向一致 + frontmatter 完整。",
   "coordinator": {
     "id": "annotation-coach",
     "label": "标注教练",
@@ -17,6 +17,7 @@
     {"id": "chart_designer", "label": "数据图表师", "icon": "📈", "color": "#0EA5E9", "file": "references/experts/chart_designer.md"},
     {"id": "diagram_designer", "label": "概念图解师", "icon": "🧩", "color": "#14B8A6", "file": "references/experts/diagram_designer.md"},
     {"id": "illustration_designer", "label": "学习插画师", "icon": "🎨", "color": "#EC4899", "file": "references/experts/illustration_designer.md"},
-    {"id": "textbook_analyst", "label": "教材分析师", "icon": "📚", "color": "#7C3AED", "file": "references/experts/textbook_analyst.md"}
+    {"id": "textbook_analyst", "label": "教材分析师", "icon": "📚", "color": "#7C3AED", "file": "references/experts/textbook_analyst.md"},
+    {"id": "file-analyst", "label": "文件解析师", "icon": "📄", "color": "#6366F1", "file": "references/experts/file-analyst.md"}
   ]
 }

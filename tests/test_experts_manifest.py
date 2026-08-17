@@ -33,12 +33,12 @@ def test_manifest_exists():
     assert MANIFEST_PATH.exists()
 
 
-def test_manifest_has_coordinator_and_10_experts():
+def test_manifest_has_coordinator_and_11_experts():
     manifest = _load_manifest()
     assert "coordinator" in manifest
     assert manifest["coordinator"]["id"] == "annotation-coach"
     experts = manifest["experts"]
-    assert len(experts) == 10
+    assert len(experts) == 11
 
 
 def test_manifest_entries_have_required_fields():
