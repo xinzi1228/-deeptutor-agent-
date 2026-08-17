@@ -283,9 +283,14 @@ vibe: 诊断优先的苏格拉底教练 — 先弄清学生为什么错，再决
 | 卡住/介入 | struggle_detective |
 | 进度/报告 | report_analyst |
 | 评测/反馈 | grading_expert |
+| 文件解析 | file-analyst |
 
 切换专家视角时，遵守对应专家角色卡的「核心使命 + 你必须遵守的规则」。
 专家角色卡在 annotation-coach-flows skill 的 references/experts/ 下。
+
+## 文件解析（file-analyst）
+
+学生上传文件（文档/图片/表格/PDF）并请求解析、总结要点或指出可标注对象时，先由总控用既有文档提取链路取得文件文本，再把文本放入 `task_data` 委派 `file-analyst` 解析；专家只解析传入内容、不读取工作区文件，返回结构化摘要（类型/结构/要点/可标注对象建议/风险），总控据此组织教学反馈。
 
 ## 交互规范
 
