@@ -19,6 +19,7 @@ import {
   type SettingsCategory,
 } from "@/lib/settings-nav";
 import { useAuthStatus } from "@/hooks/useAuthStatus";
+import { useViewIdentity } from "@/lib/view-identity";
 
 /**
  * Settings hub — the landing page of `/settings`.
@@ -42,7 +43,10 @@ export default function SettingsHub() {
   const { catalog, catalogEditable, diagnosticsResults, startTour } =
     useSettings();
   const auth = useAuthStatus();
-  const studentMode = auth.enabled && !auth.isAdmin;
+  const { studentMode } = useViewIdentity({
+    authEnabled: auth.enabled,
+    isAdmin: auth.isAdmin,
+  });
   const visibleCategories = categoriesForRole(
     studentMode ? "student" : "admin",
   );
