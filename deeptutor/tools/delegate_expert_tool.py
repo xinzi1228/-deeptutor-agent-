@@ -49,9 +49,8 @@ EXPERT_IDS: tuple[str, ...] = (
 # deeptutor.agents._shared.tool_composition) and deliberately excludes the
 # shared/system tools everywhere to prevent recursion / blocking / pollution:
 # delegate_to_expert, ask_user, write_memory, web_fetch, github, cron.
-# The one documented exception is file-analyst, which additionally reaches
-# read-only workspace parsing builtins (read_file / exec) — registered tools
-# that are not always-on but are safe (read-only / sandboxed).
+# Sub-agents never read workspace files: file-analyst receives file content
+# through task_data from the coordinator instead of reaching read_file/exec.
 EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
     "learning_planner": (
         "competency_map",
@@ -105,10 +104,8 @@ EXPERT_TOOL_WHITELISTS: dict[str, tuple[str, ...]] = {
     # Admin-only content-governance worker. The tool itself enforces the
     # structured-textbook boundary and can only create review candidates.
     "textbook_analyst": ("textbook_candidate",),
-    # 文件解析专家：只读工作区文件（read_file/exec 是安全的内置工具，非共享/系统工具）。
+    # 文件解析专家：不读取工作区文件；文件内容由总控通过 task_data 传入，只解析传入内容。
     "file-analyst": (
-        "read_file",
-        "exec",
         "kb_search",
     ),
 }
