@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   clampBox,
   moveBox,
@@ -19,6 +19,8 @@ type Props = {
   activeLabel: string;
   tool: BboxTool;
   zoom: number;
+  onZoomChange: (zoom: number) => void;
+  fitSignal: number;
   onSelect: (ids: string[]) => void;
   onSelectToggle: (id: string) => void;
   onCommit: (boxes: Bbox[], selectedIds: string[]) => void;
@@ -46,6 +48,10 @@ type MarqueeRect = { x: number; y: number; w: number; h: number };
 
 const newId = () => globalThis.crypto?.randomUUID?.() || `box-${Date.now()}-${Math.random()}`;
 
+function clampZoom(value: number) {
+  return Math.min(3, Math.max(0.5, value));
+}
+
 export default function BboxCanvas(props: Props) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -57,6 +63,35 @@ export default function BboxCanvas(props: Props) {
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
   const renderedBoxes = useMemo(() => draftBox ? props.boxes.map((box) => box.id === draftBox.id ? draftBox : box) : props.boxes, [draftBox, props.boxes]);
   const updateDraft = (box: Bbox | null) => { draftBoxRef.current = box; setDraftBox(box); };
+
+  const zoomRef = useRef(props.zoom);
+  const onZoomChangeRef = useRef(props.onZoomChange);
+  useEffect(() => {
+    zoomRef.current = props.zoom;
+    onZoomChangeRef.current = props.onZoomChange;
+  });
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const stage = stageRef.current;
+    if (!viewport || !stage) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const current = zoomRef.current;
+      const factor = event.deltaY < 0 ? 1.1 : 0.9;
+      const next = clampZoom(current * factor);
+      if (next === current) return;
+      const rect = stage.getBoundingClientRect();
+      const pointerX = event.clientX - rect.left;
+      const pointerY = event.clientY - rect.top;
+      const scaleChange = next / current;
+      viewport.scrollLeft += pointerX * (scaleChange - 1);
+      viewport.scrollTop += pointerY * (scaleChange - 1);
+      onZoomChangeRef.current(next);
+    };
+    viewport.addEventListener("wheel", handleWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", handleWheel);
+  }, []);
 
   const point = (event: React.PointerEvent) => {
     const rect = stageRef.current!.getBoundingClientRect();
@@ -172,6 +207,24 @@ export default function BboxCanvas(props: Props) {
 
   const fitWidth = Math.min(900, Math.max(280, (bounds.width / Math.max(1, bounds.height)) * 560));
   const stageWidth = Math.max(160, Math.round(fitWidth * props.zoom));
+
+  useEffect(() => {
+    if (props.fitSignal === 0) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const baseWidth = Math.max(160, Math.round(fitWidth));
+    const baseHeight = Math.max(1, Math.round(baseWidth * (bounds.height / Math.max(1, bounds.width))));
+    const fit = Math.min(
+      (viewport.clientWidth - 16) / baseWidth,
+      (viewport.clientHeight - 16) / baseHeight,
+      1,
+    );
+    const next = clampZoom(fit);
+    if (next === zoomRef.current) return;
+    viewport.scrollLeft = 0;
+    viewport.scrollTop = 0;
+    onZoomChangeRef.current(next);
+  }, [bounds, fitWidth, props.fitSignal]);
   return <div ref={viewportRef} className={`max-h-[600px] overflow-auto rounded-xl bg-slate-950/95 p-3 ${props.tool === "pan" ? "cursor-grab" : props.tool === "draw" ? "cursor-crosshair" : "cursor-default"}`}>
     <div ref={stageRef} className="relative mx-auto touch-none select-none overflow-visible bg-slate-900 shadow-2xl" style={{ width: stageWidth, aspectRatio: `${bounds.width} / ${bounds.height}` }} onPointerDown={beginStage} onPointerMove={movePointer} onPointerUp={endPointer} onPointerCancel={endPointer}>
       {props.imageUrl ? <img src={props.imageUrl} alt={props.imageAlt} draggable={false} onLoad={(event) => { const next = { width: event.currentTarget.naturalWidth || 1000, height: event.currentTarget.naturalHeight || 1000 }; setBounds(next); props.onImageSizeChange(next); }} className="pointer-events-none absolute inset-0 h-full w-full object-contain" /> : <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">任务图片暂不可用</div>}

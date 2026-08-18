@@ -392,6 +392,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
   const [state, dispatch] = useReducer(reduceBboxState, externalBoxes, (boxes) => createBboxState(boxes, labels[0]));
   const [tool, setTool] = useState<BboxTool>("draw");
   const [zoom, setZoom] = useState(1);
+  const [fitSignal, setFitSignal] = useState(0);
   const [bounds, setBounds] = useState<ImageBounds>({ width: 1000, height: 1000 });
   const externalSignature = JSON.stringify(externalBoxes);
   const localSignature = JSON.stringify(state.boxes);
@@ -449,7 +450,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
     dispatch({ type: "select", ids: all.slice(start, end + 1).map((box) => box.id) });
   }, [state.boxes, state.selectedIds]);
 
-  const fitCanvas = useCallback(() => setZoom(1), []);
+  const fitCanvas = useCallback(() => setFitSignal((s) => s + 1), []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -533,7 +534,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
           }}
         />
       </div>
-      <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedIds={state.selectedIds} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(ids) => dispatch({ type: "select", ids })} onSelectToggle={(id) => dispatch({ type: "select-toggle", id })} onCommit={commit} onImageSizeChange={(size) => { setBounds(size); onImageSizeChange(size); }} />
+      <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedIds={state.selectedIds} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} fitSignal={fitSignal} onSelect={(ids) => dispatch({ type: "select", ids })} onSelectToggle={(id) => dispatch({ type: "select-toggle", id })} onCommit={commit} onImageSizeChange={(size) => { setBounds(size); onImageSizeChange(size); }} />
       <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedIds={state.selectedIds} issues={issues} onSelect={(ids) => dispatch({ type: "select", ids })} onSelectToggle={(id) => dispatch({ type: "select-toggle", id })} onSelectRange={selectRange} onLabelChange={changeLabel} onDelete={(ids) => deleteIds(ids)} /></aside>
     </div>
     <details className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-lg lg:hidden"><summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="max-h-64 overflow-y-auto p-2"><BboxObjectList boxes={state.boxes} labels={labels} selectedIds={state.selectedIds} issues={issues} onSelect={(ids) => dispatch({ type: "select", ids })} onSelectToggle={(id) => dispatch({ type: "select-toggle", id })} onSelectRange={selectRange} onLabelChange={changeLabel} onDelete={(ids) => deleteIds(ids)} /></div></details>
