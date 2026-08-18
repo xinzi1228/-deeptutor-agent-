@@ -666,6 +666,22 @@ body[data-picker-open] .dt-mark-pulse {
   animation-play-state: paused !important;
 }
 
+/* Annotation coach → 放大为右侧侧边栏：从右侧滑入，收起时回到小面板 */
+@keyframes dt-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: dt-slide-in-right 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* Capability menu pop-up — the dropdown blooms out of the chip itself
    rather than fading in from above the composer. Origin at bottom-left so
    the menu visually "unfurls" from the chevron corner of the chip. */

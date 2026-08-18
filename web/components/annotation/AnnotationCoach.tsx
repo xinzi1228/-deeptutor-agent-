@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MessageCircle, Send, X } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, MessageCircle, Send, X } from "lucide-react";
 import { apiFetch, apiUrl } from "@/lib/api";
 import {
   UnifiedWSClient,
@@ -217,6 +217,7 @@ export default function AnnotationCoach({
   const { active } = useLearningProfile();
   const profileKey = active?.id || "locked";
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [cards, setCards] = useState<ChartData[]>([]);
   const [input, setInput] = useState("");
@@ -287,6 +288,7 @@ export default function AnnotationCoach({
       setSending(false);
       setAwaitingInput(false);
       setOpen(false);
+      setExpanded(false);
     };
     window.addEventListener("deeptutor:learning-profile-changed", resetForProfile);
     return () => window.removeEventListener("deeptutor:learning-profile-changed", resetForProfile);
@@ -295,7 +297,10 @@ export default function AnnotationCoach({
   useEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        setExpanded(false);
+      }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
@@ -633,6 +638,8 @@ export default function AnnotationCoach({
 
   const coachStatus = deriveCoachStatus(sending, awaitingInput);
   const flashActive = flash !== null;
+  // 放大为右侧侧边栏：只在面板打开时生效，关闭/收起后回到小气泡态
+  const expandedView = open && expanded;
   const ringClass = flashActive ? STATUS_RING.flash : STATUS_RING[coachStatus];
   const latestCoachMessage = [...messages].reverse().find((message) => message.role === "coach");
   const latestMood = detectCoachMood(latestCoachMessage?.content ?? "");
@@ -649,8 +656,15 @@ export default function AnnotationCoach({
           : "/coach/coach-default.png";
 
   return (
-    <div className="fixed z-50 flex flex-col items-end gap-3" style={{ right: position.right, bottom: position.bottom }}>
-      {hint && (
+    <div
+      className={`fixed z-50 ${
+        expandedView
+          ? "inset-0 flex animate-slide-in-right flex-col bg-[var(--card)] sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[360px] sm:border-l sm:border-[var(--border)] sm:shadow-xl"
+          : "flex flex-col items-end gap-3"
+      }`}
+      style={expandedView ? undefined : { right: position.right, bottom: position.bottom }}
+    >
+      {hint && !expandedView && (
         <div className="relative max-w-[260px] rounded-2xl rounded-br-sm border border-[var(--border)] bg-[var(--card)] px-3.5 py-2.5 text-[13px] leading-relaxed text-[var(--foreground)] shadow-lg">
           <button
             aria-label="close hint"
@@ -664,7 +678,16 @@ export default function AnnotationCoach({
       )}
 
       {open && (
-        <div role="dialog" aria-modal="false" aria-label="标注教练" className="fixed inset-x-3 bottom-3 flex max-h-[calc(100vh-24px)] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl sm:static sm:h-[440px] sm:w-[340px]">
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-label="标注教练"
+          className={`overflow-hidden ${
+            expandedView
+              ? "flex h-full w-full flex-col"
+              : "fixed inset-x-3 bottom-3 flex max-h-[calc(100vh-24px)] flex-col rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-xl sm:static sm:h-[440px] sm:w-[340px]"
+          }`}
+        >
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-3.5 py-3">
             <img src={coachImage} alt="标注教练星仔" className="h-8 w-8 rounded-full bg-white object-cover" />
             <div className="flex-1">
@@ -682,13 +705,35 @@ export default function AnnotationCoach({
                 })}
               </p>
             </div>
-            <button
-              aria-label="close coach"
-              onClick={() => setOpen(false)}
-              className="rounded-md p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              {expandedView ? (
+                <button
+                  aria-label="collapse annotation coach"
+                  onClick={() => setExpanded(false)}
+                  className="rounded-md p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  aria-label="expand annotation coach"
+                  onClick={() => setExpanded(true)}
+                  className="rounded-md p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                aria-label="close coach"
+                onClick={() => {
+                  setOpen(false);
+                  setExpanded(false);
+                }}
+                className="rounded-md p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {showShortcuts && (
@@ -816,23 +861,25 @@ export default function AnnotationCoach({
         </div>
       )}
 
-      <button
-        aria-label="toggle annotation coach"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onClick={() => {
-          if (suppressClickRef.current) {
-            suppressClickRef.current = false;
-            return;
-          }
-          setOpen((v) => !v);
-        }}
-        className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 ${ringClass} bg-[var(--primary)] text-2xl shadow-lg transition-transform hover:scale-105`}
-      >
-        <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-[var(--primary)] opacity-30" />
-        <img src={coachImage} alt="打开标注教练" className="relative h-12 w-12 rounded-full bg-white object-cover" />
-      </button>
+      {!expandedView && (
+        <button
+          aria-label="toggle annotation coach"
+          onPointerDown={expandedView ? undefined : onPointerDown}
+          onPointerMove={expandedView ? undefined : onPointerMove}
+          onPointerUp={expandedView ? undefined : onPointerUp}
+          onClick={() => {
+            if (suppressClickRef.current) {
+              suppressClickRef.current = false;
+              return;
+            }
+            setOpen((v) => !v);
+          }}
+          className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 ${ringClass} bg-[var(--primary)] text-2xl shadow-lg transition-transform hover:scale-105`}
+        >
+          <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-[var(--primary)] opacity-30" />
+          <img src={coachImage} alt="打开标注教练" className="relative h-12 w-12 rounded-full bg-white object-cover" />
+        </button>
+      )}
     </div>
   );
 }
