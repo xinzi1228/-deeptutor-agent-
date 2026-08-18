@@ -160,7 +160,7 @@ export default function BboxCanvas(props: Props) {
     event.stopPropagation();
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     if (event.ctrlKey || event.metaKey) props.onSelectToggle(box.id);
-    else props.onSelect([box.id]);
+    else if (!props.selectedIds.includes(box.id)) props.onSelect([box.id]);
     interaction.current = { kind: "move", start: point(event), box: { ...box } };
   };
 
