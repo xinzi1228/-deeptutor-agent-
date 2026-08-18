@@ -17,6 +17,7 @@ export type BboxAction =
   | { type: "add"; box: Bbox }
   | { type: "update"; box: Bbox }
   | { type: "delete-selected" }
+  | { type: "delete-by-ids"; ids: string[] }
   | { type: "replace-external"; boxes: Bbox[] }
   | { type: "undo" }
   | { type: "redo" };
@@ -68,6 +69,12 @@ export function reduceBboxState(state: BboxState, action: BboxAction): BboxState
       if (!state.selectedIds.length) return state;
       const removed = new Set(state.selectedIds);
       return commit(state, state.boxes.filter((box) => !removed.has(box.id)), []);
+    }
+    case "delete-by-ids": {
+      const remove = new Set(action.ids);
+      const remaining = state.boxes.filter((box) => !remove.has(box.id));
+      if (remaining.length === state.boxes.length) return state;
+      return commit(state, remaining, state.selectedIds.filter((id) => !remove.has(id)));
     }
     case "replace-external":
       return { ...state, boxes: copy(action.boxes), selectedIds: [], past: [], future: [] };

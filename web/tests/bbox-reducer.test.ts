@@ -45,6 +45,22 @@ test("多选 + 批量删除", () => {
   assert.deepEqual(s.selectedIds, []);
 });
 
+test("delete-by-ids 按 id 删除并保留可撤销历史", () => {
+  let s = createBboxState([], "car");
+  s = reduceBboxState(s, { type: "add", box: box("a") });
+  s = reduceBboxState(s, { type: "add", box: box("b") });
+  s = reduceBboxState(s, { type: "add", box: box("c") });
+  s = reduceBboxState(s, { type: "select", ids: ["a", "b", "c"] });
+  s = reduceBboxState(s, { type: "delete-by-ids", ids: ["a", "c"] });
+  assert.deepEqual(s.boxes.map((b) => b.id), ["b"]);
+  assert.deepEqual(s.selectedIds, ["b"]);
+  s = reduceBboxState(s, { type: "undo" });
+  assert.deepEqual(s.boxes.map((b) => b.id), ["a", "b", "c"]);
+  s = reduceBboxState(s, { type: "redo" });
+  assert.deepEqual(s.boxes.map((b) => b.id), ["b"]);
+  assert.equal(reduceBboxState(s, { type: "delete-by-ids", ids: ["missing"] }), s);
+});
+
 test("select-toggle 加选/减选", () => {
   let s = createBboxState([], "car");
   s = reduceBboxState(s, { type: "add", box: box("a") });
