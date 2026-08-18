@@ -38,12 +38,12 @@ export default function StudentHomeSummary({ onStartChat }: { onStartChat: () =>
   }, [activeProfileId]);
 
   const continueLearning = () => {
-    if (task?.mode === "teaching_annotation") {
-      router.push("/annotation?mode=teaching");
+    if (task?.mode === "teaching_annotation" && task.task_id) {
+      router.push(`/annotation?task=${encodeURIComponent(task.task_id)}&mode=teaching`);
       return;
     }
-    if (task?.mode === "professional_annotation") {
-      router.push("/annotation?mode=professional");
+    if (task?.mode === "professional_annotation" && task.task_id) {
+      router.push(`/annotation?task=${encodeURIComponent(task.task_id)}&mode=professional`);
       return;
     }
     onStartChat();

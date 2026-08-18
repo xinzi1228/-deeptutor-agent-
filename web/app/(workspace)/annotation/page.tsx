@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
 import AnnotationProgress from "@/components/annotation/AnnotationProgress";
@@ -39,11 +40,19 @@ const UnifiedAnnotationWorkbench = dynamic(
   { ssr: false, loading: () => <div className="flex h-full items-center justify-center text-sm text-[var(--muted-foreground)]">正在加载统一标注台…</div> },
 );
 
-export default function AnnotationPage() {
+function AnnotationPageInner() {
   const { t } = useTranslation();
   const { openTask } = useCurrentLearningTask();
   const { active } = useLearningProfile();
-  const [mode, setMode] = useState<"image" | "text" | "audio" | "video" | "pro">("image");
+  const searchParams = useSearchParams();
+  const queryTask = searchParams.get("task");
+  const queryMode = searchParams.get("mode");
+  const [mode, setMode] = useState<"image" | "text" | "audio" | "video" | "pro">(() => {
+    const m = queryMode;
+    if (m === "professional") return "pro";
+    if (m && ["image", "text", "audio", "video"].includes(m)) return m as "image" | "text" | "audio" | "video";
+    return "image";
+  });
   const [tasks, setTasks] = useState<Array<{ id: string; title: string; type: string; modal: "image" | "text" | "audio" | "video"; difficulty: string }>>([]);
   const [professionalTasks, setProfessionalTasks] = useState<typeof tasks>([]);
   const [selectedTask, setSelectedTask] = useState("");
@@ -239,6 +248,28 @@ export default function AnnotationPage() {
     }
   };
 
+  const queryHandledRef = useRef(false);
+  useEffect(() => {
+    if (queryHandledRef.current) return;
+    if (!queryTask) {
+      queryHandledRef.current = true;
+      return;
+    }
+    const inTeaching = tasks.some((task) => task.id === queryTask);
+    const inProfessional = professionalTasks.some((task) => task.id === queryTask);
+    if (inTeaching || inProfessional) {
+      queryHandledRef.current = true;
+      if (queryMode === "professional" && inProfessional) {
+        void chooseProfessionalTask(queryTask);
+      } else {
+        void chooseTask(queryTask);
+      }
+      window.history.replaceState({}, "", "/annotation");
+    }
+    // 仅在 tasks/professionalTasks 加载完成后触发一次；chooseTask/chooseProfessionalTask 不应进入依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryTask, queryMode, tasks, professionalTasks]);
+
   const takeOverEditing = useCallback(async () => {
     if (!selectedTask || !editAccess.lease || !browserSessionId) return;
     try {
@@ -428,5 +459,13 @@ export default function AnnotationPage() {
 
       <AnnotationCoach />
     </div>
+  );
+}
+
+export default function AnnotationPage() {
+  return (
+    <Suspense fallback={null}>
+      <AnnotationPageInner />
+    </Suspense>
   );
 }
