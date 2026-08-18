@@ -194,6 +194,8 @@ function AnnotationPageInner() {
   }, [acquireForTask, browserSessionId, editAccess.editable, editAccess.lease, lastTaskKey, openTask, saveOwnedCheckpoint, selectedTask]);
 
   useEffect(() => {
+    // 深链优先：URL 指定了任务时，不执行 localStorage 恢复
+    if (queryTask) return;
     if (tasks.length === 0 || restoredTaskRef.current || !profileId) return;
     restoredTaskRef.current = true;
     let saved: string | null = null;
@@ -264,6 +266,9 @@ function AnnotationPageInner() {
       } else {
         void chooseTask(queryTask);
       }
+      window.history.replaceState({}, "", "/annotation");
+    } else if (tasks.length > 0 && professionalTasks.length > 0) {
+      queryHandledRef.current = true;
       window.history.replaceState({}, "", "/annotation");
     }
     // 仅在 tasks/professionalTasks 加载完成后触发一次；chooseTask/chooseProfessionalTask 不应进入依赖
