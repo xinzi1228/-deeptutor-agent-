@@ -16,6 +16,7 @@ import { invalidateStudentDashboard } from "@/lib/student-dashboard-api";
 import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
 import type { AnnotationEditLease } from "@/lib/annotation-edit-session";
 import BboxCanvas from "@/components/annotation/bbox/BboxCanvas";
+import BboxLabelPanel from "@/components/annotation/bbox/BboxLabelPanel";
 import BboxObjectList from "@/components/annotation/bbox/BboxObjectList";
 import BboxToolbar, { type BboxTool } from "@/components/annotation/bbox/BboxToolbar";
 import AnnotationResultCard from "@/components/annotation/AnnotationResultCard";
@@ -494,11 +495,34 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
   }, [issues.length, onInteractionState, state.activeLabel, state.boxes.length, state.selectedIds, tool]);
   return <div className="space-y-3">
     <BboxToolbar tool={tool} onToolChange={setTool} activeLabel={state.activeLabel} labels={labels} onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} onFit={fitCanvas} canUndo={state.past.length > 0} canRedo={state.future.length > 0} hasSelection={state.selectedIds.length > 0} onUndo={handleUndo} onRedo={handleRedo} onDelete={() => state.selectedIds.length > 0 && deleteBox(state.selectedIds[0])} />
-    <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
+    <div className="grid min-w-0 gap-3 lg:grid-cols-[140px_minmax(0,1fr)_220px] xl:grid-cols-[140px_minmax(0,1fr)_220px]">
+      <div className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:block">
+        <BboxLabelPanel
+          labels={labels}
+          activeLabel={state.activeLabel}
+          selectedIds={state.selectedIds}
+          onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })}
+          onApplyToSelection={(label) => {
+            if (state.selectedIds.length === 1) {
+              const target = state.boxes.find((b) => b.id === state.selectedIds[0]);
+              if (target) {
+                const next = { ...target, label };
+                dispatch({ type: "update", box: next });
+                onChange(state.boxes.map((b) => b.id === next.id ? next : b));
+              }
+            } else if (state.selectedIds.length > 1) {
+              dispatch({ type: "set-selected-label", label });
+              onChange(state.boxes.map((b) => state.selectedIds.includes(b.id) ? { ...b, label } : b));
+            } else {
+              dispatch({ type: "set-active-label", label });
+            }
+          }}
+        />
+      </div>
       <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedId={state.selectedIds[0] ?? null} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(id) => dispatch({ type: "select", ids: id ? [id] : [] })} onCommit={commit} onImageSizeChange={(size) => { setBounds(size); onImageSizeChange(size); }} />
-      <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 xl:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedIds[0] ?? null} issues={issues} onSelect={(id) => dispatch({ type: "select", ids: [id] })} onLabelChange={changeLabel} onDelete={deleteBox} /></aside>
+      <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedIds[0] ?? null} issues={issues} onSelect={(id) => dispatch({ type: "select", ids: [id] })} onLabelChange={changeLabel} onDelete={deleteBox} /></aside>
     </div>
-    <details className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-lg xl:hidden"><summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="max-h-64 overflow-y-auto p-2"><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedIds[0] ?? null} issues={issues} onSelect={(id) => dispatch({ type: "select", ids: [id] })} onLabelChange={changeLabel} onDelete={deleteBox} /></div></details>
+    <details className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-lg lg:hidden"><summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="max-h-64 overflow-y-auto p-2"><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedIds[0] ?? null} issues={issues} onSelect={(id) => dispatch({ type: "select", ids: [id] })} onLabelChange={changeLabel} onDelete={deleteBox} /></div></details>
     {issues.length > 0 && <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-700"><strong>本地质检发现 {issues.length} 项：</strong>{issues.slice(0, 3).map((issue) => <span key={`${issue.boxId}-${issue.code}`} className="ml-2">{issue.message}</span>)}</div>}
     <p className="text-center text-[11px] text-[var(--muted-foreground)]">V 选择 · R/B 画框 · H 平移 · 1-9 选标签 · Delete 删除 · Ctrl+Z 撤销 · Ctrl+Shift+Z/Y 重做 · Ctrl+± 缩放 · Shift+1 适配 · Shift+2 原始尺寸。</p>
   </div>;
