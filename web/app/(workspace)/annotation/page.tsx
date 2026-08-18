@@ -13,6 +13,7 @@ import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import type { AnnotationTask } from "@/components/annotation/UnifiedAnnotationWorkbench";
 import { useCurrentLearningTask } from "@/components/current-task/CurrentLearningTaskContext";
 import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
+import { readLastTaskFor, writeLastTaskFor, type AnnotationModeKey } from "@/lib/annotation-mode-memory";
 import {
   acquireAnnotationEditLease,
   checkpointProfessionalEditLease,
@@ -100,53 +101,6 @@ function AnnotationPageInner() {
     return lease;
   }, [browserSessionId, editAccess, selectedTask]);
 
-  const switchMode = useCallback(async (nextMode: "image" | "text" | "audio" | "video" | "pro") => {
-    if (nextMode === mode) return;
-    const startedAt = performance.now();
-    taskRequestVersion.current += 1;
-    const previousTask = selectedTask;
-    const compatibleTask = chooseCompatibleTask(tasks, nextMode, previousTask);
-    try {
-      const checkpointed = await saveOwnedCheckpoint();
-      if (previousTask && checkpointed && browserSessionId) {
-        await releaseAnnotationEditLease(previousTask, browserSessionId, checkpointed);
-      }
-    } catch (reason) {
-      setEditAccess((current) => ({ ...current, message: reason instanceof Error ? reason.message : "切换前保存失败" }));
-      return;
-    }
-    setMode(nextMode);
-    // 每种模态拥有独立任务上下文。专业模式也必须重新从本人任务中进入。
-    if (!compatibleTask || nextMode === "pro" || mode === "pro") {
-      setSelectedTask("");
-      setSelectedTaskData(null);
-      setProfessionalUrl("");
-      setEditAccess({ editable: false, lease: null, message: "请选择任务" });
-    }
-    requestAnimationFrame(() => emitPerformanceMetric({
-      name: "annotation_mode_switch",
-      route: "/annotation",
-      duration_ms: performance.now() - startedAt,
-      stage: nextMode,
-    }));
-  }, [browserSessionId, mode, saveOwnedCheckpoint, selectedTask, tasks]);
-
-  useEffect(() => {
-    fetch("/api/v1/annotation/tasks").then((res) => res.ok ? res.json() : Promise.reject()).then((data) => {
-      setTasks(data.tasks || []);
-    }).catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (mode !== "pro") return;
-    Promise.all([
-      fetch("/api/v1/label-studio/status", { cache: "no-store" }).then((res) => res.ok ? res.json() : Promise.reject()),
-      fetch("/api/v1/label-studio/professional/tasks", { cache: "no-store" }).then((res) => res.ok ? res.json() : { tasks: [] }),
-    ])
-      .then(([status, assigned]) => { setLabelStudio(status); setProfessionalTasks(assigned.tasks || []); })
-      .catch(() => setLabelStudio({ available: false, detail: "无法连接本地服务，或学习档案尚未解锁" }));
-  }, [mode]);
-
   const chooseTask = useCallback(async (taskId: string) => {
     if (!taskId) return;
     const requestVersion = ++taskRequestVersion.current;
@@ -165,7 +119,7 @@ function AnnotationPageInner() {
       if (requestVersion !== taskRequestVersion.current) return;
       setSelectedTaskData(task);
       try {
-        window.localStorage.setItem(lastTaskKey, taskId);
+        writeLastTaskFor(profileId || "", task.modal as AnnotationModeKey, taskId);
       } catch { /* ignore */ }
       setMode(task.modal);
       await openTask({ courseId: "annotation-foundations", taskId, mode: "teaching_annotation" });
@@ -191,7 +145,61 @@ function AnnotationPageInner() {
       });
       // 保持当前工作台；选择器仍可重试
     }
-  }, [acquireForTask, browserSessionId, editAccess.editable, editAccess.lease, lastTaskKey, openTask, saveOwnedCheckpoint, selectedTask]);
+  }, [acquireForTask, browserSessionId, editAccess.editable, editAccess.lease, openTask, profileId, saveOwnedCheckpoint, selectedTask]);
+
+  const switchMode = useCallback(async (nextMode: "image" | "text" | "audio" | "video" | "pro") => {
+    if (nextMode === mode) return;
+    const startedAt = performance.now();
+    taskRequestVersion.current += 1;
+    const previousTask = selectedTask;
+    const compatibleTask = chooseCompatibleTask(tasks, nextMode, previousTask);
+    try {
+      const checkpointed = await saveOwnedCheckpoint();
+      if (previousTask && checkpointed && browserSessionId) {
+        await releaseAnnotationEditLease(previousTask, browserSessionId, checkpointed);
+      }
+    } catch (reason) {
+      setEditAccess((current) => ({ ...current, message: reason instanceof Error ? reason.message : "切换前保存失败" }));
+      return;
+    }
+    setMode(nextMode);
+    // 每种模态拥有独立任务上下文。专业模式也必须重新从本人任务中进入。
+    if (!compatibleTask || nextMode === "pro" || mode === "pro") {
+      setSelectedTask("");
+      setSelectedTaskData(null);
+      setProfessionalUrl("");
+      setEditAccess({ editable: false, lease: null, message: "请选择任务" });
+    }
+    // 切换到教学模态时，按该模态的本地记忆自动恢复上次任务（覆盖空态清空）
+    if (nextMode !== "pro" && mode !== "pro") {
+      const saved = readLastTaskFor(profileId || "", nextMode);
+      if (saved && tasks.some((task) => task.id === saved && task.modal === nextMode)) {
+        void chooseTask(saved);
+      }
+    }
+    requestAnimationFrame(() => emitPerformanceMetric({
+      name: "annotation_mode_switch",
+      route: "/annotation",
+      duration_ms: performance.now() - startedAt,
+      stage: nextMode,
+    }));
+  }, [browserSessionId, chooseTask, mode, profileId, saveOwnedCheckpoint, selectedTask, tasks]);
+
+  useEffect(() => {
+    fetch("/api/v1/annotation/tasks").then((res) => res.ok ? res.json() : Promise.reject()).then((data) => {
+      setTasks(data.tasks || []);
+    }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "pro") return;
+    Promise.all([
+      fetch("/api/v1/label-studio/status", { cache: "no-store" }).then((res) => res.ok ? res.json() : Promise.reject()),
+      fetch("/api/v1/label-studio/professional/tasks", { cache: "no-store" }).then((res) => res.ok ? res.json() : { tasks: [] }),
+    ])
+      .then(([status, assigned]) => { setLabelStudio(status); setProfessionalTasks(assigned.tasks || []); })
+      .catch(() => setLabelStudio({ available: false, detail: "无法连接本地服务，或学习档案尚未解锁" }));
+  }, [mode]);
 
   useEffect(() => {
     // 深链优先：URL 指定了任务时，不执行 localStorage 恢复
@@ -200,12 +208,15 @@ function AnnotationPageInner() {
     restoredTaskRef.current = true;
     let saved: string | null = null;
     try {
-      saved = window.localStorage.getItem(lastTaskKey);
+      // 模态记忆优先，旧键（无模态后缀）作为兼容回退
+      saved = mode !== "pro"
+        ? readLastTaskFor(profileId, mode) ?? window.localStorage.getItem(lastTaskKey)
+        : window.localStorage.getItem(lastTaskKey);
     } catch { /* ignore */ }
     if (!saved) return;
     const exists = tasks.some((task) => task.id === saved);
     if (exists) void chooseTask(saved);
-  }, [tasks, chooseTask, lastTaskKey, profileId]);
+  }, [tasks, chooseTask, lastTaskKey, profileId, mode]);
 
   const chooseProfessionalTask = async (taskId: string) => {
     const requestVersion = ++taskRequestVersion.current;
