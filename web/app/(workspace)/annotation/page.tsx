@@ -171,7 +171,7 @@ function AnnotationPageInner() {
       setEditAccess({ editable: false, lease: null, message: "请选择任务" });
     }
     // 切换到教学模态时，按该模态的本地记忆自动恢复上次任务（覆盖空态清空）
-    if (nextMode !== "pro" && mode !== "pro") {
+    if (nextMode !== "pro") {
       const saved = readLastTaskFor(profileId || "", nextMode);
       if (saved && tasks.some((task) => task.id === saved && task.modal === nextMode)) {
         void chooseTask(saved);
