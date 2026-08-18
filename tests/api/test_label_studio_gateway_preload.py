@@ -167,6 +167,64 @@ def test_rewrite_text_injects_app_settings_hostname() -> None:
     assert "hostname: ''" in router_module._rewrite_text("hostname: ''")
 
 
+def test_rewrite_text_injects_complete_frontend_proxy_url() -> None:
+    """Full injected URL: frontend origin + proxy prefix, usable as new URL()."""
+    proxy_url = f"http://127.0.0.1:3782{router_module.PROXY_PREFIX}"
+    rewritten = router_module._rewrite_text('    hostname: "",', proxy_url)
+    injected = "http://127.0.0.1:3782/api/v1/label-studio/proxy"
+    assert f'hostname: "{injected}"' in rewritten
+    assert f'{router_module.PROXY_PREFIX}{router_module.PROXY_PREFIX}' not in rewritten
+
+
+def _frontend_request(headers: dict[str, str]) -> "object":
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/v1/label-studio/proxy/projects/7",
+        "query_string": b"",
+        "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+        "scheme": "http",
+        "server": ("127.0.0.1", 8001),
+        "client": ("127.0.0.1", 53984),
+    }
+    return Request(scope)
+
+
+def test_frontend_proxy_base_url_uses_frontend_host_header() -> None:
+    """Forwarded Host header (frontend origin 3782) wins over backend base_url."""
+    request = _frontend_request({"host": "127.0.0.1:3782"})
+    assert (
+        router_module._frontend_proxy_base_url(request)
+        == f"http://127.0.0.1:3782{router_module.PROXY_PREFIX}"
+    )
+
+
+def test_frontend_proxy_base_url_prefers_forwarded_host() -> None:
+    """x-forwarded-host/x-forwarded-proto take precedence over Host header."""
+    request = _frontend_request(
+        {
+            "host": "127.0.0.1:8001",
+            "x-forwarded-host": "127.0.0.1:3782",
+            "x-forwarded-proto": "https",
+        }
+    )
+    assert (
+        router_module._frontend_proxy_base_url(request)
+        == f"https://127.0.0.1:3782{router_module.PROXY_PREFIX}"
+    )
+
+
+def test_frontend_proxy_base_url_falls_back_to_backend_origin() -> None:
+    """Without frontend-derived headers, fall back to the backend base_url."""
+    request = _frontend_request({"host": "127.0.0.1:8001"})
+    assert (
+        router_module._frontend_proxy_base_url(request)
+        == f"http://127.0.0.1:8001{router_module.PROXY_PREFIX}"
+    )
+
+
 def test_rewrite_text_rewrites_url_literals() -> None:
     rewritten = router_module._rewrite_text('"/static/app.css" "/api/current-user/whoami" "/projects/1"')
     assert f'"{router_module.PROXY_PREFIX}/static/app.css"' in rewritten

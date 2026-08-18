@@ -280,6 +280,23 @@ async def sync_professional_attempt(task_id: str) -> dict:
     return {"synced": True, "created": created, "attempt": attempt, "score_record": score_record}
 
 
+def _frontend_proxy_base_url(request: Request) -> str:
+    """Derive the proxy base URL from the frontend origin, not the backend's.
+
+    The proxy is usually reached through the Next.js rewrite (web/proxy.ts),
+    which preserves the original frontend Host header (e.g. 127.0.0.1:3782).
+    Injecting the backend origin (request.base_url, e.g. 127.0.0.1:8001) into
+    Label Studio's HTML makes the iframe fire cross-origin API calls that drop
+    the learning-profile unlock cookie, so the backend responds 423 Locked.
+    Prefer forwarded headers (set by the frontend proxy), then the Host header,
+    and fall back to the backend base_url only when neither is usable.
+    """
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    proto = request.headers.get("x-forwarded-proto") or str(request.url.scheme)
+    frontend_origin = f"{proto}://{forwarded_host}" if forwarded_host else str(request.base_url).rstrip("/")
+    return frontend_origin + PROXY_PREFIX
+
+
 def _rewrite_text(text: str, proxy_base_url: str = "") -> str:
     pairs = (
         ('"/static/', f'"{PROXY_PREFIX}/static/'),
@@ -443,7 +460,7 @@ async def proxy(path: str, request: Request) -> Response:
         # scans that add several seconds of latency through the proxy).
         rewritten = _rewrite_text(
             upstream.text,
-            proxy_base_url=str(request.base_url).rstrip("/") + PROXY_PREFIX,
+            proxy_base_url=_frontend_proxy_base_url(request),
         )
         if is_html:
             rewritten = _inject_realtime_bridge(rewritten, path)
