@@ -70,6 +70,7 @@ function AnnotationPageInner() {
   const [editAccess, setEditAccess] = useState<EditAccess>({ editable: false, lease: null, message: "请选择任务" });
   const draftSaverRef = useRef<(() => Promise<{ draftVersion: number; lease: AnnotationEditLease }>) | null>(null);
   const taskRequestVersion = useRef(0);
+  const professionalRequestVersion = useRef(0);
   const restoredTaskRef = useRef(false);
   const profileId = active?.id;
   const lastTaskKey = profileId ? `deeptutor_last_annotation_task.${profileId}` : "deeptutor_last_annotation_task";
@@ -107,6 +108,9 @@ function AnnotationPageInner() {
   const chooseTask = useCallback(async (taskId: string) => {
     if (!taskId) return;
     const requestVersion = ++taskRequestVersion.current;
+    professionalRequestVersion.current += 1;
+    setProfessionalLoading(false);
+    setPreloadTimedOut(false);
     const startedAt = performance.now();
     try {
       if (selectedTask && selectedTask !== taskId && editAccess.editable && editAccess.lease) {
@@ -154,6 +158,9 @@ function AnnotationPageInner() {
     if (nextMode === mode) return;
     const startedAt = performance.now();
     taskRequestVersion.current += 1;
+    professionalRequestVersion.current += 1;
+    setProfessionalLoading(false);
+    setPreloadTimedOut(false);
     const previousTask = selectedTask;
     const compatibleTask = chooseCompatibleTask(tasks, nextMode, previousTask);
     try {
@@ -246,7 +253,7 @@ function AnnotationPageInner() {
   }, [tasks, chooseTask, lastTaskKey, profileId, mode]);
 
   const chooseProfessionalTask = async (taskId: string) => {
-    const requestVersion = ++taskRequestVersion.current;
+    const requestVersion = ++professionalRequestVersion.current;
     const startedAt = performance.now();
     setProfessionalLoading(true);
     setProfessionalUrl("");
@@ -271,8 +278,9 @@ function AnnotationPageInner() {
         throw new Error(error.detail || "专业任务准备失败");
       }
       const data = await response.json();
-      if (requestVersion !== taskRequestVersion.current) return;
+      if (requestVersion !== professionalRequestVersion.current) return;
       setProfessionalUrl(data.workbench_url);
+      setLabelStudio((current) => ({ ...(current || {}), available: true }));
       await openTask({ courseId: "annotation-professional", taskId, mode: "professional_annotation" });
       emitPerformanceMetric({
         name: "annotation_task_visible",
@@ -281,6 +289,7 @@ function AnnotationPageInner() {
         stage: "professional",
       });
     } catch (error) {
+      if (requestVersion !== professionalRequestVersion.current) return;
       emitPerformanceMetric({
         name: "annotation_task_visible",
         route: "/annotation",
@@ -292,7 +301,9 @@ function AnnotationPageInner() {
       setLabelStudio((current) => ({ available: false, configured: current?.configured, management_url: current?.management_url, detail: error instanceof Error ? error.message : "专业任务准备失败" }));
     } finally {
       stopTimeout();
-      setProfessionalLoading(false);
+      if (requestVersion === professionalRequestVersion.current) {
+        setProfessionalLoading(false);
+      }
     }
   };
 
