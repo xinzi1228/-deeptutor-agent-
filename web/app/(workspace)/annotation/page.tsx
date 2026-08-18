@@ -63,6 +63,9 @@ function AnnotationPageInner() {
   const [professionalLoading, setProfessionalLoading] = useState(false);
   const [professionalSyncing, setProfessionalSyncing] = useState(false);
   const [professionalResult, setProfessionalResult] = useState<{ metrics: Record<string, number>; report: string; scoreRecord?: AnnotationScoreRecord | null } | null>(null);
+  const [preloadSrc, setPreloadSrc] = useState("");
+  const [preloadStage, setPreloadStage] = useState("正在准备 Label Studio 项目…");
+  const [preloadTimedOut, setPreloadTimedOut] = useState(false);
   const [browserSessionId, setBrowserSessionId] = useState("");
   const [editAccess, setEditAccess] = useState<EditAccess>({ editable: false, lease: null, message: "请选择任务" });
   const draftSaverRef = useRef<(() => Promise<{ draftVersion: number; lease: AnnotationEditLease }>) | null>(null);
@@ -192,14 +195,38 @@ function AnnotationPageInner() {
   }, []);
 
   useEffect(() => {
-    if (mode !== "pro") return;
+    // 档案解锁后自动后台准备专业任务（幂等，失败不阻塞）
+    if (!profileId) return;
+    const controller = new AbortController();
+    void apiFetch(apiUrl("/api/v1/label-studio/preload"), {
+      method: "POST",
+      signal: controller.signal,
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [profileId]);
+
+  useEffect(() => {
+    // 进入专业模式时刷新状态；档案解锁后也可在非 pro 模式提前拉取，用于隐藏 iframe 预载
+    if (mode !== "pro" && !profileId) return;
+    let cancelled = false;
     Promise.all([
       fetch("/api/v1/label-studio/status", { cache: "no-store" }).then((res) => res.ok ? res.json() : Promise.reject()),
       fetch("/api/v1/label-studio/professional/tasks", { cache: "no-store" }).then((res) => res.ok ? res.json() : { tasks: [] }),
     ])
-      .then(([status, assigned]) => { setLabelStudio(status); setProfessionalTasks(assigned.tasks || []); })
-      .catch(() => setLabelStudio({ available: false, detail: "无法连接本地服务，或学习档案尚未解锁" }));
-  }, [mode]);
+      .then(([status, assigned]) => {
+        if (cancelled) return;
+        setLabelStudio(status);
+        setProfessionalTasks(assigned.tasks || []);
+        // /status 的 prepared_tasks 无 URL；mapping.public_dict() 含 project_id，用它预载项目数据页
+        const projectId = status?.mapping?.project_id;
+        setPreloadSrc(projectId ? `/api/v1/label-studio/proxy/projects/${projectId}/data` : "");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLabelStudio({ available: false, detail: "无法连接本地服务，或学习档案尚未解锁" });
+      });
+    return () => { cancelled = true; };
+  }, [profileId, mode]);
 
   useEffect(() => {
     // 深链优先：URL 指定了任务时，不执行 localStorage 恢复
@@ -224,13 +251,20 @@ function AnnotationPageInner() {
     setProfessionalLoading(true);
     setProfessionalUrl("");
     setProfessionalResult(null);
+    setPreloadStage("正在准备 Label Studio 项目…");
+    setPreloadTimedOut(false);
+    const timeoutTimer = window.setTimeout(() => setPreloadTimedOut(true), 15000);
+    const stopTimeout = () => window.clearTimeout(timeoutTimer);
     try {
       if (selectedTask && selectedTask !== taskId && editAccess.editable && editAccess.lease) {
+        setPreloadStage("正在保存并释放上一任务编辑权…");
         const checkpointed = await saveOwnedCheckpoint();
         if (checkpointed) await releaseAnnotationEditLease(selectedTask, browserSessionId, checkpointed);
       }
       setSelectedTask(taskId);
+      setPreloadStage("正在同步编辑权限…");
       await acquireForTask(taskId, "professional");
+      setPreloadStage("正在生成专业标注工作台…");
       const response = await apiFetch(apiUrl(`/api/v1/label-studio/prepare/${encodeURIComponent(taskId)}`), { method: "POST" });
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
@@ -257,6 +291,7 @@ function AnnotationPageInner() {
       });
       setLabelStudio((current) => ({ available: false, configured: current?.configured, management_url: current?.management_url, detail: error instanceof Error ? error.message : "专业任务准备失败" }));
     } finally {
+      stopTimeout();
       setProfessionalLoading(false);
     }
   };
@@ -346,6 +381,8 @@ function AnnotationPageInner() {
   }, [professionalSyncing, reportLiveState, selectedTask]);
 
   useEffect(() => {
+    // 隐藏预载 iframe 同样会被注入桥接脚本；只有专业模式才接收并上报这些事件
+    if (mode !== "pro") return;
     const onProfessionalEvent = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.data?.type !== "label_studio_workbench_event") return;
       const allowedStages = new Set(["bridge_ready", "draft_changed", "selection_changed", "tool_changed", "label_changed", "undo", "save", "task_changed"]);
@@ -363,7 +400,7 @@ function AnnotationPageInner() {
     };
     window.addEventListener("message", onProfessionalEvent);
     return () => window.removeEventListener("message", onProfessionalEvent);
-  }, [reportLiveState, selectedTask]);
+  }, [mode, reportLiveState, selectedTask]);
 
   const handleLeaseChange = useCallback((lease: AnnotationEditLease) => {
     setEditAccess({ editable: true, lease, message: "" });
@@ -470,8 +507,14 @@ function AnnotationPageInner() {
       <div className="flex-1">
         {mode !== "pro" ? selectedTaskData ? <UnifiedAnnotationWorkbench key={selectedTask} task={selectedTaskData} previousTaskId={selectedIndex > 0 ? filteredTasks[selectedIndex - 1]?.id : undefined} nextTaskId={selectedIndex >= 0 ? filteredTasks[selectedIndex + 1]?.id : undefined} onSelectTask={(taskId) => void chooseTask(taskId)} onLiveState={reportLiveState} readOnly={!editAccess.editable} browserSessionId={browserSessionId} leaseVersion={editAccess.lease?.version} onLeaseChange={handleLeaseChange} onLeaseLost={handleLeaseLost} registerDraftSaver={registerDraftSaver} /> : <div className="flex h-full items-center justify-center p-8"><div className="max-w-md rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 text-center"><h2 className="font-semibold">选择一项任务开始练习</h2><p className="mt-2 text-xs leading-5 text-[var(--muted-foreground)]">统一 React 标注台会自动保存草稿到当前学习档案，并把实时进度提供给标注教练。</p></div></div> : labelStudio?.available && professionalUrl ? (
           <div className="relative h-full"><iframe src={professionalUrl} className={`h-full w-full border-0 ${editAccess.editable ? "" : "pointer-events-none opacity-70"}`} title="Label Studio 专业标注台" />{!editAccess.editable && <div className="absolute inset-x-4 top-4 rounded-xl border border-amber-500/35 bg-[var(--card)]/95 p-3 text-center text-xs text-amber-700 shadow-sm">专业标注台当前只读，请先在上方接管编辑。</div>}</div>
-        ) : <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 text-sm"><h2 className="font-semibold">{professionalLoading ? "正在准备你的专业任务…" : labelStudio?.available ? "请选择一项专业任务" : "Label Studio 专业模式尚未就绪"}</h2><p className="mt-2 text-[var(--muted-foreground)]">{labelStudio?.available ? "系统会为当前学习档案准备独立项目，并通过同源网关直接打开，不需要再次登录。" : "请启动本机 8080 服务，并在系统环境中配置 LABEL_STUDIO_API_TOKEN 与 LABEL_STUDIO_BRIDGE_SECRET。教学模式仍可正常使用。"}</p><p className="mt-2 text-xs text-[var(--muted-foreground)]">检测信息：{labelStudio?.detail || (labelStudio?.configured === false ? "服务已连接，但尚未配置 API Token" : "正在检测服务…")}</p>{labelStudio?.management_url && <a className="mt-3 inline-block text-xs text-[var(--primary)] underline" href={labelStudio.management_url} target="_blank" rel="noreferrer">管理员打开 Label Studio 管理台</a>}</div></div>}
+        ) : professionalLoading ? (
+          <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 text-sm"><h2 className="font-semibold">正在准备你的专业任务…</h2><p className="mt-2 text-[var(--muted-foreground)]">{preloadStage}</p>{preloadTimedOut && <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"><p className="text-amber-800">准备超时。请检查 Label Studio 服务与凭证后重试。</p><button type="button" className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 font-medium text-white" onClick={() => { if (selectedTask) void chooseProfessionalTask(selectedTask); }}>重试</button></div>}</div></div>
+        ) : <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 text-sm"><h2 className="font-semibold">{labelStudio?.available ? "请选择一项专业任务" : "Label Studio 专业模式尚未就绪"}</h2><p className="mt-2 text-[var(--muted-foreground)]">{labelStudio?.available ? "系统会为当前学习档案准备独立项目，并通过同源网关直接打开，不需要再次登录。" : "请启动本机 8080 服务，并在系统环境中配置 LABEL_STUDIO_API_TOKEN 与 LABEL_STUDIO_BRIDGE_SECRET。教学模式仍可正常使用。"}</p><p className="mt-2 text-xs text-[var(--muted-foreground)]">检测信息：{labelStudio?.detail || (labelStudio?.configured === false ? "服务已连接，但尚未配置 API Token" : "正在检测服务…")}</p>{labelStudio?.management_url && <a className="mt-3 inline-block text-xs text-[var(--primary)] underline" href={labelStudio.management_url} target="_blank" rel="noreferrer">管理员打开 Label Studio 管理台</a>}</div></div>}
       </div>
+
+      {mode !== "pro" && labelStudio?.available && profileId && preloadSrc && (
+        <iframe src={preloadSrc} className="pointer-events-none fixed -left-[10000px] top-0 h-[600px] w-[1200px] border-0 opacity-0" aria-hidden tabIndex={-1} title="Label Studio 预加载" />
+      )}
 
       <AnnotationCoach />
     </div>
