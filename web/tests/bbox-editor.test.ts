@@ -54,7 +54,7 @@ test("local validation reports invalid and duplicate boxes", () => {
 
 test("bbox reducer supports selection, label change, delete, undo and redo", () => {
   let state = createBboxState([box], "车辆");
-  state = reduceBboxState(state, { type: "select", id: "a" });
+  state = reduceBboxState(state, { type: "select", ids: ["a"] });
   state = reduceBboxState(state, { type: "set-selected-label", label: "行人" });
   assert.equal(state.boxes[0].label, "行人");
   state = reduceBboxState(state, { type: "delete-selected" });
