@@ -295,6 +295,14 @@ def _rewrite_text(text: str) -> str:
     )
     for old, new in pairs:
         text = text.replace(old, new)
+    # Label Studio's HTML injects window.APP_SETTINGS with an empty hostname,
+    # which makes the LS frontend compute gateway = "" + "/api" and fire API
+    # requests at our own root path (404). Point it at the proxy prefix so
+    # gateway = PROXY_PREFIX + "/api" routes every LS API call through us.
+    # Only the HTML branch reaches this literal (Django template output); JS
+    # bundles read window.APP_SETTINGS.hostname but never contain it.
+    text = text.replace('hostname: ""', f'hostname: "{PROXY_PREFIX}"')
+    text = text.replace("hostname: ''", f'hostname: "{PROXY_PREFIX}"')
     # Normalize any double-prefix back to a single proxy prefix. Label
     # Studio's HTML/JS can reference assets that were already rewritten
     # (e.g. a nested bundle), which would otherwise produce

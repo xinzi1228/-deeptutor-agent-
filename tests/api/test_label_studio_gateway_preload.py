@@ -149,6 +149,29 @@ def test_preload_partial_failure_is_not_ready(tmp_path: Path, monkeypatch) -> No
     assert set(body["task_urls"]) == {"task1", "task3"}
 
 
+def test_rewrite_text_injects_app_settings_hostname() -> None:
+    """LS HTML's window.APP_SETTINGS.hostname must point at the proxy prefix.
+
+    The LS frontend computes gateway = `${window.APP_SETTINGS.hostname}/api`.
+    Django renders hostname as "" (empty), so without rewriting every LS API
+    request resolves against our root path and 404s. The proxy rewrites both
+    double- and single-quoted empty literals to the proxy prefix.
+    """
+    expected = f'hostname: "{router_module.PROXY_PREFIX}"'
+    assert expected in router_module._rewrite_text('    hostname: "",')
+    assert expected in router_module._rewrite_text("    hostname: '',")
+    assert "hostname: \"\"" not in router_module._rewrite_text('hostname: ""')
+    assert "hostname: ''" not in router_module._rewrite_text("hostname: ''")
+
+
+def test_rewrite_text_rewrites_url_literals() -> None:
+    rewritten = router_module._rewrite_text('"/static/app.css" "/api/current-user/whoami" "/projects/1"')
+    assert f'"{router_module.PROXY_PREFIX}/static/app.css"' in rewritten
+    assert f'"{router_module.PROXY_PREFIX}/api/current-user/whoami"' in rewritten
+    assert f'"{router_module.PROXY_PREFIX}/projects/1"' in rewritten
+    assert router_module.PROXY_PREFIX + router_module.PROXY_PREFIX not in rewritten
+
+
 def test_status_reports_ready_count_after_preload(tmp_path: Path, monkeypatch) -> None:
     fake = FakeLabelStudioClient()
     monkeypatch.setattr(router_module, "LabelStudioClient", lambda: fake)
