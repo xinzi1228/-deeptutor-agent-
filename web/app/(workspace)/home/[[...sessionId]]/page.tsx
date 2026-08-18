@@ -1628,7 +1628,7 @@ export default function ChatPage() {
               </div>
             ) : !hasMessages ? (
               <div
-                className={`flex w-full flex-1 min-h-0 justify-center animate-fade-in px-6 ${studentMode ? "items-center overflow-y-auto py-8" : "items-end pb-14"}`}
+                className={`flex w-full flex-1 min-h-0 justify-center animate-fade-in px-6 ${studentMode ? "items-center overflow-y-auto py-12" : "items-end pb-14"}`}
               >
                 {studentMode ? (
                   <StudentHomeSummary
