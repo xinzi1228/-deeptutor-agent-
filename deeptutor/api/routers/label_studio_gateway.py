@@ -54,18 +54,65 @@ def _context(*, write: bool = False) -> tuple[object, object, LabelStudioProfile
     return access, root, LabelStudioProfileMap.load(root, access.profile_id)
 
 
+def _assigned_professional_task_ids(mapping: LabelStudioProfileMap) -> list[str]:
+    from deeptutor.api.routers.annotation import _task_bank
+
+    bank = _task_bank()
+    starter = [key for key, value in bank.items() if value.get("modal") in {"image", "text"}]
+    return mapping.assigned(starter)
+
+
 @router.get("/status")
 async def status() -> dict:
     access, root, mapping = _context()
     client = LabelStudioClient()
     available = await client.health()
-    return {
+    result = {
         "available": available,
         "configured": bool(client.token),
         "credential_mode": "local_auto" if client.token_source == "local_database" else client.token_source,
         "mapping": mapping.public_dict(),
         "management_url": client.base_url if get_current_user().role == "admin" else None,
         "mode": "profile_project_same_origin_gateway",
+    }
+    if available:
+        from deeptutor.api.routers.annotation import _task_bank
+
+        bank = _task_bank()
+        assigned = _assigned_professional_task_ids(mapping)
+        result["prepared_tasks"] = [
+            {"id": tid, "title": bank[tid].get("title", tid)}
+            for tid in assigned
+            if tid in mapping.task_map and tid in bank
+        ]
+        result["ready_count"] = len(result["prepared_tasks"])
+        result["total_count"] = len(assigned)
+    return result
+
+
+async def _prepare_task_url(
+    access: object,
+    root: object,
+    mapping: LabelStudioProfileMap,
+    client: LabelStudioClient,
+    task_id: str,
+) -> dict | None:
+    """为单个任务准备专业模式 URL；失败返回 None（不抛异常，供批量调用）。"""
+    from deeptutor.api.routers.annotation import _task_bank
+
+    task = _task_bank().get(task_id)
+    if task is None:
+        return None
+    try:
+        project_id, ls_task_id = await client.ensure_task(mapping, task_id, task, root)
+    except LabelStudioUnavailable:
+        return None
+    return {
+        "task_id": task_id,
+        "project_id": project_id,
+        "ls_task_id": ls_task_id,
+        "workbench_url": f"{PROXY_PREFIX}/projects/{project_id}/data?task={ls_task_id}",
+        "task_list_url": f"{PROXY_PREFIX}/projects/{project_id}/data",
     }
 
 
@@ -77,28 +124,43 @@ async def prepare(task_id: str) -> dict:
     task = _task_bank().get(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail=f"找不到任务 {task_id}")
-    allowed = mapping.assigned([
-        key for key, value in _task_bank().items() if value.get("modal") in {"image", "text"}
-    ])
-    if task_id not in allowed:
+    if task_id not in _assigned_professional_task_ids(mapping):
         raise HTTPException(status_code=403, detail="这项专业任务尚未分配给当前学习档案")
     client = LabelStudioClient()
-    try:
-        project_id, ls_task_id = await client.ensure_task(mapping, task_id, task, root)
-    except LabelStudioUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    result = await _prepare_task_url(access, root, mapping, client, task_id)
+    if result is None:
+        raise HTTPException(status_code=503, detail="Label Studio 服务不可用，无法准备专业任务")
     AnnotationAttemptStore(root).set_current(
         task_id=task_id,
         mode="professional",
         stage="opened",
-        summary={"project_id": project_id, "ls_task_id": ls_task_id, "title": task.get("title", task_id)},
+        summary={
+            "project_id": result["project_id"],
+            "ls_task_id": result["ls_task_id"],
+            "title": task.get("title", task_id),
+        },
     )
+    return result
+
+
+@router.post("/preload")
+async def preload() -> dict:
+    """为当前档案批量准备所有已分配专业任务（幂等，失败不阻塞）。"""
+    _access, root, mapping = _context(write=True)
+    assigned = _assigned_professional_task_ids(mapping)
+    client = LabelStudioClient()
+    task_urls: dict[str, str] = {}
+    prepared_count = 0
+    for task_id in assigned:
+        result = await _prepare_task_url(_access, root, mapping, client, task_id)
+        if result:
+            prepared_count += 1
+            task_urls[task_id] = result["workbench_url"]
     return {
-        "task_id": task_id,
-        "project_id": project_id,
-        "ls_task_id": ls_task_id,
-        "workbench_url": f"{PROXY_PREFIX}/projects/{project_id}/data?task={ls_task_id}",
-        "task_list_url": f"{PROXY_PREFIX}/projects/{project_id}/data",
+        "ready": prepared_count == len(assigned) and len(assigned) > 0,
+        "prepared": prepared_count,
+        "total": len(assigned),
+        "task_urls": task_urls,
     }
 
 
