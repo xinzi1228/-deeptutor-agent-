@@ -150,18 +150,21 @@ def test_preload_partial_failure_is_not_ready(tmp_path: Path, monkeypatch) -> No
 
 
 def test_rewrite_text_injects_app_settings_hostname() -> None:
-    """LS HTML's window.APP_SETTINGS.hostname must point at the proxy prefix.
+    """LS HTML's window.APP_SETTINGS.hostname must point at the proxy URL.
 
-    The LS frontend computes gateway = `${window.APP_SETTINGS.hostname}/api`.
-    Django renders hostname as "" (empty), so without rewriting every LS API
-    request resolves against our root path and 404s. The proxy rewrites both
-    double- and single-quoted empty literals to the proxy prefix.
+    The LS frontend computes gateway = `${window.APP_SETTINGS.hostname}/api` and
+    later runs `new URL(window.APP_SETTINGS.hostname)`. Django renders hostname
+    as "" (empty), so the proxy must rewrite both double- and single-quoted empty
+    literals to an absolute proxy URL — a bare path would make `new URL()` throw
+    and crash the LS React app. Non-proxy callers (no proxy_base_url) must leave
+    hostname untouched.
     """
-    expected = f'hostname: "{router_module.PROXY_PREFIX}"'
-    assert expected in router_module._rewrite_text('    hostname: "",')
-    assert expected in router_module._rewrite_text("    hostname: '',")
-    assert "hostname: \"\"" not in router_module._rewrite_text('hostname: ""')
-    assert "hostname: ''" not in router_module._rewrite_text("hostname: ''")
+    proxy_url = f"http://127.0.0.1:3782{router_module.PROXY_PREFIX}"
+    assert f'hostname: "{proxy_url}"' in router_module._rewrite_text('    hostname: "",', proxy_url)
+    assert f'hostname: "{proxy_url}"' in router_module._rewrite_text("    hostname: '',", proxy_url)
+    # Without proxy_base_url the literal stays untouched (non-proxy rewrite path).
+    assert 'hostname: ""' in router_module._rewrite_text('hostname: ""')
+    assert "hostname: ''" in router_module._rewrite_text("hostname: ''")
 
 
 def test_rewrite_text_rewrites_url_literals() -> None:

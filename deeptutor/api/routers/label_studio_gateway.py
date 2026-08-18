@@ -280,7 +280,7 @@ async def sync_professional_attempt(task_id: str) -> dict:
     return {"synced": True, "created": created, "attempt": attempt, "score_record": score_record}
 
 
-def _rewrite_text(text: str) -> str:
+def _rewrite_text(text: str, proxy_base_url: str = "") -> str:
     pairs = (
         ('"/static/', f'"{PROXY_PREFIX}/static/'),
         ("'/static/", f"'{PROXY_PREFIX}/static/"),
@@ -297,12 +297,17 @@ def _rewrite_text(text: str) -> str:
         text = text.replace(old, new)
     # Label Studio's HTML injects window.APP_SETTINGS with an empty hostname,
     # which makes the LS frontend compute gateway = "" + "/api" and fire API
-    # requests at our own root path (404). Point it at the proxy prefix so
-    # gateway = PROXY_PREFIX + "/api" routes every LS API call through us.
-    # Only the HTML branch reaches this literal (Django template output); JS
-    # bundles read window.APP_SETTINGS.hostname but never contain it.
-    text = text.replace('hostname: ""', f'hostname: "{PROXY_PREFIX}"')
-    text = text.replace("hostname: ''", f'hostname: "{PROXY_PREFIX}"')
+    # requests at our own root path (404). Point it at an absolute proxy URL so
+    # gateway = <origin>/api/v1/label-studio/proxy + "/api" routes every LS API
+    # call through us. The full URL (not a bare path) is required because the LS
+    # bundle does `new URL(window.APP_SETTINGS.hostname)`; a relative path throws
+    # "Failed to construct 'URL': Invalid URL" and crashes the React app. Only
+    # the HTML branch reaches this literal (Django template output); JS bundles
+    # read window.APP_SETTINGS.hostname but never contain it. Non-proxy callers
+    # (e.g. tests) omit proxy_base_url and leave hostname untouched.
+    if proxy_base_url:
+        text = text.replace('hostname: ""', f'hostname: "{proxy_base_url}"')
+        text = text.replace("hostname: ''", f'hostname: "{proxy_base_url}"')
     # Normalize any double-prefix back to a single proxy prefix. Label
     # Studio's HTML/JS can reference assets that were already rewritten
     # (e.g. a nested bundle), which would otherwise produce
@@ -436,7 +441,10 @@ async def proxy(path: str, request: Request) -> Response:
         # up to ~2.5MB) contain no bare /static/ or /react-app/ paths and
         # rewriting them on every request is expensive (multiple full-file
         # scans that add several seconds of latency through the proxy).
-        rewritten = _rewrite_text(upstream.text)
+        rewritten = _rewrite_text(
+            upstream.text,
+            proxy_base_url=str(request.base_url).rstrip("/") + PROXY_PREFIX,
+        )
         if is_html:
             rewritten = _inject_realtime_bridge(rewritten, path)
         content = rewritten.encode("utf-8")
