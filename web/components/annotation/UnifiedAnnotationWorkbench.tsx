@@ -400,7 +400,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
     if (externalSignature !== localSignature) dispatch({ type: "replace-external", boxes: externalBoxes });
   }, [externalBoxes, externalSignature, localSignature]);
 
-  const commit = useCallback((boxes: Bbox[], selectedId: string | null) => {
+  const commit = useCallback((boxes: Bbox[], selectedIds: string[]) => {
     const previousById = new Map(state.boxes.map((box) => [box.id, box]));
     const added = boxes.filter((box) => !previousById.has(box.id));
     const removed = state.boxes.filter((box) => !boxes.some((next) => next.id === box.id));
@@ -408,7 +408,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
     if (removed.length) dispatch({ type: "delete-by-ids", ids: removed.map((box) => box.id) });
     added.forEach((box) => dispatch({ type: "add", box }));
     updated.forEach((box) => dispatch({ type: "update", box }));
-    dispatch({ type: "select", ids: selectedId ? [selectedId] : [] });
+    dispatch({ type: "select", ids: selectedIds });
     onChange(boxes);
   }, [onChange, state.boxes]);
 
@@ -426,14 +426,28 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
     onChange(next);
   }, [onChange, state.future]);
 
-  const deleteBox = useCallback((id: string) => {
-    const remaining = state.selectedIds.filter((selected) => selected !== id);
-    commit(state.boxes.filter((box) => box.id !== id), remaining[0] ?? null);
+  const deleteIds = useCallback((ids: string[]) => {
+    const remove = new Set(ids);
+    commit(
+      state.boxes.filter((box) => !remove.has(box.id)),
+      state.selectedIds.filter((id) => !remove.has(id)),
+    );
   }, [commit, state.boxes, state.selectedIds]);
 
   const changeLabel = useCallback((id: string, label: string) => {
-    commit(state.boxes.map((box) => box.id === id ? { ...box, label } : box), id);
+    commit(state.boxes.map((box) => box.id === id ? { ...box, label } : box), [id]);
   }, [commit, state.boxes]);
+
+  const selectRange = useCallback((id: string) => {
+    if (!state.selectedIds.length) { dispatch({ type: "select", ids: [id] }); return; }
+    const all = state.boxes;
+    const anchorIndex = all.findIndex((box) => box.id === state.selectedIds[0]);
+    const targetIndex = all.findIndex((box) => box.id === id);
+    if (anchorIndex === -1 || targetIndex === -1) { dispatch({ type: "select", ids: [id] }); return; }
+    const start = Math.min(anchorIndex, targetIndex);
+    const end = Math.max(anchorIndex, targetIndex);
+    dispatch({ type: "select", ids: all.slice(start, end + 1).map((box) => box.id) });
+  }, [state.boxes, state.selectedIds]);
 
   const fitCanvas = useCallback(() => setZoom(1), []);
 
@@ -452,7 +466,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
         if (key === "h") { handled(() => setTool("pan")); return; }
         if (key === "u" || event.key === "Escape") { handled(() => dispatch({ type: "clear-selection" })); return; }
       }
-      if ((event.key === "Delete" || event.key === "Backspace") && state.selectedIds.length > 0) { handled(() => deleteBox(state.selectedIds[0])); return; }
+      if ((event.key === "Delete" || event.key === "Backspace") && state.selectedIds.length > 0) { handled(() => deleteIds(state.selectedIds)); return; }
       if ((event.ctrlKey || event.metaKey) && (event.key === "+" || event.key === "=")) { handled(() => setZoom((z) => Math.min(3, z + 0.25))); return; }
       if ((event.ctrlKey || event.metaKey) && event.key === "-") { handled(() => setZoom((z) => Math.max(0.5, z - 0.25))); return; }
       if (event.shiftKey && !event.ctrlKey && !event.metaKey && event.code === "Digit1") { handled(fitCanvas); return; }
@@ -481,7 +495,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [deleteBox, fitCanvas, handleRedo, handleUndo, labels, onChange, setTool, state.boxes, state.selectedIds]);
+  }, [deleteIds, fitCanvas, handleRedo, handleUndo, labels, onChange, setTool, state.boxes, state.selectedIds]);
 
   const issues = useMemo(() => validateBoxes(state.boxes, bounds), [bounds, state.boxes]);
   useEffect(() => {
@@ -494,7 +508,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
     });
   }, [issues.length, onInteractionState, state.activeLabel, state.boxes.length, state.selectedIds, tool]);
   return <div className="space-y-3">
-    <BboxToolbar tool={tool} onToolChange={setTool} activeLabel={state.activeLabel} labels={labels} onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} onFit={fitCanvas} canUndo={state.past.length > 0} canRedo={state.future.length > 0} hasSelection={state.selectedIds.length > 0} onUndo={handleUndo} onRedo={handleRedo} onDelete={() => state.selectedIds.length > 0 && deleteBox(state.selectedIds[0])} />
+    <BboxToolbar tool={tool} onToolChange={setTool} activeLabel={state.activeLabel} labels={labels} onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} onFit={fitCanvas} canUndo={state.past.length > 0} canRedo={state.future.length > 0} hasSelection={state.selectedIds.length > 0} onUndo={handleUndo} onRedo={handleRedo} onDelete={() => state.selectedIds.length > 0 && deleteIds(state.selectedIds)} />
     <div className="grid min-w-0 gap-3 lg:grid-cols-[140px_minmax(0,1fr)_220px] xl:grid-cols-[140px_minmax(0,1fr)_220px]">
       <div className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:block">
         <BboxLabelPanel
@@ -519,10 +533,10 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
           }}
         />
       </div>
-      <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedId={state.selectedIds[0] ?? null} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(id) => dispatch({ type: "select", ids: id ? [id] : [] })} onCommit={commit} onImageSizeChange={(size) => { setBounds(size); onImageSizeChange(size); }} />
-      <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedIds[0] ?? null} issues={issues} onSelect={(id) => dispatch({ type: "select", ids: [id] })} onLabelChange={changeLabel} onDelete={deleteBox} /></aside>
+      <BboxCanvas imageUrl={task.image_url} imageAlt={task.title} boxes={state.boxes} selectedIds={state.selectedIds} activeLabel={state.activeLabel} tool={tool} zoom={zoom} onSelect={(ids) => dispatch({ type: "select", ids })} onSelectToggle={(id) => dispatch({ type: "select-toggle", id })} onCommit={commit} onImageSizeChange={(size) => { setBounds(size); onImageSizeChange(size); }} />
+      <aside className="hidden max-h-[600px] overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 lg:block"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">对象列表 · {state.boxes.length}</div><BboxObjectList boxes={state.boxes} labels={labels} selectedIds={state.selectedIds} issues={issues} onSelect={(ids) => dispatch({ type: "select", ids })} onSelectToggle={(id) => dispatch({ type: "select-toggle", id })} onSelectRange={selectRange} onLabelChange={changeLabel} onDelete={(ids) => deleteIds(ids)} /></aside>
     </div>
-    <details className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-lg lg:hidden"><summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="max-h-64 overflow-y-auto p-2"><BboxObjectList boxes={state.boxes} labels={labels} selectedId={state.selectedIds[0] ?? null} issues={issues} onSelect={(id) => dispatch({ type: "select", ids: [id] })} onLabelChange={changeLabel} onDelete={deleteBox} /></div></details>
+    <details className="fixed bottom-4 right-4 z-40 w-72 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-lg lg:hidden"><summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium">对象列表（{state.boxes.length}）</summary><div className="max-h-64 overflow-y-auto p-2"><BboxObjectList boxes={state.boxes} labels={labels} selectedIds={state.selectedIds} issues={issues} onSelect={(ids) => dispatch({ type: "select", ids })} onSelectToggle={(id) => dispatch({ type: "select-toggle", id })} onSelectRange={selectRange} onLabelChange={changeLabel} onDelete={(ids) => deleteIds(ids)} /></div></details>
     {issues.length > 0 && <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-700"><strong>本地质检发现 {issues.length} 项：</strong>{issues.slice(0, 3).map((issue) => <span key={`${issue.boxId}-${issue.code}`} className="ml-2">{issue.message}</span>)}</div>}
     <p className="text-center text-[11px] text-[var(--muted-foreground)]">V 选择 · R/B 画框 · H 平移 · 1-9 选标签 · Delete 删除 · Ctrl+Z 撤销 · Ctrl+Shift+Z/Y 重做 · Ctrl+± 缩放 · Shift+1 适配 · Shift+2 原始尺寸。</p>
   </div>;
