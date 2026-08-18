@@ -462,10 +462,15 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
           handled(() => {
             const label = labels[idx];
             if (state.selectedIds.length === 1) {
-              const targetBox = state.boxes.find((item) => item.id === state.selectedIds[0]);
-              if (targetBox) dispatch({ type: "update", box: { ...targetBox, label } });
+              const target = state.boxes.find((item) => item.id === state.selectedIds[0]);
+              if (target) {
+                const next = { ...target, label };
+                dispatch({ type: "update", box: next });
+                onChange(state.boxes.map((box) => box.id === next.id ? next : box));
+              }
             } else if (state.selectedIds.length > 1) {
               dispatch({ type: "set-selected-label", label });
+              onChange(state.boxes.map((box) => state.selectedIds.includes(box.id) ? { ...box, label } : box));
             } else {
               dispatch({ type: "set-active-label", label });
             }
@@ -475,7 +480,7 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [deleteBox, fitCanvas, handleRedo, handleUndo, labels, setTool, state.boxes, state.selectedIds]);
+  }, [deleteBox, fitCanvas, handleRedo, handleUndo, labels, onChange, setTool, state.boxes, state.selectedIds]);
 
   const issues = useMemo(() => validateBoxes(state.boxes, bounds), [bounds, state.boxes]);
   useEffect(() => {
