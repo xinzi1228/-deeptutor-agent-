@@ -80,15 +80,23 @@ async def list_profiles(_: TokenPayload | None = Depends(require_auth)) -> dict:
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_profile(body: CreateProfileRequest, _: TokenPayload | None = Depends(require_auth)) -> dict:
     store, _ = _stores()
+    user = get_current_user()
     try:
-        profile = store.create(get_current_user().id, body.name, body.pin, body.avatar)
+        profile = store.create(user.id, body.name, body.pin, body.avatar)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    from deeptutor.services.learning_profiles.migration import LearningProfileMigrator
+    # 仅当该账号还没有任何档案（创建的是第一个档案）时，把档案功能引入前的账号级旧数据迁移进它；
+    # 后续创建的新档案从空白开始，不复制账号级旧数据。
+    existing = store.list(user.id)
+    if len(existing) == 1:  # 刚创建的这个是第一个
+        from deeptutor.services.learning_profiles.migration import LearningProfileMigrator
 
-    migration = LearningProfileMigrator(store.root.parent).migrate(profile.id)
-    _audit(store, "profile_created", profile.id, metadata={"migration_status": migration["status"]})
-    return {**profile.public_dict(), "legacy_migration": {"status": migration["status"], "source_preserved": True}}
+        migration = LearningProfileMigrator(store.root.parent).migrate(profile.id)
+        migration_status = migration["status"]
+    else:
+        migration_status = "skipped_not_first_profile"
+    _audit(store, "profile_created", profile.id, metadata={"migration_status": migration_status})
+    return {**profile.public_dict(), "legacy_migration": {"status": migration_status, "source_preserved": True}}
 
 
 @router.patch("/{profile_id}")

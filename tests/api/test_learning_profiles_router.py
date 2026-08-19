@@ -94,6 +94,28 @@ def test_impersonation_requires_reason_and_explicit_scope(tmp_path, monkeypatch)
     assert forbidden.status_code == 422
 
 
+def test_second_profile_does_not_migrate_legacy_data(tmp_path, monkeypatch):
+    """第二个档案创建后不复制账号级旧库，保持空白。"""
+    (tmp_path / "chat_history.db").write_bytes(b"legacy-account-session-data")
+    with _client(tmp_path, monkeypatch) as client:
+        first = client.post("/api/v1/learning-profiles", json={"name": "小明", "pin": "1234"})
+        assert first.status_code == 201
+        first_body = first.json()
+        assert first_body["legacy_migration"]["status"] == "verified"
+        first_id = first_body["id"]
+
+        second = client.post("/api/v1/learning-profiles", json={"name": "小红", "pin": "5678"})
+        assert second.status_code == 201
+        second_body = second.json()
+        assert second_body["legacy_migration"]["status"] == "skipped_not_first_profile"
+        second_id = second_body["id"]
+
+    first_session_db = tmp_path / "workspace" / "learning_profiles" / first_id / "sessions" / "chat_history.db"
+    second_session_db = tmp_path / "workspace" / "learning_profiles" / second_id / "sessions" / "chat_history.db"
+    assert first_session_db.exists()
+    assert not second_session_db.exists()
+
+
 def test_impersonation_returns_scoped_auditable_grant(tmp_path, monkeypatch):
     with _client(tmp_path, monkeypatch, role="admin") as client:
         profile_id = client.post(
