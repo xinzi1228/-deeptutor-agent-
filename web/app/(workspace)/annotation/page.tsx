@@ -58,7 +58,7 @@ function AnnotationPageInner() {
   const [professionalTasks, setProfessionalTasks] = useState<typeof tasks>([]);
   const [selectedTask, setSelectedTask] = useState("");
   const [selectedTaskData, setSelectedTaskData] = useState<AnnotationTask | null>(null);
-  const [labelStudio, setLabelStudio] = useState<{ available: boolean; configured?: boolean; management_url?: string | null; detail?: string } | null>(null);
+  const [labelStudio, setLabelStudio] = useState<{ available: boolean; configured?: boolean; management_url?: string | null; detail?: string; ready?: boolean; prepared_count?: number; ready_count?: number; task_urls?: Record<string, string> } | null>(null);
   const [professionalUrl, setProfessionalUrl] = useState("");
   const [professionalLoading, setProfessionalLoading] = useState(false);
   const [professionalSyncing, setProfessionalSyncing] = useState(false);
@@ -202,14 +202,38 @@ function AnnotationPageInner() {
   }, []);
 
   useEffect(() => {
-    // 档案解锁后自动后台准备专业任务（幂等，失败不阻塞）
+    // 档案解锁后自动后台准备专业任务（幂等，失败重试一次）
     if (!profileId) return;
+    let cancelled = false;
     const controller = new AbortController();
-    void apiFetch(apiUrl("/api/v1/label-studio/preload"), {
-      method: "POST",
-      signal: controller.signal,
-    }).catch(() => undefined);
-    return () => controller.abort();
+    const run = (attempt: number) => {
+      apiFetch(apiUrl("/api/v1/label-studio/preload"), {
+        method: "POST",
+        signal: controller.signal,
+      })
+        .then((res) => {
+          if (cancelled) return null;
+          if (!res.ok) throw new Error("preload failed");
+          return res.json();
+        })
+        .then((data) => {
+          if (cancelled || !data) return;
+          setLabelStudio((current) => ({
+            ...(current || {}),
+            available: current?.available ?? false,
+            ready: Boolean(data.ready),
+            prepared_count: Number(data.prepared || 0),
+            task_urls: data.task_urls || {},
+          }));
+        })
+        .catch(() => {
+          if (attempt < 1 && !cancelled) {
+            setTimeout(() => run(attempt + 1), 2000);
+          }
+        });
+    };
+    run(0);
+    return () => { cancelled = true; controller.abort(); };
   }, [profileId]);
 
   useEffect(() => {
@@ -217,7 +241,11 @@ function AnnotationPageInner() {
     if (mode !== "pro" && !profileId) return;
     let cancelled = false;
     Promise.all([
-      fetch("/api/v1/label-studio/status", { cache: "no-store" }).then((res) => res.ok ? res.json() : Promise.reject()),
+      fetch("/api/v1/label-studio/status", { cache: "no-store" }).then(async (res) => {
+        if (res.status === 423) throw Object.assign(new Error("unlocked"), { code: 423 });
+        if (!res.ok) throw new Error("status failed");
+        return res.json();
+      }),
       fetch("/api/v1/label-studio/professional/tasks", { cache: "no-store" }).then((res) => res.ok ? res.json() : { tasks: [] }),
     ])
       .then(([status, assigned]) => {
@@ -228,9 +256,10 @@ function AnnotationPageInner() {
         const projectId = status?.mapping?.project_id;
         setPreloadSrc(projectId ? `/api/v1/label-studio/proxy/projects/${projectId}/data` : "");
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
-        setLabelStudio({ available: false, detail: "无法连接本地服务，或学习档案尚未解锁" });
+        if (err?.code === 423) setLabelStudio({ available: false, detail: "unlocked" });
+        else setLabelStudio({ available: false, detail: "无法连接本地服务" });
       });
     return () => { cancelled = true; };
   }, [profileId, mode]);
@@ -520,6 +549,10 @@ function AnnotationPageInner() {
           <div className="relative h-full"><iframe src={professionalUrl} className={`h-full w-full border-0 ${editAccess.editable ? "" : "pointer-events-none opacity-70"}`} title="Label Studio 专业标注台" />{!editAccess.editable && <div className="absolute inset-x-4 top-4 rounded-xl border border-amber-500/35 bg-[var(--card)]/95 p-3 text-center text-xs text-amber-700 shadow-sm">专业标注台当前只读，请先在上方接管编辑。</div>}</div>
         ) : professionalLoading ? (
           <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 text-sm"><h2 className="font-semibold">正在准备你的专业任务…</h2><p className="mt-2 text-[var(--muted-foreground)]">{preloadStage}</p>{preloadTimedOut && <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"><p className="text-amber-800">准备超时。请检查 Label Studio 服务与凭证后重试。</p><button type="button" className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 font-medium text-white" onClick={() => { if (selectedTask) void chooseProfessionalTask(selectedTask); }}>重试</button></div>}</div></div>
+        ) : labelStudio?.available && (labelStudio.ready_count ?? 0) > 0 ? (
+          <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 text-sm"><h2 className="font-semibold">专业模式已就绪</h2><p className="mt-2 text-[var(--muted-foreground)]">已准备好 {labelStudio.ready_count ?? 0} 个专业任务，选择后直接进入。</p></div></div>
+        ) : labelStudio?.detail === "unlocked" ? (
+          <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 text-sm"><h2 className="font-semibold">学习档案未解锁</h2><p className="mt-2 text-[var(--muted-foreground)]">请先在左侧解锁学习档案，专业模式需要档案已解锁后才能使用。</p></div></div>
         ) : <div className="flex h-full items-center justify-center p-6"><div className="max-w-lg rounded-xl border border-amber-500/40 bg-amber-500/10 p-5 text-sm"><h2 className="font-semibold">{labelStudio?.available ? "请选择一项专业任务" : "Label Studio 专业模式尚未就绪"}</h2><p className="mt-2 text-[var(--muted-foreground)]">{labelStudio?.available ? "系统会为当前学习档案准备独立项目，并通过同源网关直接打开，不需要再次登录。" : "请启动本机 8080 服务，并在系统环境中配置 LABEL_STUDIO_API_TOKEN 与 LABEL_STUDIO_BRIDGE_SECRET。教学模式仍可正常使用。"}</p><p className="mt-2 text-xs text-[var(--muted-foreground)]">检测信息：{labelStudio?.detail || (labelStudio?.configured === false ? "服务已连接，但尚未配置 API Token" : "正在检测服务…")}</p>{labelStudio?.management_url && <a className="mt-3 inline-block text-xs text-[var(--primary)] underline" href={labelStudio.management_url} target="_blank" rel="noreferrer">管理员打开 Label Studio 管理台</a>}</div></div>}
       </div>
 
