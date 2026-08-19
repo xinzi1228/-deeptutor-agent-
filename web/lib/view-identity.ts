@@ -35,6 +35,21 @@ export function setViewIdentity(identity: ViewIdentity): void {
   }
 }
 
+/**
+ * 是否已选择过界面身份（AUTH 关闭时的首次访问引导依据）。
+ *
+ * - 已选择：localStorage 中存在身份键 → true，直接进对应端。
+ * - 未选择：false，引导到 /login 选身份。
+ */
+export function hasChosenIdentity(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(VIEW_IDENTITY_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function isStudentView(identity: ViewIdentity): boolean {
   return identity === "student";
 }

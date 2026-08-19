@@ -5,6 +5,7 @@ import {
   setViewIdentity,
   isStudentView,
   resolveViewIdentity,
+  hasChosenIdentity,
 } from "../lib/view-identity";
 
 const KEY = "deeptutor_view_identity";
@@ -69,4 +70,15 @@ test("resolveViewIdentity: AUTH 关闭时回退到 localStorage 存储身份", (
 
 test("resolveViewIdentity: AUTH 关闭且未存储时默认学生", () => {
   assert.equal(resolveViewIdentity({ authEnabled: false }), "student");
+});
+
+test("hasChosenIdentity: 未选择时返回 false", () => {
+  assert.equal(hasChosenIdentity(), false);
+});
+
+test("hasChosenIdentity: 选择后返回 true", () => {
+  setViewIdentity("student");
+  assert.equal(hasChosenIdentity(), true);
+  setViewIdentity("staff");
+  assert.equal(hasChosenIdentity(), true);
 });
