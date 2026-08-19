@@ -287,6 +287,9 @@ function AnnotationPageInner() {
     // 深链优先：URL 指定了任务时，不执行 localStorage 恢复
     if (queryTask) return;
     if (tasks.length === 0 || restoredTaskRef.current || !profileId) return;
+    // 等 mode 修正到最后模态再恢复；否则会用旧模态读错任务（与 modeInitialized 同 commit 竞态）
+    const lastMode = readLastModeFor(profileId);
+    if (lastMode && lastMode !== mode) return;
     restoredTaskRef.current = true;
     let saved: string | null = null;
     try {
