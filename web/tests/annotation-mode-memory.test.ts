@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test, beforeEach, afterEach } from "node:test";
 import {
   lastTaskKeyFor,
+  readLastModeFor,
   readLastTaskFor,
+  writeLastModeFor,
   writeLastTaskFor,
   type AnnotationModeKey,
 } from "../lib/annotation-mode-memory";
@@ -53,4 +55,12 @@ test("不同 modal 独立", () => {
 
 test("无 profile 退化全局键", () => {
   assert.equal(lastTaskKeyFor("", "image"), "deeptutor_last_annotation_task.image");
+});
+
+test("last mode 读写", () => {
+  writeLastModeFor("lp_test", "video");
+  assert.equal(readLastModeFor("lp_test"), "video");
+  writeLastModeFor("lp_test", "pro");
+  assert.equal(readLastModeFor("lp_test"), "pro");
+  assert.equal(readLastModeFor(""), null);
 });

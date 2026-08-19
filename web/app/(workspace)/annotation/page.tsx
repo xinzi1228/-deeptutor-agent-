@@ -13,7 +13,7 @@ import { emitPerformanceMetric } from "@/lib/performance-metrics";
 import type { AnnotationTask } from "@/components/annotation/UnifiedAnnotationWorkbench";
 import { useCurrentLearningTask } from "@/components/current-task/CurrentLearningTaskContext";
 import { useLearningProfile } from "@/components/learning-profiles/LearningProfileContext";
-import { readLastTaskFor, writeLastTaskFor, type AnnotationModeKey } from "@/lib/annotation-mode-memory";
+import { readLastModeFor, readLastTaskFor, writeLastModeFor, writeLastTaskFor, type AnnotationModeKey } from "@/lib/annotation-mode-memory";
 import {
   acquireAnnotationEditLease,
   checkpointProfessionalEditLease,
@@ -52,8 +52,9 @@ function AnnotationPageInner() {
     const m = queryMode;
     if (m === "professional") return "pro";
     if (m && ["image", "text", "audio", "video"].includes(m)) return m as "image" | "text" | "audio" | "video";
-    return "image";
+    return readLastModeFor(active?.id || "") ?? "image";
   });
+  const modeInitializedRef = useRef(false);
   const [tasks, setTasks] = useState<Array<{ id: string; title: string; type: string; modal: "image" | "text" | "audio" | "video"; difficulty: string }>>([]);
   const [professionalTasks, setProfessionalTasks] = useState<typeof tasks>([]);
   const [selectedTask, setSelectedTask] = useState("");
@@ -173,6 +174,7 @@ function AnnotationPageInner() {
       return;
     }
     setMode(nextMode);
+    writeLastModeFor(profileId || "", nextMode);
     // 每种模态拥有独立任务上下文。专业模式也必须重新从本人任务中进入。
     if (!compatibleTask || nextMode === "pro" || mode === "pro") {
       setSelectedTask("");
@@ -265,6 +267,23 @@ function AnnotationPageInner() {
   }, [profileId, mode]);
 
   useEffect(() => {
+    // profileId 异步就绪后，用该档案的最后模态修正初始模式（queryMode 时已由 URL 决定，不再覆盖）
+    if (!profileId || modeInitializedRef.current || queryMode) return;
+    modeInitializedRef.current = true;
+    const lastMode = readLastModeFor(profileId);
+    if (lastMode && lastMode !== mode) setMode(lastMode);
+  }, [profileId, mode, queryMode]);
+
+  useEffect(() => {
+    // 关闭/刷新页面前强制落盘草稿与编辑检查点
+    const onUnload = () => {
+      void saveOwnedCheckpoint();
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, [saveOwnedCheckpoint]);
+
+  useEffect(() => {
     // 深链优先：URL 指定了任务时，不执行 localStorage 恢复
     if (queryTask) return;
     if (tasks.length === 0 || restoredTaskRef.current || !profileId) return;
@@ -310,6 +329,8 @@ function AnnotationPageInner() {
       if (requestVersion !== professionalRequestVersion.current) return;
       setProfessionalUrl(data.workbench_url);
       setLabelStudio((current) => ({ ...(current || {}), available: true }));
+      writeLastTaskFor(profileId || "", "pro", taskId);
+      writeLastModeFor(profileId || "", "pro");
       await openTask({ courseId: "annotation-professional", taskId, mode: "professional_annotation" });
       emitPerformanceMetric({
         name: "annotation_task_visible",
