@@ -1185,7 +1185,7 @@
   "task23": {
     "title": "模糊无法辨认图片如何处理？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "模糊无法辨认图片如何处理？",
@@ -1227,7 +1227,7 @@
   "task24": {
     "title": "矩形框边缘应？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "矩形框边缘应？",
@@ -1269,7 +1269,7 @@
   "task25": {
     "title": "哪个目标应标注？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "哪个目标应标注？",
@@ -1311,7 +1311,7 @@
   "task26": {
     "title": "stuff类别(天空/道路)实例ID应？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "stuff类别(天空/道路)实例ID应？",
@@ -1353,7 +1353,7 @@
   "task27": {
     "title": "数字\"123\"应转写为？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "数字\"123\"应转写为？",
@@ -1395,7 +1395,7 @@
   "task28": {
     "title": "情绪判定主要依据？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "情绪判定主要依据？",
@@ -1437,7 +1437,7 @@
   "task29": {
     "title": "目标遮挡<30帧恢复应？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "目标遮挡<30帧恢复应？",
@@ -1479,7 +1479,7 @@
   "task30": {
     "title": "密集描述每片段长度？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "密集描述每片段长度？",
@@ -1521,7 +1521,7 @@
   "task31": {
     "title": "BIO中B代表？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "BIO中B代表？",
@@ -1563,7 +1563,7 @@
   "task32": {
     "title": "\"马云创立阿里巴巴\"正确三元组？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "\"马云创立阿里巴巴\"正确三元组？",
@@ -1605,7 +1605,7 @@
   "task33": {
     "title": "3D框几个自由度？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "3D框几个自由度？",
@@ -1647,7 +1647,7 @@
   "task34": {
     "title": "切分点精度标准？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "切分点精度标准？",
@@ -1689,7 +1689,7 @@
   "task35": {
     "title": "关键帧+插值目的？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "关键帧+插值目的？",
@@ -1731,7 +1731,7 @@
   "task36": {
     "title": "持续空调运行声归类？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "持续空调运行声归类？",
@@ -1773,7 +1773,7 @@
   "task37": {
     "title": "反语\"服务太棒了\"(实际很差)？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "反语\"服务太棒了\"(实际很差)？",
@@ -1815,7 +1815,7 @@
   "task38": {
     "title": "CT窗宽窗位作用？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "CT窗宽窗位作用？",
@@ -1857,7 +1857,7 @@
   "task39": {
     "title": "最易被误标为缺陷的？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "最易被误标为缺陷的？",
@@ -1899,7 +1899,7 @@
   "task40": {
     "title": "不应标注的场景图三元组？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "不应标注的场景图三元组？",
@@ -1941,7 +1941,7 @@
   "task41": {
     "title": "\"帮我查下明天天气\"正确意图？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "\"帮我查下明天天气\"正确意图？",
@@ -1983,7 +1983,7 @@
   "task42": {
     "title": "不应标为病灶的是？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "不应标为病灶的是？",
@@ -2025,7 +2025,7 @@
   "task43": {
     "title": "语义分割中图像边界标注要求？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "语义分割中图像边界标注要求？",
@@ -2067,7 +2067,7 @@
   "task44": {
     "title": "深度估计近/远处深度值关系？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "深度估计近/远处深度值关系？",
@@ -2109,7 +2109,7 @@
   "task45": {
     "title": ">70%遮挡的人应如何处理？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": ">70%遮挡的人应如何处理？",
@@ -2151,7 +2151,7 @@
   "task46": {
     "title": "小目标(<16×16px)应？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "小目标(<16×16px)应？",
@@ -2193,7 +2193,7 @@
   "task47": {
     "title": "被遮挡关节点应如何处理？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "被遮挡关节点应如何处理？",
@@ -2235,7 +2235,7 @@
   "task48": {
     "title": "实例与语义分割核心区别？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "实例与语义分割核心区别？",
@@ -2277,7 +2277,7 @@
   "task49": {
     "title": "密集人群实例分割要求？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "密集人群实例分割要求？",
@@ -2319,7 +2319,7 @@
   "task50": {
     "title": "变化检测最重要注意事项？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "变化检测最重要注意事项？",
@@ -2361,7 +2361,7 @@
   "task51": {
     "title": "场景图关系标注必须满足？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "场景图关系标注必须满足？",
@@ -2403,7 +2403,7 @@
   "task52": {
     "title": "VAD工具的作用是？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "VAD工具的作用是？",
@@ -2445,7 +2445,7 @@
   "task53": {
     "title": "TTS单句时长推荐范围？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "TTS单句时长推荐范围？",
@@ -2487,7 +2487,7 @@
   "task54": {
     "title": "重叠语音应如何处理？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "重叠语音应如何处理？",
@@ -2529,7 +2529,7 @@
   "task55": {
     "title": "说话人日志核心回答？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "说话人日志核心回答？",
@@ -2571,7 +2571,7 @@
   "task56": {
     "title": "SVS与普通TTS主要区别？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "SVS与普通TTS主要区别？",
@@ -2613,7 +2613,7 @@
   "task57": {
     "title": "音素标注精度要求？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "音素标注精度要求？",
@@ -2655,7 +2655,7 @@
   "task58": {
     "title": "韵律标注停顿层级分？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "韵律标注停顿层级分？",
@@ -2697,7 +2697,7 @@
   "task59": {
     "title": "鸡尾酒会问题核心挑战？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "鸡尾酒会问题核心挑战？",
@@ -2739,7 +2739,7 @@
   "task60": {
     "title": "视频与图像最关键的差异？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "视频与图像最关键的差异？",
@@ -2781,7 +2781,7 @@
   "task61": {
     "title": "持续事件应如何打点？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "持续事件应如何打点？",
@@ -2823,7 +2823,7 @@
   "task62": {
     "title": "自动打点工具结果应？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "自动打点工具结果应？",
@@ -2865,7 +2865,7 @@
   "task63": {
     "title": "片段间应保持什么关系？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "片段间应保持什么关系？",
@@ -2907,7 +2907,7 @@
   "task64": {
     "title": "动作质量多标注者一致性指标？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "动作质量多标注者一致性指标？",
@@ -2949,7 +2949,7 @@
   "task65": {
     "title": "视频异常检测正常行为应？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "视频异常检测正常行为应？",
@@ -2991,7 +2991,7 @@
   "task66": {
     "title": "地面物体交界处应？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "地面物体交界处应？",
@@ -3033,7 +3033,7 @@
   "task67": {
     "title": "补全推测形状依据？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "补全推测形状依据？",
@@ -3075,7 +3075,7 @@
   "task68": {
     "title": "传感器冲突时应？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "传感器冲突时应？",
@@ -3327,7 +3327,7 @@
   "task74": {
     "title": "DICOM窗宽窗位的作用？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "DICOM窗宽窗位的作用？",
@@ -3369,7 +3369,7 @@
   "task75": {
     "title": "CT中层间边界要求？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "CT中层间边界要求？",
@@ -3411,7 +3411,7 @@
   "task76": {
     "title": "细胞级特征应在何放大倍数？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "细胞级特征应在何放大倍数？",
@@ -3453,7 +3453,7 @@
   "task77": {
     "title": "PET主要提供什么信息？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "PET主要提供什么信息？",
@@ -3495,7 +3495,7 @@
   "task78": {
     "title": "人脸标注中遮挡>50%应？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "人脸标注中遮挡>50%应？",
@@ -3537,7 +3537,7 @@
   "task79": {
     "title": "OCR中弯曲文字应用什么方式标注？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "OCR中弯曲文字应用什么方式标注？",
@@ -3579,7 +3579,7 @@
   "task80": {
     "title": "车道线标注中虚线段应？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "车道线标注中虚线段应？",
@@ -3621,7 +3621,7 @@
   "task81": {
     "title": "项目实战评分的主要构成？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "项目实战评分的主要构成？",
@@ -3663,7 +3663,7 @@
   "task82": {
     "title": "表情标注的核心判据是？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "表情标注的核心判据是？",
@@ -3705,7 +3705,7 @@
   "task83": {
     "title": "全景分割中PQ全称含义？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "全景分割中PQ全称含义？",
@@ -3747,7 +3747,7 @@
   "task84": {
     "title": "工业缺陷标注误报率应<=？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "工业缺陷标注误报率应<=？",
@@ -3789,7 +3789,7 @@
   "task85": {
     "title": "区域挑战标注软边界用于？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "区域挑战标注软边界用于？",
@@ -3831,7 +3831,7 @@
   "task86": {
     "title": "遥感多光谱标注NDWI用于？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "遥感多光谱标注NDWI用于？",
@@ -3873,7 +3873,7 @@
   "task87": {
     "title": "方言片段中方言特有词汇应？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "方言片段中方言特有词汇应？",
@@ -3915,7 +3915,7 @@
   "task88": {
     "title": "音乐节拍点应参考什么？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "音乐节拍点应参考什么？",
@@ -3957,7 +3957,7 @@
   "task89": {
     "title": "声纹挑战中短片段(<2s)应？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "声纹挑战中短片段(<2s)应？",
@@ -3999,7 +3999,7 @@
   "task90": {
     "title": "多风格TTS情感强度分几级？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "多风格TTS情感强度分几级？",
@@ -4041,7 +4041,7 @@
   "task91": {
     "title": "环境声音挑战中最多同时标注多少个事件？",
     "type": "classification",
-    "modal": "audio",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "环境声音挑战中最多同时标注多少个事件？",
@@ -4083,7 +4083,7 @@
   "task92": {
     "title": "视频追踪中ID不变的目的是？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "视频追踪中ID不变的目的是？",
@@ -4125,7 +4125,7 @@
   "task93": {
     "title": "行为识别核心判据是？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "行为识别核心判据是？",
@@ -4167,7 +4167,7 @@
   "task94": {
     "title": "视频进阶中关键帧间距如何确定？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "视频进阶中关键帧间距如何确定？",
@@ -4209,7 +4209,7 @@
   "task95": {
     "title": "事件检测中触发条件包括？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "事件检测中触发条件包括？",
@@ -4251,7 +4251,7 @@
   "task96": {
     "title": "交叉剪辑场景应如何分割？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "交叉剪辑场景应如何分割？",
@@ -4293,7 +4293,7 @@
   "task97": {
     "title": "视频描述+定位中粒度应？",
     "type": "classification",
-    "modal": "video",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "视频描述+定位中粒度应？",
@@ -4335,7 +4335,7 @@
   "task98": {
     "title": "3D点云标注使用什么单位？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "3D点云标注使用什么单位？",
@@ -4377,7 +4377,7 @@
   "task99": {
     "title": "点云格式检查最重要的是？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "点云格式检查最重要的是？",
@@ -4419,7 +4419,7 @@
   "task100": {
     "title": "粘连实例应如何分割？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "粘连实例应如何分割？",
@@ -4503,7 +4503,7 @@
   "task102": {
     "title": "医学影像标注最特殊要求？",
     "type": "classification",
-    "modal": "image",
+    "modal": "text",
     "difficulty": "easy",
     "object_count": 1,
     "text": "医学影像标注最特殊要求？",
