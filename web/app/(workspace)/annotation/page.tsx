@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Tag, PenLine, Wrench, Mic, Video, FileText } from "lucide-react";
 import AnnotationProgress from "@/components/annotation/AnnotationProgress";
 import AnnotationResultCard from "@/components/annotation/AnnotationResultCard";
+import { AnnotationLiveStateProvider, useAnnotationLiveState } from "@/components/annotation/AnnotationLiveStateContext";
 import { apiFetch, apiUrl } from "@/lib/api";
 import type { AnnotationScoreRecord } from "@/lib/learning-api";
 import { emitPerformanceMetric } from "@/lib/performance-metrics";
@@ -45,6 +46,7 @@ function AnnotationPageInner() {
   const { t } = useTranslation();
   const { openTask } = useCurrentLearningTask();
   const { active } = useLearningProfile();
+  const { updateLiveState } = useAnnotationLiveState();
   const searchParams = useSearchParams();
   const queryTask = searchParams.get("task");
   const queryMode = searchParams.get("mode");
@@ -119,13 +121,17 @@ function AnnotationPageInner() {
         if (checkpointed) await releaseAnnotationEditLease(selectedTask, browserSessionId, checkpointed);
       }
       setSelectedTask(taskId);
-      const res = await fetch(`/api/v1/annotation/tasks/${encodeURIComponent(taskId)}`);
-      if (!res.ok) throw new Error("任务加载失败");
-      const { task } = await res.json();
+      const [taskRes, gtRes] = await Promise.all([
+        fetch(`/api/v1/annotation/tasks/${encodeURIComponent(taskId)}`),
+        fetch(`/api/v1/annotation/ground-truth/${encodeURIComponent(taskId)}`),
+      ]);
+      if (!taskRes.ok) throw new Error("任务加载失败");
+      const { task } = await taskRes.json();
+      const gtData = (await gtRes.json().catch(() => ({}))) as { ground_truth?: Array<Record<string, unknown>> };
       if (requestVersion !== taskRequestVersion.current) return;
       await acquireForTask(taskId, "teaching");
       if (requestVersion !== taskRequestVersion.current) return;
-      setSelectedTaskData(task);
+      setSelectedTaskData({ ...task, ground_truth: Array.isArray(gtData?.ground_truth) ? gtData.ground_truth : [] });
       try {
         writeLastTaskFor(profileId || "", task.modal as AnnotationModeKey, taskId);
       } catch { /* ignore */ }
@@ -421,7 +427,17 @@ function AnnotationPageInner() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ task_id: taskId, mode: String(state.mode || "teaching"), stage: String(state.stage || "editing"), summary: state }),
     }).catch(() => undefined);
-  }, [selectedTask]);
+    // 实时同步给标注教练（前端共享状态，零延迟）
+    updateLiveState({
+      taskId,
+      annotationCount: Number(state.annotation_count || 0),
+      labels: Array.isArray(state.labels) ? (state.labels as string[]) : [],
+      selectedObjectId: String(state.selected_object_id || ""),
+      currentLabel: String(state.current_label || ""),
+      tool: String(state.tool || ""),
+      missingObjects: Array.isArray(state.missing_objects) ? (state.missing_objects as string[]) : [],
+    });
+  }, [selectedTask, updateLiveState]);
 
   const syncProfessionalResult = useCallback(async () => {
     if (!selectedTask || professionalSyncing) return;
@@ -591,8 +607,10 @@ function AnnotationPageInner() {
 
 export default function AnnotationPage() {
   return (
-    <Suspense fallback={null}>
-      <AnnotationPageInner />
-    </Suspense>
+    <AnnotationLiveStateProvider>
+      <Suspense fallback={null}>
+        <AnnotationPageInner />
+      </Suspense>
+    </AnnotationLiveStateProvider>
   );
 }

@@ -44,6 +44,7 @@ export type AnnotationTask = {
   labels?: string[];
   items?: Array<{ id: string | number; text: string }>;
   pre_annotation?: Array<Record<string, unknown>>;
+  ground_truth?: Array<Record<string, unknown>>;
 };
 
 type Props = {
@@ -500,6 +501,13 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
   }, [deleteIds, fitCanvas, handleRedo, handleUndo, labels, onChange, setTool, state.boxes, state.selectedIds]);
 
   const issues = useMemo(() => validateBoxes(state.boxes, bounds), [bounds, state.boxes]);
+  const missing = useMemo(() => {
+    const gtLabels = (task.ground_truth || [])
+      .filter((row) => row && row.label)
+      .map((row) => String(row.label));
+    const current = state.boxes.map((box) => box.label);
+    return [...new Set(gtLabels.filter((label) => !current.includes(label)))];
+  }, [state.boxes, task]);
   useEffect(() => {
     onInteractionState?.({
       annotation_count: state.boxes.length,
@@ -507,8 +515,9 @@ function BBoxEditor({ task, predictions, onChange, onImageSizeChange, onInteract
       current_label: state.activeLabel,
       tool,
       validation_issue_count: issues.length,
+      missing_objects: missing,
     });
-  }, [issues.length, onInteractionState, state.activeLabel, state.boxes.length, state.selectedIds, tool]);
+  }, [issues.length, missing, onInteractionState, state.activeLabel, state.boxes.length, state.selectedIds, tool]);
   return <div className="space-y-3">
     <BboxToolbar tool={tool} onToolChange={setTool} activeLabel={state.activeLabel} labels={labels} onActiveLabelChange={(label) => dispatch({ type: "set-active-label", label })} zoom={zoom} onZoomChange={(value) => setZoom(Math.min(3, Math.max(0.5, value)))} onFit={fitCanvas} canUndo={state.past.length > 0} canRedo={state.future.length > 0} hasSelection={state.selectedIds.length > 0} onUndo={handleUndo} onRedo={handleRedo} onDelete={() => state.selectedIds.length > 0 && deleteIds(state.selectedIds)} />
     {objListCollapsed && (
