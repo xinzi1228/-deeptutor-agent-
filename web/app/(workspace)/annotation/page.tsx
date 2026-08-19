@@ -196,7 +196,7 @@ function AnnotationPageInner() {
   }, [browserSessionId, chooseTask, mode, profileId, saveOwnedCheckpoint, selectedTask, tasks]);
 
   useEffect(() => {
-    fetch("/api/v1/annotation/tasks").then((res) => res.ok ? res.json() : Promise.reject()).then((data) => {
+    fetch("/api/v1/annotation/tasks?practice_only=true").then((res) => res.ok ? res.json() : Promise.reject()).then((data) => {
       setTasks(data.tasks || []);
     }).catch(() => undefined);
   }, []);

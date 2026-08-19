@@ -58,6 +58,8 @@ _REPORTERS = {
     "ner": annotation_check._ner_report,
 }
 
+PRACTICE_TASK_TYPES = {"bbox", "audio_event", "audio_transcription", "video_event", "video_tracking", "ner"}
+
 
 class ActivityRequest(BaseModel):
     task_id: str = Field(max_length=120)
@@ -529,14 +531,21 @@ async def ground_truth(task_id: str) -> dict[str, Any]:
 
 
 @router.get("/tasks")
-async def list_annotation_tasks() -> dict[str, Any]:
-    """Return safe task summaries for the learner-owned annotation workbench."""
+async def list_annotation_tasks(practice_only: bool = False) -> dict[str, Any]:
+    """Return safe task summaries for the learner-owned annotation workbench.
+
+    ``practice_only`` keeps only hands-on annotation tasks (bbox/audio/video/ner);
+    theory tasks (classification/judgment/standard/error_case) belong to the chat.
+    """
     tasks = []
     for task_id, task in _task_bank().items():
+        task_type = task.get("type", "bbox")
+        if practice_only and task_type not in PRACTICE_TASK_TYPES:
+            continue
         tasks.append({
             "id": task_id,
             "title": task.get("title", task_id),
-            "type": task.get("type", "bbox"),
+            "type": task_type,
             "modal": task.get("modal", "image"),
             "difficulty": task.get("difficulty", ""),
             "instruction": task.get("instruction", ""),
